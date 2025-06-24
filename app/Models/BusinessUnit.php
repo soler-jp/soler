@@ -41,4 +41,10 @@ class BusinessUnit extends Model
     {
         return $this->hasMany(FiscalYear::class);
     }
+
+    public function accounts()
+    {
+        return $this->hasMany(Account::class);
+    }
+
 }
