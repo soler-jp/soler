@@ -140,4 +140,24 @@ class BusinessUnit extends Model
     {
         return $this->accounts()->create($attributes);
     }
+
+    /**
+     * FiscalYearを作成するヘルパーメソッド
+     * 
+     *  @param int $year
+     * @return FiscalYear
+     */
+    public function createFiscalYear(int $year): FiscalYear
+    {
+
+        $hasActive = $this->fiscalYears()->where('is_active', true)->exists();
+
+        return $this->fiscalYears()->create([
+            'year' => $year,
+            'start_date' => "$year-01-01",
+            'end_date' => "$year-12-31",
+            'is_closed' => false,
+            'is_active' => !$hasActive,  // まだなければtrueにする
+        ]);
+    }
 }
