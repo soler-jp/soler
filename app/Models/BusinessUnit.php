@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class BusinessUnit extends Model
 {
@@ -47,4 +48,96 @@ class BusinessUnit extends Model
         return $this->hasMany(Account::class);
     }
 
+    // 初期勘定科目リスト
+    public static array $defaultAccounts = [
+        // 資産（asset）
+        ['name' => '現金', 'type' => Account::TYPE_ASSET],
+        ['name' => '当座預金', 'type' => Account::TYPE_ASSET],
+        ['name' => '定期預金', 'type' => Account::TYPE_ASSET],
+        ['name' => 'その他の預金', 'type' => Account::TYPE_ASSET],
+        ['name' => '受取手形', 'type' => Account::TYPE_ASSET],
+        ['name' => '売掛金', 'type' => Account::TYPE_ASSET],
+        ['name' => '有価証券', 'type' => Account::TYPE_ASSET],
+        ['name' => '棚卸資産', 'type' => Account::TYPE_ASSET],
+        ['name' => '前払金', 'type' => Account::TYPE_ASSET],
+        ['name' => '貸付金', 'type' => Account::TYPE_ASSET],
+        ['name' => '建物', 'type' => Account::TYPE_ASSET],
+        ['name' => '建物附属設備', 'type' => Account::TYPE_ASSET],
+        ['name' => '機械装置', 'type' => Account::TYPE_ASSET],
+        ['name' => '車両運搬具', 'type' => Account::TYPE_ASSET],
+        ['name' => '工具器具備品', 'type' => Account::TYPE_ASSET],
+        ['name' => '土地', 'type' => Account::TYPE_ASSET],
+        ['name' => '期首商品（棚卸高）', 'type' => Account::TYPE_ASSET],
+        ['name' => '期末商品（棚卸高）', 'type' => Account::TYPE_ASSET],
+
+        // 負債（liability）
+        ['name' => '支払手形', 'type' => Account::TYPE_LIABILITY],
+        ['name' => '買掛金', 'type' => Account::TYPE_LIABILITY],
+        ['name' => '借入金', 'type' => Account::TYPE_LIABILITY],
+        ['name' => '未払金', 'type' => Account::TYPE_LIABILITY],
+        ['name' => '前受金', 'type' => Account::TYPE_LIABILITY],
+        ['name' => '預り金', 'type' => Account::TYPE_LIABILITY],
+
+        // 資本（equity）
+        ['name' => '事業主借', 'type' => Account::TYPE_EQUITY],
+        ['name' => '事業主貸', 'type' => Account::TYPE_EQUITY],
+        ['name' => '元入金', 'type' => Account::TYPE_EQUITY],
+
+        // 収益（revenue）
+        ['name' => '売上高', 'type' => Account::TYPE_REVENUE],
+        ['name' => '雑収入', 'type' => Account::TYPE_REVENUE],
+        ['name' => '家事消費等', 'type' => Account::TYPE_REVENUE],
+
+        // 費用（expense）
+        ['name' => '仕入金額', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '租税公課', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '荷造運賃', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '水道光熱費', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '旅費交通費', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '通信費', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '広告宣伝費', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '接待交際費', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '損害保険料', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '修繕費', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '消耗品費', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '減価償却費', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '福利厚生費', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '給料賃金', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '外注工賃', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '利子割引料', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '地代家賃', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '貸倒金', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '雑費', 'type' => Account::TYPE_EXPENSE],
+    ];
+
+    /**
+     * BusinessUnitを作成し、標準勘定科目も同時に登録する
+     *
+     * @param array $attributes
+     * @return self
+     */
+    public static function createWithDefaultAccounts(array $attributes): self
+    {
+        return DB::transaction(function () use ($attributes) {
+            $businessUnit = self::create($attributes);
+
+            foreach (self::$defaultAccounts as $account) {
+                $businessUnit->createAccount($account);
+            }
+
+            return $businessUnit;
+        });
+    }
+
+
+    /**
+     * BusinessUnitに紐づくアカウントを作成するヘルパーメソッド
+     *
+     * @param array $attributes
+     * @return Account
+     */
+    public function createAccount(array $attributes): Account
+    {
+        return $this->accounts()->create($attributes);
+    }
 }

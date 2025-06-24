@@ -19,7 +19,7 @@ class BusinessUnitTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $unit = $user->createBusinessUnit([
+        $unit = $user->createBusinessUnitWithDefaults([
             'name' => '農業事業',
             'type' => BusinessUnit::TYPE_AGRICULTURE,
         ]);
@@ -67,12 +67,34 @@ class BusinessUnitTest extends TestCase
     public function userとのリレーションが正しく機能する()
     {
         $user = User::factory()->create();
-        $unit = $user->createBusinessUnit([
+        $unit = $user->createBusinessUnitWithDefaults([
             'name' => '不動産管理',
             'type' => BusinessUnit::TYPE_REAL_ESTATE,
         ]);
 
         $this->assertInstanceOf(User::class, $unit->user);
         $this->assertEquals($user->id, $unit->user->id);
+    }
+
+    #[Test]
+    public function createWithDefaultAccountsは標準勘定科目を登録する()
+    {
+        $user = User::factory()->create();
+
+        $businessUnit = BusinessUnit::createWithDefaultAccounts([
+            'user_id' => $user->id,
+            'name' => '新規事業',
+            'type' => BusinessUnit::TYPE_GENERAL,
+        ]);
+
+        $this->assertDatabaseHas('business_units', ['id' => $businessUnit->id, 'name' => '新規事業']);
+
+        foreach (BusinessUnit::$defaultAccounts as $account) {
+            $this->assertDatabaseHas('accounts', [
+                'business_unit_id' => $businessUnit->id,
+                'name' => $account['name'],
+                'type' => $account['type'],
+            ]);
+        }
     }
 }

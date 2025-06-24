@@ -53,8 +53,10 @@ class User extends Authenticatable
         return $this->hasMany(BusinessUnit::class);
     }
 
-    public function createBusinessUnit(array $attributes): BusinessUnit
+    public function createBusinessUnitWithDefaults(array $attributes): BusinessUnit
     {
-        return $this->businessUnits()->create($attributes);
+        return BusinessUnit::createWithDefaultAccounts(
+            array_merge($attributes, ['user_id' => $this->id])
+        );
     }
 }
