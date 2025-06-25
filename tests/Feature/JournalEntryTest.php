@@ -9,6 +9,8 @@ use PHPUnit\Framework\Attributes\Test;
 use App\Validators\JournalEntryValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use App\Models\User;
+use App\Services\TransactionRegistrar;
 
 class JournalEntryTest extends TestCase
 {
@@ -254,5 +256,118 @@ class JournalEntryTest extends TestCase
 
         $this->expectNotToPerformAssertions();
         JournalEntryValidator::validate($data, true);
+    }
+
+
+    #[Test]
+    public function 同一勘定科目に複数の補助科目を使って取引を登録できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $account = $unit->accounts()
+            ->where('name', 'その他の預金')
+            ->firstOrFail();
+
+        $subA = $account->createSubAccount(['name' => '口座A']);
+        $subB = $account->createSubAccount(['name' => '口座B']);
+        $subC = $account->createSubAccount(['name' => '口座C']);
+
+        $equityAccount = $unit->accounts()->where('type', 'equity')->first();
+
+        $registrar = app(TransactionRegistrar::class);
+
+        $registrar->register(
+            $fiscalYear,
+            [
+                'date' => '2025-03-01',
+                'description' => '口座Aへの入金',
+            ],
+            [
+                [
+                    'account_id' => $account->id,
+                    'sub_account_id' => $subA->id,
+                    'type' => 'debit',
+                    'amount' => 10000,
+                    'tax_amount' => 0,
+                    'tax_type' => 'non_taxable',
+                ],
+                [
+                    'account_id' => $equityAccount->id,
+                    'type' => 'credit',
+                    'amount' => 10000,
+                    'tax_amount' => 0,
+                    'tax_type' => 'non_taxable',
+                ],
+            ]
+        );
+
+        $registrar->register(
+            $fiscalYear,
+            [
+                'date' => '2025-03-02',
+                'description' => '口座Bへの入金',
+            ],
+            [
+                [
+                    'account_id' => $account->id,
+                    'sub_account_id' => $subB->id,
+                    'type' => 'debit',
+                    'amount' => 20000,
+                    'tax_amount' => 0,
+                    'tax_type' => 'non_taxable',
+                ],
+                [
+                    'account_id' => $equityAccount->id,
+                    'type' => 'credit',
+                    'amount' => 20000,
+                    'tax_amount' => 0,
+                    'tax_type' => 'non_taxable',
+                ],
+            ]
+        );
+
+        $registrar->register(
+            $fiscalYear,
+            [
+                'date' => '2025-03-03',
+                'description' => '口座Cへの入金',
+            ],
+            [
+                [
+                    'account_id' => $account->id,
+                    'sub_account_id' => $subC->id,
+                    'type' => 'debit',
+                    'amount' => 30000,
+                    'tax_amount' => 0,
+                    'tax_type' => 'non_taxable',
+                ],
+                [
+                    'account_id' => $equityAccount->id,
+                    'type' => 'credit',
+                    'amount' => 30000,
+                    'tax_amount' => 0,
+                    'tax_type' => 'non_taxable',
+                ],
+            ]
+        );
+
+        $this->assertSame(3, $account->journalEntries()->count());
+
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $subA->id,
+            'amount' => 10000,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $subB->id,
+            'amount' => 20000,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $subC->id,
+            'amount' => 30000,
+        ]);
     }
 }

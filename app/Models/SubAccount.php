@@ -13,7 +13,6 @@ class SubAccount extends Model
     use HasFactory;
 
     protected $fillable = [
-        'business_unit_id',
         'account_id',
         'name',
     ];
