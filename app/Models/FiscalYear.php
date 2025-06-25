@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Services\TransactionRegistrar;
+use App\Models\Transaction;
 
 class FiscalYear extends Model
 {
@@ -29,5 +31,15 @@ class FiscalYear extends Model
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function registerTransaction(
+        array $transactionData,
+        array $journalEntriesData,
+        ?TransactionRegistrar $registrar = null
+    ): Transaction {
+        $registrar ??= app(TransactionRegistrar::class);
+
+        return $registrar->register($this, $transactionData, $journalEntriesData);
     }
 }
