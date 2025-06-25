@@ -344,4 +344,186 @@ class TransactionRegistrarTest extends TestCase
             'description' => 'tax_amount込みバランステスト',
         ]);
     }
+
+    #[Test]
+    public function tax_amountが不整合でバランスが崩れる場合は登録できない()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        $debitAccount = Account::factory()->create();
+        $creditAccount = Account::factory()->create();
+
+        $registrar = new TransactionRegistrar();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => 'tax_amount不整合によるバランスエラー',
+        ];
+
+        $journalEntriesData = [
+            [
+                'account_id' => $debitAccount->id,
+                'type' => 'debit',
+                'amount' => 5000,
+                'tax_amount' => 500,
+                'tax_type' => 'taxable_purchases_10',
+            ],
+            [
+                'account_id' => $creditAccount->id,
+                'type' => 'credit',
+                'amount' => 5400,
+                'tax_amount' => 0,
+                'tax_type' => 'non_taxable',
+            ],
+        ];
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('仕訳の金額がバランスしていません');
+
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function tax_amountがマイナスだと登録できない()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        $debitAccount = Account::factory()->create();
+        $creditAccount = Account::factory()->create();
+
+        $registrar = new TransactionRegistrar();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => 'マイナス税額',
+        ];
+
+        $journalEntriesData = [
+            [
+                'account_id' => $debitAccount->id,
+                'type' => 'debit',
+                'amount' => 5000,
+                'tax_amount' => -100,
+                'tax_type' => 'taxable_purchases_10',
+            ],
+            [
+                'account_id' => $creditAccount->id,
+                'type' => 'credit',
+                'amount' => 4900,
+                'tax_amount' => 0,
+                'tax_type' => 'non_taxable',
+            ],
+        ];
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('tax_amount');
+
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function tax_amountがnullでも登録できる()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        $debitAccount = Account::factory()->create();
+        $creditAccount = Account::factory()->create();
+
+        $registrar = new TransactionRegistrar();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => 'tax_amount null 許容',
+        ];
+
+        $journalEntriesData = [
+            [
+                'account_id' => $debitAccount->id,
+                'type' => 'debit',
+                'amount' => 3000,
+                'tax_amount' => null,
+                'tax_type' => 'non_taxable',
+            ],
+            [
+                'account_id' => $creditAccount->id,
+                'type' => 'credit',
+                'amount' => 3000,
+                'tax_amount' => null,
+                'tax_type' => 'non_taxable',
+            ],
+        ];
+
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $transaction->id,
+            'description' => 'tax_amount null 許容',
+        ]);
+    }
+
+    #[Test]
+    public function tax_typeのみ指定してtax_amountが未指定だと登録できない()
+    {
+        $this->expectException(ValidationException::class);
+
+        $fiscalYear = FiscalYear::factory()->create();
+        $account = Account::factory()->create();
+
+        $registrar = new TransactionRegistrar();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => 'tax_typeのみ指定',
+        ];
+
+        $journalEntriesData = [
+            [
+                'account_id' => $account->id,
+                'type' => 'debit',
+                'amount' => 1000,
+                'tax_type' => 'taxable_purchases_10',
+            ],
+            [
+                'account_id' => $account->id,
+                'type' => 'credit',
+                'amount' => 1000,
+            ],
+        ];
+
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function tax_amountが片方だけ指定された場合もバランスが取れていれば登録できる()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        $debitAccount = Account::factory()->create();
+        $creditAccount = Account::factory()->create();
+
+        $registrar = new TransactionRegistrar();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => 'tax_amount片側のみ',
+        ];
+
+        $journalEntriesData = [
+            [
+                'account_id' => $debitAccount->id,
+                'type' => 'debit',
+                'amount' => 4500,
+                'tax_amount' => 500,
+                'tax_type' => 'taxable_purchases_10',
+            ],
+            [
+                'account_id' => $creditAccount->id,
+                'type' => 'credit',
+                'amount' => 5000,
+            ],
+        ];
+
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $transaction->id,
+            'description' => 'tax_amount片側のみ',
+        ]);
+    }
 }
