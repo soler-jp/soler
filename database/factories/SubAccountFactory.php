@@ -5,9 +5,9 @@ namespace Database\Factories;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Account>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\SubAccount>
  */
-class AccountFactory extends Factory
+class SubAccountFactory extends Factory
 {
     /**
      * Define the model's default state.
@@ -17,9 +17,9 @@ class AccountFactory extends Factory
     public function definition(): array
     {
         return [
-            'business_unit_id' => \App\Models\BusinessUnit::factory(),
+            'account_id' => \App\Models\Account::factory(),
             'name' => $this->faker->word,
-            'type' => $this->faker->randomElement(['asset', 'liability', 'equity', 'revenue', 'expense']),
         ];
     }
 }
+// 
