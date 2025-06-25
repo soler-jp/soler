@@ -42,16 +42,17 @@ class TransactionRegistrar
         }
 
         // ドメインロジック: 仕訳の金額がバランスしているか確認
-        $totalDebit = collect($journalEntriesData)
-            ->where('type', 'debit')
-            ->sum('amount');
-
-        $totalCredit = collect($journalEntriesData)
-            ->where('type', 'credit')
-            ->sum('amount');
+        $totalDebit = $this->totalWithTax(array_filter($journalEntriesData, fn($e) => $e['type'] === 'debit'));
+        $totalCredit = $this->totalWithTax(array_filter($journalEntriesData, fn($e) => $e['type'] === 'credit'));
 
         if ($totalDebit !== $totalCredit) {
-            throw new \DomainException('仕訳の金額がバランスしていません。');
+            $diff = $totalDebit - $totalCredit;
+            throw new \DomainException(sprintf(
+                '仕訳の金額がバランスしていません（借方: %d / 貸方: %d / 差額: %+d）',
+                $totalDebit,
+                $totalCredit,
+                $diff
+            ));
         }
 
         return DB::transaction(function () use ($transactionData, $journalEntriesData) {
@@ -64,5 +65,11 @@ class TransactionRegistrar
 
             return $transaction;
         });
+    }
+
+
+    function totalWithTax(array $entries): int
+    {
+        return collect($entries)->sum(fn($e) => (int) ($e['amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
     }
 }

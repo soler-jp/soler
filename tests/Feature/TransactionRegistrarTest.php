@@ -137,7 +137,7 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage('仕訳の金額がバランスしていません。');
+        $this->expectExceptionMessage('仕訳の金額がバランスしていません（借方: 1000 / 貸方: 800 / 差額: +200）');
 
         $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
     }
@@ -302,5 +302,46 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+
+
+    #[Test]
+    public function tax_amount込みでもバランスが正しければ登録できる()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        $debitAccount = Account::factory()->create();
+        $creditAccount = Account::factory()->create();
+
+        $registrar = new TransactionRegistrar();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => 'tax_amount込みバランステスト',
+        ];
+
+        $journalEntriesData = [
+            [
+                'account_id' => $debitAccount->id,
+                'type' => 'debit',
+                'amount' => 5000,
+                'tax_amount' => 500,
+                'tax_type' => 'taxable_purchases_10',
+            ],
+            [
+                'account_id' => $creditAccount->id,
+                'type' => 'credit',
+                'amount' => 5500,
+                'tax_amount' => 0,
+                'tax_type' => 'non_taxable',
+            ],
+        ];
+
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $transaction->id,
+            'description' => 'tax_amount込みバランステスト',
+        ]);
     }
 }
