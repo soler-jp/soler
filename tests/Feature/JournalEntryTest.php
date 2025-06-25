@@ -4,26 +4,15 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\Transaction;
-use App\Models\SubAccount;
-use Illuminate\Support\Facades\Validator;
 use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use App\Validators\JournalEntryValidator;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 
 class JournalEntryTest extends TestCase
 {
-    private function getValidator(array $data)
-    {
-        return Validator::make($data, [
-            'transaction_id' => ['required', 'exists:transactions,id'],
-            'account_id' => ['required', 'exists:accounts,id'],
-            'sub_account_id' => ['nullable', 'exists:sub_accounts,id'],
-            'type' => ['required', 'in:debit,credit'],
-            'amount' => ['required', 'integer', 'min:1'],
-            'tax_amount' => ['nullable', 'integer', 'min:0'],
-            'tax_type' => ['nullable', 'in:taxable_sales_10,taxable_sales_8,taxable_purchases_10,non_taxable,tax_free'],
-            'is_effective' => ['boolean'],
-        ]);
-    }
+    use RefreshDatabase;
 
     #[Test]
     public function 正しいデータでバリデーションが通る()
@@ -37,23 +26,41 @@ class JournalEntryTest extends TestCase
             'type' => 'debit',
             'amount' => 1000,
         ];
-        $this->assertTrue($this->getValidator($data)->passes());
+
+        $this->expectNotToPerformAssertions();
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
     public function transaction_idがnullの場合はバリデーションエラー()
     {
         Account::factory()->create();
-        $data = ['transaction_id' => null, 'account_id' => 1, 'type' => 'debit', 'amount' => 1000];
-        $this->assertTrue($this->getValidator($data)->fails());
+
+        $data = [
+            'transaction_id' => null,
+            'account_id' => 1,
+            'type' => 'debit',
+            'amount' => 1000,
+        ];
+
+        $this->expectException(ValidationException::class);
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
     public function account_idがnullの場合はバリデーションエラー()
     {
         Transaction::factory()->create();
-        $data = ['transaction_id' => 1, 'account_id' => null, 'type' => 'debit', 'amount' => 1000];
-        $this->assertTrue($this->getValidator($data)->fails());
+
+        $data = [
+            'transaction_id' => 1,
+            'account_id' => null,
+            'type' => 'debit',
+            'amount' => 1000,
+        ];
+
+        $this->expectException(ValidationException::class);
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
@@ -61,8 +68,16 @@ class JournalEntryTest extends TestCase
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
-        $data = ['transaction_id' => $transaction->id, 'account_id' => $account->id, 'type' => null, 'amount' => 1000];
-        $this->assertTrue($this->getValidator($data)->fails());
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
+            'type' => null,
+            'amount' => 1000,
+        ];
+
+        $this->expectException(ValidationException::class);
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
@@ -70,8 +85,16 @@ class JournalEntryTest extends TestCase
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
-        $data = ['transaction_id' => $transaction->id, 'account_id' => $account->id, 'type' => 'debit', 'amount' => null];
-        $this->assertTrue($this->getValidator($data)->fails());
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
+            'type' => 'debit',
+            'amount' => null,
+        ];
+
+        $this->expectException(ValidationException::class);
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
@@ -79,8 +102,16 @@ class JournalEntryTest extends TestCase
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
-        $data = ['transaction_id' => $transaction->id, 'account_id' => $account->id, 'type' => 'invalid', 'amount' => 1000];
-        $this->assertTrue($this->getValidator($data)->fails());
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
+            'type' => 'invalid',
+            'amount' => 1000,
+        ];
+
+        $this->expectException(ValidationException::class);
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
@@ -88,8 +119,16 @@ class JournalEntryTest extends TestCase
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
-        $data = ['transaction_id' => $transaction->id, 'account_id' => $account->id, 'type' => 'debit', 'amount' => 0];
-        $this->assertTrue($this->getValidator($data)->fails());
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
+            'type' => 'debit',
+            'amount' => 0,
+        ];
+
+        $this->expectException(ValidationException::class);
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
@@ -97,8 +136,17 @@ class JournalEntryTest extends TestCase
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
-        $data = ['transaction_id' => $transaction->id, 'account_id' => $account->id, 'type' => 'debit', 'amount' => 1000, 'tax_amount' => -100];
-        $this->assertTrue($this->getValidator($data)->fails());
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
+            'type' => 'debit',
+            'amount' => 1000,
+            'tax_amount' => -100,
+        ];
+
+        $this->expectException(ValidationException::class);
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
@@ -106,8 +154,17 @@ class JournalEntryTest extends TestCase
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
-        $data = ['transaction_id' => $transaction->id, 'account_id' => $account->id, 'type' => 'debit', 'amount' => 1000, 'tax_type' => 'wrong'];
-        $this->assertTrue($this->getValidator($data)->fails());
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
+            'type' => 'debit',
+            'amount' => 1000,
+            'tax_type' => 'wrong',
+        ];
+
+        $this->expectException(ValidationException::class);
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
@@ -115,8 +172,17 @@ class JournalEntryTest extends TestCase
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
-        $data = ['transaction_id' => $transaction->id, 'account_id' => $account->id, 'type' => 'debit', 'amount' => 1000, 'is_effective' => 'yes'];
-        $this->assertTrue($this->getValidator($data)->fails());
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
+            'type' => 'debit',
+            'amount' => 1000,
+            'is_effective' => 'yes',
+        ];
+
+        $this->expectException(ValidationException::class);
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
@@ -124,8 +190,17 @@ class JournalEntryTest extends TestCase
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
-        $data = ['transaction_id' => $transaction->id, 'account_id' => $account->id, 'type' => 'debit', 'amount' => 1000, 'sub_account_id' => null];
-        $this->assertTrue($this->getValidator($data)->passes());
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
+            'type' => 'debit',
+            'amount' => 1000,
+            'sub_account_id' => null,
+        ];
+
+        $this->expectNotToPerformAssertions();
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
@@ -133,8 +208,17 @@ class JournalEntryTest extends TestCase
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
-        $data = ['transaction_id' => $transaction->id, 'account_id' => $account->id, 'type' => 'debit', 'amount' => 1000, 'tax_amount' => null];
-        $this->assertTrue($this->getValidator($data)->passes());
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
+            'type' => 'debit',
+            'amount' => 1000,
+            'tax_amount' => null,
+        ];
+
+        $this->expectNotToPerformAssertions();
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
@@ -142,8 +226,17 @@ class JournalEntryTest extends TestCase
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
-        $data = ['transaction_id' => $transaction->id, 'account_id' => $account->id, 'type' => 'debit', 'amount' => 1000, 'tax_type' => null];
-        $this->assertTrue($this->getValidator($data)->passes());
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
+            'type' => 'debit',
+            'amount' => 1000,
+            'tax_type' => null,
+        ];
+
+        $this->expectNotToPerformAssertions();
+        JournalEntryValidator::validate($data);
     }
 
     #[Test]
@@ -151,7 +244,15 @@ class JournalEntryTest extends TestCase
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
-        $data = ['transaction_id' => $transaction->id, 'account_id' => $account->id, 'type' => 'debit', 'amount' => 1000];
-        $this->assertTrue($this->getValidator($data)->passes());
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
+            'type' => 'debit',
+            'amount' => 1000,
+        ];
+
+        $this->expectNotToPerformAssertions();
+        JournalEntryValidator::validate($data);
     }
 }
