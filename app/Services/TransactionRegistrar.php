@@ -33,9 +33,12 @@ class TransactionRegistrar
         $transactionData['fiscal_year_id'] = $fiscalYear->id;
         $transactionData = TransactionValidator::validate($transactionData);
 
+        $validatedEntries = [];
+
         foreach ($journalEntriesData as $entry) {
-            JournalEntryValidator::validate($entry, false);
+            $validatedEntries[] = JournalEntryValidator::validate($entry, false);
         }
+
 
         if (empty($journalEntriesData)) {
             throw new \InvalidArgumentException('仕訳データが空です。');
@@ -55,10 +58,10 @@ class TransactionRegistrar
             ));
         }
 
-        return DB::transaction(function () use ($transactionData, $journalEntriesData) {
+        return DB::transaction(function () use ($transactionData, $validatedEntries) {
             $transaction = Transaction::create(TransactionValidator::validate($transactionData));
 
-            foreach ($journalEntriesData as $entry) {
+            foreach ($validatedEntries as $entry) {
                 $entry['transaction_id'] = $transaction->id;
                 $transaction->journalEntries()->create($entry);
             }

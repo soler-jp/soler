@@ -376,7 +376,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ];
 
-        $this->expectException(DomainException::class);
+        $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('仕訳の金額がバランスしていません');
 
         $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -414,14 +414,18 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('tax_amount');
+        $this->expectExceptionMessage('消費税額');
 
         $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
     }
 
     #[Test]
-    public function tax_amountがnullでも登録できる()
+    public function tax_typeが記述していて、tax_amountがnullだと登録できない()
     {
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('消費税額');
+
         $fiscalYear = FiscalYear::factory()->create();
         $debitAccount = Account::factory()->create();
         $creditAccount = Account::factory()->create();
@@ -459,35 +463,42 @@ class TransactionRegistrarTest extends TestCase
     }
 
     #[Test]
-    public function tax_typeのみ指定してtax_amountが未指定だと登録できない()
+    public function tax_typeを記述していて、tax_amountが0だと登録できる()
     {
-        $this->expectException(ValidationException::class);
-
         $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
+        $debitAccount = Account::factory()->create();
+        $creditAccount = Account::factory()->create();
 
         $registrar = new TransactionRegistrar();
 
         $transactionData = [
             'date' => now()->toDateString(),
-            'description' => 'tax_typeのみ指定',
+            'description' => 'tax_amount null 許容',
         ];
 
         $journalEntriesData = [
             [
-                'account_id' => $account->id,
+                'account_id' => $debitAccount->id,
                 'type' => 'debit',
-                'amount' => 1000,
-                'tax_type' => 'taxable_purchases_10',
+                'amount' => 3000,
+                'tax_amount' => 0,
+                'tax_type' => 'non_taxable',
             ],
             [
-                'account_id' => $account->id,
+                'account_id' => $creditAccount->id,
                 'type' => 'credit',
-                'amount' => 1000,
+                'amount' => 3000,
+                'tax_amount' => 0,
+                'tax_type' => 'non_taxable',
             ],
         ];
 
-        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $transaction->id,
+            'description' => 'tax_amount null 許容',
+        ]);
     }
 
     #[Test]
