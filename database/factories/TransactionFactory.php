@@ -17,7 +17,8 @@ class TransactionFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'fiscal_year_id' => \App\Models\FiscalYear::factory(),
+            'date' => $this->faker->dateTimeBetween('-1 year', 'now')->format('Y-m-d'),
         ];
     }
 }

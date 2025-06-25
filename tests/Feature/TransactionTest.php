@@ -16,6 +16,36 @@ class TransactionTest extends TestCase
 
     use RefreshDatabase;
 
+
+    //////////
+    // Factory のテスト
+    //////////
+
+    #[Test]
+    public function factoryでTransactionをmakeできる()
+    {
+        $transaction = Transaction::factory()->make();
+
+        $this->assertInstanceOf(Transaction::class, $transaction);
+        $this->assertNotNull($transaction->fiscal_year_id);
+        $this->assertNotNull($transaction->business_unit_id);
+        $this->assertNotNull($transaction->created_by);
+        $this->assertIsString($transaction->description);
+        $this->assertNotNull($transaction->recorded_on);
+    }
+
+    #[Test]
+    public function factoryでTransactionをcreateできる()
+    {
+        $transaction = Transaction::factory()->create();
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $transaction->id,
+        ]);
+    }
+
+    ///////////////////////////
+
     #[Test]
     public function 正しいデータでバリデーションが通る()
     {
