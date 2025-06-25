@@ -4,6 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\BusinessUnit;
+use App\Models\SubAccount;
+use App\Models\JournalEntry;
 
 class Account extends Model
 {
@@ -33,5 +36,24 @@ class Account extends Model
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function subAccounts()
+    {
+        return $this->hasMany(SubAccount::class);
+    }
+
+    public function journalEntries()
+    {
+        return $this->hasMany(JournalEntry::class);
+    }
+
+    public function createSubAccount(array $attributes): SubAccount
+    {
+        if (empty($attributes['name'])) {
+            throw new \InvalidArgumentException('name は必須です。');
+        }
+
+        return $this->subAccounts()->create($attributes);
     }
 }
