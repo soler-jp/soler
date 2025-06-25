@@ -19,6 +19,7 @@ class TransactionFactory extends Factory
         return [
             'fiscal_year_id' => \App\Models\FiscalYear::factory(),
             'date' => $this->faker->dateTimeBetween('-1 year', 'now')->format('Y-m-d'),
+            'created_by' => \App\Models\User::factory(),
         ];
     }
 }

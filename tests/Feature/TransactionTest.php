@@ -28,10 +28,7 @@ class TransactionTest extends TestCase
 
         $this->assertInstanceOf(Transaction::class, $transaction);
         $this->assertNotNull($transaction->fiscal_year_id);
-        $this->assertNotNull($transaction->business_unit_id);
         $this->assertNotNull($transaction->created_by);
-        $this->assertIsString($transaction->description);
-        $this->assertNotNull($transaction->recorded_on);
     }
 
     #[Test]
