@@ -320,4 +320,150 @@ class GeneralLedgerServiceTest extends TestCase
         $this->assertIsArray($ledger);
         $this->assertCount(0, $ledger);
     }
+
+    #[Test]
+    public function 補助科目に紐づく仕訳のみがLedgerに表示される()
+    {
+        $user = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業',
+        ]);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $account = $unit->getAccountByName('現金');
+        $subAccountA = $account->subAccounts()->create(['name' => 'レジ']);
+        $subAccountB = $account->subAccounts()->create(['name' => '金庫']);
+
+        $otherAccount = $unit->getAccountByName('事業主借');
+
+        $registrar = new TransactionRegistrar();
+
+        // レジ（対象）
+        $registrar->register(
+            fiscalYear: $fiscalYear,
+            transactionData: [
+                'date' => '2025-01-01',
+                'description' => 'レジに入金',
+            ],
+            journalEntriesData: [
+                [
+                    'account_id' => $account->id,
+                    'sub_account_id' => $subAccountA->id,
+                    'type' => 'debit',
+                    'amount' => 10000,
+                ],
+                [
+                    'account_id' => $otherAccount->id,
+                    'type' => 'credit',
+                    'amount' => 10000,
+                ],
+            ]
+        );
+
+        // 金庫（除外対象）
+        $registrar->register(
+            fiscalYear: $fiscalYear,
+            transactionData: [
+                'date' => '2025-01-02',
+                'description' => '金庫に入金',
+            ],
+            journalEntriesData: [
+                [
+                    'account_id' => $account->id,
+                    'sub_account_id' => $subAccountB->id,
+                    'type' => 'debit',
+                    'amount' => 5000,
+                ],
+                [
+                    'account_id' => $otherAccount->id,
+                    'type' => 'credit',
+                    'amount' => 5000,
+                ],
+            ]
+        );
+
+        $ledger = (new GeneralLedgerService())->generateForSubAccount($subAccountA, $fiscalYear);
+
+        $this->assertCount(1, $ledger);
+        $this->assertSame('2025-01-01', $ledger[0]['date']);
+        $this->assertSame('レジに入金', $ledger[0]['description']);
+        $this->assertSame(10000, $ledger[0]['debit']);
+        $this->assertNull($ledger[0]['credit']);
+        $this->assertSame(10000, $ledger[0]['balance']);
+    }
+
+
+    #[Test]
+    public function 現金出納帳が現金勘定の仕訳のみを返す()
+    {
+        $user = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業',
+        ]);
+
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $cash = $unit->getAccountByName('現金');
+        $other = $unit->getAccountByName('事業主借');
+
+        $registrar = new TransactionRegistrar();
+
+        // 1. 現金が借方
+        $registrar->register(
+            fiscalYear: $fiscalYear,
+            transactionData: [
+                'date' => '2025-01-05',
+                'description' => '現金の出資',
+            ],
+            journalEntriesData: [
+                [
+                    'account_id' => $cash->id,
+                    'type' => 'debit',
+                    'amount' => 30000,
+                ],
+                [
+                    'account_id' => $other->id,
+                    'type' => 'credit',
+                    'amount' => 30000,
+                ],
+            ]
+        );
+
+        // 2. 現金が貸方
+        $registrar->register(
+            fiscalYear: $fiscalYear,
+            transactionData: [
+                'date' => '2025-01-10',
+                'description' => '現金支出',
+            ],
+            journalEntriesData: [
+                [
+                    'account_id' => $cash->id,
+                    'type' => 'credit',
+                    'amount' => 10000,
+                ],
+                [
+                    'account_id' => $other->id,
+                    'type' => 'debit',
+                    'amount' => 10000,
+                ],
+            ]
+        );
+
+        $cashbook = (new GeneralLedgerService())->generateCashbook($fiscalYear);
+
+        $this->assertCount(2, $cashbook);
+
+        $this->assertSame('2025-01-05', $cashbook[0]['date']);
+        $this->assertSame(30000, $cashbook[0]['debit']);
+        $this->assertNull($cashbook[0]['credit']);
+        $this->assertSame(30000, $cashbook[0]['balance']);
+
+        $this->assertSame('2025-01-10', $cashbook[1]['date']);
+        $this->assertNull($cashbook[1]['debit']);
+        $this->assertSame(10000, $cashbook[1]['credit']);
+        $this->assertSame(20000, $cashbook[1]['balance']);
+    }
 }
