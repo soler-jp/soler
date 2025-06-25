@@ -160,4 +160,9 @@ class BusinessUnit extends Model
             'is_active' => !$hasActive,  // まだなければtrueにする
         ]);
     }
+
+    public function getAccountByName(string $name): ?Account
+    {
+        return $this->accounts()->where('name', $name)->first();
+    }
 }

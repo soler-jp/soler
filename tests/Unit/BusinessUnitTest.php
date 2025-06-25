@@ -97,4 +97,33 @@ class BusinessUnitTest extends TestCase
             ]);
         }
     }
+
+    #[Test]
+    public function nameでAccountを取得できる()
+    {
+        $user = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業',
+        ]);
+
+        $account = $unit->getAccountByName('その他の預金');
+
+        $this->assertNotNull($account);
+        $this->assertSame('その他の預金', $account->name);
+    }
+
+    #[Test]
+    public function 存在しないnameを指定した場合nullが返る()
+    {
+        $user = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業',
+        ]);
+
+        $account = $unit->getAccountByName('架空勘定');
+
+        $this->assertNull($account);
+    }
 }
