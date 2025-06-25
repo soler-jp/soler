@@ -13,19 +13,18 @@ class JournalEntryValidator
      * @return array 検証済みデータ
      * @throws ValidationException バリデーションエラー時
      */
-    public static function validate(array $data): array
+    public static function validate(array $data, $requireTransactionId): array
     {
-        return Validator::make($data, self::rules(), [], self::attributes())
+        return Validator::make($data, self::rules($requireTransactionId), [], self::attributes())
             ->validate();
     }
 
     /**
      * バリデーションルール
      */
-    public static function rules(): array
+    public static function rules(bool $requireTransactionId = true): array
     {
-        return [
-            'transaction_id'   => ['required', 'exists:transactions,id'],
+        return array_merge([
             'account_id'       => ['required', 'exists:accounts,id'],
             'sub_account_id'   => ['nullable', 'exists:sub_accounts,id'],
             'type'             => ['required', 'in:debit,credit'],
@@ -33,7 +32,9 @@ class JournalEntryValidator
             'tax_amount'       => ['nullable', 'integer', 'min:0'],
             'tax_type'         => ['nullable', 'in:taxable_sales_10,taxable_sales_8,taxable_purchases_10,non_taxable,tax_free'],
             'is_effective'     => ['boolean'],
-        ];
+        ], $requireTransactionId ? [
+            'transaction_id'   => ['required', 'exists:transactions,id'],
+        ] : []);
     }
 
     /**

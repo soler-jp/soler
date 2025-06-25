@@ -1,0 +1,306 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Account;
+use App\Models\FiscalYear;
+use App\Models\Transaction;
+use App\Services\TransactionRegistrar;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
+use Illuminate\Validation\ValidationException;
+
+class TransactionRegistrarTest extends TestCase
+{
+    use RefreshDatabase;
+
+    #[Test]
+    public function 単一仕訳で取引が登録できる()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        $account = Account::factory()->create();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => '文房具を現金で購入',
+        ];
+
+        $journalEntriesData = [
+            [
+                'account_id' => $account->id,
+                'type' => 'debit',
+                'amount' => 1000,
+            ],
+            [
+                'account_id' => $account->id,
+                'type' => 'credit',
+                'amount' => 1000,
+            ],
+        ];
+
+        $registrar = new TransactionRegistrar();
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $transaction->id,
+            'description' => '文房具を現金で購入',
+        ]);
+
+        $this->assertDatabaseCount('journal_entries', 2);
+        $this->assertEquals($transaction->id, $transaction->journalEntries()->first()->transaction_id);
+    }
+
+
+    #[Test]
+    public function fiscalYearがnullだと登録できない()
+    {
+        $this->expectException(ValidationException::class);
+
+        $registrar = new TransactionRegistrar();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => 'テスト取引',
+        ];
+
+        $journalEntriesData = [
+            [
+                'account_id' => 1,
+                'type' => 'debit',
+                'amount' => 1000,
+            ],
+            [
+                'account_id' => 1,
+                'type' => 'credit',
+                'amount' => 1000,
+            ],
+        ];
+        $registrar->register(null, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function 不正な仕訳データの場合は登録できない()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+
+        $registrar = new TransactionRegistrar();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => '不正な仕訳テスト',
+        ];
+
+        $account = Account::factory()->create();
+
+        $journalEntriesData = [
+            [
+                'account_id' => $account->id,
+                'type' => 'debit',
+                'amount' => 1000,
+            ],
+            [
+                'account_id' => 99999, // 存在しないID
+                'type' => 'credit',
+                'amount' => 1000,
+            ],
+        ];
+
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function 仕訳の金額バランスが崩れている場合は登録できない()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        $account = Account::factory()->create();
+
+        $registrar = new TransactionRegistrar();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => 'バランス崩れ',
+        ];
+
+        $journalEntriesData = [
+            [
+                'account_id' => $account->id,
+                'type' => 'debit',
+                'amount' => 1000,
+            ],
+            [
+                'account_id' => $account->id,
+                'type' => 'credit',
+                'amount' => 800, // バランスが崩れている
+            ],
+        ];
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('仕訳の金額がバランスしていません。');
+
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function journal_entryのaccount_idがnullだと登録できない()
+    {
+        $this->expectException(ValidationException::class);
+
+        $fiscalYear = FiscalYear::factory()->create();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => 'エラー検証',
+        ];
+
+        $journalEntriesData = [
+            ['account_id' => null, 'type' => 'debit', 'amount' => 1000],
+            ['account_id' => 1, 'type' => 'credit', 'amount' => 1000],
+        ];
+
+        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function 仕訳が1件しかないと登録できない()
+    {
+        $this->expectException(\DomainException::class);
+
+        $fiscalYear = FiscalYear::factory()->create();
+        $account = Account::factory()->create();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => '仕訳1件のみ',
+        ];
+
+        $journalEntriesData = [
+            ['account_id' => $account->id, 'type' => 'debit', 'amount' => 1000],
+        ];
+
+        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function 借方と貸方の金額が一致しないと登録できない()
+    {
+        $this->expectException(\DomainException::class);
+
+        $fiscalYear = FiscalYear::factory()->create();
+        $account = Account::factory()->create();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => 'バランス不一致',
+        ];
+
+        $journalEntriesData = [
+            ['account_id' => $account->id, 'type' => 'debit', 'amount' => 1000],
+            ['account_id' => $account->id, 'type' => 'credit', 'amount' => 900],
+        ];
+
+        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function 日付が不正な形式だと登録できない()
+    {
+        $this->expectException(ValidationException::class);
+
+        $fiscalYear = FiscalYear::factory()->create();
+        $account = Account::factory()->create();
+
+        $transactionData = [
+            'date' => 'invalid-date',
+            'description' => '不正日付',
+        ];
+
+        $journalEntriesData = [
+            ['account_id' => $account->id, 'type' => 'debit', 'amount' => 500],
+            ['account_id' => $account->id, 'type' => 'credit', 'amount' => 500],
+        ];
+
+        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function 金額が0円だと登録できない()
+    {
+        $this->expectException(ValidationException::class);
+
+        $fiscalYear = FiscalYear::factory()->create();
+        $account = Account::factory()->create();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => '金額ゼロ',
+        ];
+
+        $journalEntriesData = [
+            ['account_id' => $account->id, 'type' => 'debit', 'amount' => 0],
+            ['account_id' => $account->id, 'type' => 'credit', 'amount' => 0],
+        ];
+
+        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function typeが不正な値だと登録できない()
+    {
+        $this->expectException(ValidationException::class);
+
+        $fiscalYear = FiscalYear::factory()->create();
+        $account = Account::factory()->create();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => '不正type',
+        ];
+
+        $journalEntriesData = [
+            ['account_id' => $account->id, 'type' => 'invalid', 'amount' => 1000],
+            ['account_id' => $account->id, 'type' => 'credit', 'amount' => 1000],
+        ];
+
+        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function journalEntriesが空配列だと登録できない()
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $fiscalYear = FiscalYear::factory()->create();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => '仕訳なし',
+        ];
+
+        $journalEntriesData = [];
+
+        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function journalEntriesがすべてdebitだと登録できない()
+    {
+        $this->expectException(\DomainException::class);
+
+        $fiscalYear = FiscalYear::factory()->create();
+        $account = Account::factory()->create();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => '借方のみ',
+        ];
+
+        $journalEntriesData = [
+            ['account_id' => $account->id, 'type' => 'debit', 'amount' => 1000],
+            ['account_id' => $account->id, 'type' => 'debit', 'amount' => 1000],
+        ];
+
+        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+}

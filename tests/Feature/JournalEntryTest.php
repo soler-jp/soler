@@ -28,7 +28,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectNotToPerformAssertions();
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -44,7 +44,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectException(ValidationException::class);
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -60,7 +60,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectException(ValidationException::class);
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -77,7 +77,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectException(ValidationException::class);
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -94,7 +94,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectException(ValidationException::class);
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -111,7 +111,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectException(ValidationException::class);
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -128,7 +128,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectException(ValidationException::class);
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -146,7 +146,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectException(ValidationException::class);
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -164,7 +164,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectException(ValidationException::class);
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -182,7 +182,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectException(ValidationException::class);
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -200,7 +200,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectNotToPerformAssertions();
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -218,7 +218,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectNotToPerformAssertions();
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -236,7 +236,7 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectNotToPerformAssertions();
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 
     #[Test]
@@ -253,6 +253,6 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectNotToPerformAssertions();
-        JournalEntryValidator::validate($data);
+        JournalEntryValidator::validate($data, true);
     }
 }
