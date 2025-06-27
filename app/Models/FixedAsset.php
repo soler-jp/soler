@@ -14,6 +14,8 @@ class FixedAsset extends Model
         'name',
         'asset_category',
         'acquisition_date',
+        'taxable_amount',
+        'tax_amount',
         'acquisition_cost',
         'depreciation_base_amount',
         'useful_life',
