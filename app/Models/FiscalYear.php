@@ -16,6 +16,7 @@ class FiscalYear extends Model
         'year',
         'is_active',
         'is_closed',    // 決算済フラグ
+        'is_tax_exclusive',
         'start_date',
         'end_date',
 
