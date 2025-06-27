@@ -126,4 +126,44 @@ class BusinessUnitTest extends TestCase
 
         $this->assertNull($account);
     }
+
+
+    #[Test]
+    public function taxPaidAccountは仮払消費税のAccountを返す()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
+
+        $account = $unit->accounts()->create([
+            'name' => '仮払消費税',
+            'type' => 'asset',
+        ]);
+
+        $this->assertSame($account->id, $unit->taxPaidAccount()->id);
+    }
+
+    #[Test]
+    public function taxReceivedAccountは仮受消費税のAccountを返す()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
+
+        $account = $unit->accounts()->create([
+            'name' => '仮受消費税',
+            'type' => 'liability',
+        ]);
+
+        $this->assertSame($account->id, $unit->taxReceivedAccount()->id);
+    }
+
+    #[Test]
+    public function taxPaidAccountが存在しないと例外を投げる()
+    {
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
+
+        $unit->taxPaidAccount();
+    }
 }

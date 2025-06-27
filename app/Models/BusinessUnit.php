@@ -165,4 +165,18 @@ class BusinessUnit extends Model
     {
         return $this->accounts()->where('name', $name)->first();
     }
+
+    public function taxPaidAccount(): Account
+    {
+        return $this->accounts()
+            ->where('name', '仮払消費税')
+            ->firstOrFail();
+    }
+
+    public function taxReceivedAccount(): Account
+    {
+        return $this->accounts()
+            ->where('name', '仮受消費税')
+            ->firstOrFail();
+    }
 }
