@@ -16,7 +16,8 @@ class FiscalYear extends Model
         'year',
         'is_active',
         'is_closed',    // 決算済フラグ
-        'is_tax_exclusive',
+        'is_taxable',   // 課税事業者ならtrue, 免税事業者なfalse
+        'is_tax_exclusive',  // 税抜経理ならtrue, 税込経理ならfalse
         'start_date',
         'end_date',
 
