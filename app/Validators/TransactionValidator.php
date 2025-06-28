@@ -31,6 +31,7 @@ class TransactionValidator
             'description' => ['required', 'string', 'max:255'],
             'remarks' => ['nullable', 'string'],
             'is_adjusting_entry' => ['boolean'],
+            'is_planned' => ['nullable', 'boolean'],
             'created_by' => ['nullable', 'exists:users,id'],
         ];
     }

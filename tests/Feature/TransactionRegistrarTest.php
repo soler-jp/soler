@@ -10,6 +10,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Illuminate\Validation\ValidationException;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class TransactionRegistrarTest extends TestCase
 {
@@ -536,5 +538,44 @@ class TransactionRegistrarTest extends TestCase
             'id' => $transaction->id,
             'description' => 'tax_amount片側のみ',
         ]);
+    }
+
+    #[Test]
+    public function is_plannedをtrueにして取引を登録できる()
+    {
+        $user = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'Test帳簿',
+        ]);
+
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $account = $unit->accounts()->first(); // デフォルトAccountを利用
+
+        $registrar = new TransactionRegistrar();
+
+        $transactionData = [
+            'date' => now()->toDateString(),
+            'description' => '予定取引テスト',
+            'is_planned' => true,
+        ];
+
+        $journalEntries = [
+            [
+                'account_id' => $account->id,
+                'type' => 'debit',
+                'amount' => 1000,
+            ],
+            [
+                'account_id' => $account->id,
+                'type' => 'credit',
+                'amount' => 1000,
+            ],
+        ];
+
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntries);
+
+        $this->assertTrue($transaction->is_planned);
     }
 }

@@ -19,12 +19,14 @@ class Transaction extends Model
         'description',
         'remarks',
         'is_adjusting_entry',
+        'is_planned',
         'created_by',
     ];
 
     protected $casts = [
         'date' => 'date',
         'is_adjusting_entry' => 'boolean',
+        'is_planned' => 'boolean',
     ];
 
     /**
