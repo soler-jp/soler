@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use App\Models\RecurringTransactionPlan;
+use Illuminate\Validation\ValidationException;
 
 class BusinessUnit extends Model
 {
@@ -186,11 +187,14 @@ class BusinessUnit extends Model
         return $this->hasMany(RecurringTransactionPlan::class);
     }
 
-
     public function createRecurringTransactionPlan(array $attributes): RecurringTransactionPlan
     {
+        $attributes['business_unit_id'] = $this->id;
+
+        $validated = RecurringTransactionPlan::validate($attributes);
+
         return $this->recurringTransactionPlans()
-            ->create($attributes)
+            ->create($validated)
             ->refresh();
     }
 }
