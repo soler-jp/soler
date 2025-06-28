@@ -578,4 +578,200 @@ class TransactionRegistrarTest extends TestCase
 
         $this->assertTrue($transaction->is_planned);
     }
+
+
+    #[Test]
+    public function 予定取引を本登録に変更できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $expenseAccount = $unit->accounts()->where('name', '通信費')->first();
+        $assetAccount = $unit->accounts()->where('name', '現金')->first();
+
+        $registrar = new TransactionRegistrar();
+
+        $transaction = $registrar->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '予定取引',
+            'is_planned' => true,
+        ], [
+            [
+                'account_id' => $expenseAccount->id,
+                'type' => 'debit',
+                'amount' => 1000,
+                'tax_type' => 'taxable_purchases_10',
+                'tax_amount' => 100,
+            ],
+            [
+                'account_id' => $assetAccount->id,
+                'type' => 'credit',
+                'amount' => 1100,
+            ],
+        ]);
+
+        $this->assertTrue($transaction->is_planned);
+
+        $confirmed = $registrar->confirmPlanned($transaction, [
+            'description' => '本登録済み',
+            'date' => '2025-04-02',
+            'journal_entries' => [
+                [
+                    'account_id' => $expenseAccount->id,
+                    'type' => 'debit',
+                    'amount' => 1000,
+                    'tax_type' => 'taxable_purchases_10',
+                    'tax_amount' => 100,
+                ],
+                [
+                    'account_id' => $assetAccount->id,
+                    'type' => 'credit',
+                    'amount' => 1100,
+                ],
+            ],
+        ]);
+
+
+        $this->assertFalse($confirmed->is_planned);
+        $this->assertSame('本登録済み', $confirmed->description);
+        $this->assertSame('2025-04-02', $confirmed->date->toDateString());
+    }
+
+    #[Test]
+    public function 本登録時に仕訳の内容を変更できて元の仕訳は削除される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $expenseAccount = $unit->accounts()->where('name', '通信費')->first();
+        $assetAccount = $unit->accounts()->where('name', '現金')->first();
+        $liabilityAccount = $unit->accounts()->where('name', '未払金')->first();
+
+        $registrar = new TransactionRegistrar();
+
+        $transaction = $registrar->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '予定取引',
+            'is_planned' => true,
+        ], [
+            [
+                'account_id' => $expenseAccount->id,
+                'type' => 'debit',
+                'amount' => 1000,
+                'tax_type' => 'taxable_purchases_10',
+                'tax_amount' => 100,
+            ],
+            [
+                'account_id' => $assetAccount->id,
+                'type' => 'credit',
+                'amount' => 1100,
+            ],
+        ]);
+
+        $originalEntryIds = $transaction->journalEntries()->pluck('id')->toArray();
+
+        $confirmed = $registrar->confirmPlanned($transaction, [
+            'description' => '本登録済み（仕訳変更）',
+            'date' => '2025-04-02',
+            'journal_entries' => [
+                [
+                    'account_id' => $expenseAccount->id,
+                    'type' => 'debit',
+                    'amount' => 2000,
+                    'tax_type' => 'taxable_purchases_10',
+                    'tax_amount' => 200,
+                ],
+                [
+                    'account_id' => $liabilityAccount->id,
+                    'type' => 'credit',
+                    'amount' => 2200,
+                ],
+            ],
+        ]);
+
+        $this->assertFalse($confirmed->is_planned);
+        $this->assertSame('本登録済み（仕訳変更）', $confirmed->description);
+        $this->assertSame('2025-04-02', $confirmed->date->toDateString());
+        $this->assertCount(2, $confirmed->journalEntries);
+
+        foreach ($originalEntryIds as $id) {
+            $this->assertDatabaseMissing('journal_entries', ['id' => $id]);
+        }
+    }
+
+    #[Test]
+    public function 予定取引を0円の本登録に変換して取消できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $expense = $unit->accounts()->where('name', '通信費')->first();
+        $asset = $unit->accounts()->where('name', '現金')->first();
+
+        $registrar = new TransactionRegistrar();
+
+        $transaction = $registrar->register($fiscalYear, [
+            'date' => '2025-05-01',
+            'description' => '取消予定取引',
+            'is_planned' => true,
+        ], [
+            [
+                'account_id' => $expense->id,
+                'type' => 'debit',
+                'amount' => 1000,
+                'tax_type' => 'taxable_purchases_10',
+                'tax_amount' => 100,
+            ],
+            [
+                'account_id' => $asset->id,
+                'type' => 'credit',
+                'amount' => 1100,
+            ],
+        ]);
+
+        $cancelled = $registrar->cancelPlanned($transaction);
+
+        $this->assertFalse($cancelled->is_planned);
+        $this->assertSame('取消予定取引（取消）', $cancelled->description);
+
+        $this->assertCount(2, $cancelled->journalEntries);
+        $this->assertTrue($cancelled->journalEntries->every(fn($e) => $e->amount === 0));
+    }
+
+    #[Test]
+    public function 本登録済みの取引は取消できない()
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $expense = $unit->accounts()->where('name', '通信費')->first();
+        $asset = $unit->accounts()->where('name', '現金')->first();
+
+        $registrar = new TransactionRegistrar();
+
+        $transaction = $registrar->register($fiscalYear, [
+            'date' => '2025-05-01',
+            'description' => '本登録取引',
+            'is_planned' => false,
+        ], [
+            [
+                'account_id' => $expense->id,
+                'type' => 'debit',
+                'amount' => 1000,
+            ],
+            [
+                'account_id' => $asset->id,
+                'type' => 'credit',
+                'amount' => 1000,
+            ],
+        ]);
+
+        $registrar->cancelPlanned($transaction);
+    }
 }

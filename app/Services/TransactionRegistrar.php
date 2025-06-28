@@ -75,4 +75,65 @@ class TransactionRegistrar
     {
         return collect($entries)->sum(fn($e) => (int) ($e['amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
     }
+
+
+    public function confirmPlanned(Transaction $transaction, array $updates): Transaction
+    {
+        if (! $transaction->is_planned) {
+            throw new \InvalidArgumentException('この取引は既に本登録されています。');
+        }
+
+        $journalEntries = $updates['journal_entries'] ?? null;
+
+        if (! is_array($journalEntries) || empty($journalEntries)) {
+            throw new \InvalidArgumentException('journal_entries が必要です。');
+        }
+
+        return DB::transaction(function () use ($transaction, $updates, $journalEntries) {
+            // 既存の仕訳削除
+            $transaction->journalEntries()->delete();
+
+            // 取引本体を更新（予定 → 本登録）
+            $transaction->update([
+                ...$updates,
+                'is_planned' => false,
+            ]);
+
+            // 新しい仕訳を作成
+            foreach ($journalEntries as $entryData) {
+                $transaction->journalEntries()->create($entryData);
+            }
+
+            return $transaction->fresh();
+        });
+    }
+
+    public function cancelPlanned(Transaction $transaction): Transaction
+    {
+        if (! $transaction->is_planned) {
+            throw new \InvalidArgumentException('本登録された取引は取消できません。');
+        }
+
+        $originalEntries = $transaction->journalEntries()->get();
+
+        if ($originalEntries->isEmpty()) {
+            throw new \RuntimeException('元の仕訳が存在しません。');
+        }
+
+        $zeroedEntries = $originalEntries->map(function ($entry) {
+            return [
+                'account_id' => $entry->account_id,
+                'type' => $entry->type,
+                'amount' => 0,
+                'tax_type' => null,
+                'tax_amount' => 0,
+            ];
+        })->all();
+
+        return $this->confirmPlanned($transaction, [
+            'description' => $transaction->description . '（取消）',
+            'date' => $transaction->date->toDateString(),
+            'journal_entries' => $zeroedEntries,
+        ]);
+    }
 }
