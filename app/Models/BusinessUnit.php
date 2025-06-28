@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use App\Models\RecurringTransactionPlan;
 
 class BusinessUnit extends Model
 {
@@ -178,5 +179,18 @@ class BusinessUnit extends Model
         return $this->accounts()
             ->where('name', '仮受消費税')
             ->firstOrFail();
+    }
+
+    public function recurringTransactionPlans()
+    {
+        return $this->hasMany(RecurringTransactionPlan::class);
+    }
+
+
+    public function createRecurringTransactionPlan(array $attributes): RecurringTransactionPlan
+    {
+        return $this->recurringTransactionPlans()
+            ->create($attributes)
+            ->refresh();
     }
 }
