@@ -6,8 +6,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Validation\Rule;
 use Illuminate\Contracts\Validation\Validator as ValidatorContract;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 
 class RecurringTransactionPlan extends Model
 {
@@ -41,6 +42,10 @@ class RecurringTransactionPlan extends Model
         return $this->belongsTo(BusinessUnit::class);
     }
 
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
+    }
 
     public static function validator(array $attributes): ValidatorContract
     {
@@ -89,5 +94,47 @@ class RecurringTransactionPlan extends Model
         }
 
         return $validator->validated();
+    }
+
+    public function getPlannedDatesIn(FiscalYear $fiscalYear): Collection
+    {
+        $dates = collect();
+        $date = Carbon::parse($fiscalYear->start_date)->startOfMonth();
+
+        while ($date->lessThanOrEqualTo(Carbon::parse($fiscalYear->end_date))) {
+            $day = min($this->day_of_month, $date->daysInMonth);
+            $dates->push($date->copy()->day($day));
+
+            $date->addMonths($this->interval === 'bimonthly' ? 2 : 1)->startOfMonth();
+        }
+
+        return $dates;
+    }
+
+    public function toTransactionData(Carbon $date): array
+    {
+        return [
+            'transaction' => [
+                'date' => $date->toDateString(),
+                'description' => $this->name,
+                'remarks' => null,
+                'is_planned' => true,
+                'recurring_transaction_plan_id' => $this->id,
+            ],
+            'entries' => [
+                [
+                    'account_id' => $this->debit_account_id,
+                    'type' => 'debit',
+                    'amount' => $this->amount,
+                    'tax_amount' => $this->tax_amount,
+                    'tax_type' => $this->tax_type,
+                ],
+                [
+                    'account_id' => $this->credit_account_id,
+                    'type' => 'credit',
+                    'amount' => $this->amount + (int) $this->tax_amount,
+                ],
+            ],
+        ];
     }
 }

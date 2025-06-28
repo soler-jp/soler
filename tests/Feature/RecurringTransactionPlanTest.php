@@ -225,4 +225,161 @@ class RecurringTransactionPlanTest extends TestCase
 
         $this->assertNotNull($plan2);
     }
+
+    #[Test]
+    public function tax付きのmonthlyプランで1年分の予定取引が生成される()
+    {
+        $user = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業'])->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $debit_account = $unit->accounts()->where('name', '水道光熱費')->first();
+        $credit_account = $unit->accounts()->where('name', 'その他の預金')->first();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'business_unit_id' => $unit->id,
+            'name' => '税込月次プラン',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'is_income' => false,
+            'debit_account_id' => $debit_account->id,
+            'credit_account_id' => $credit_account->id,
+            'amount' => 10000,
+            'tax_amount' => 1000,
+            'tax_type' => 'taxable_purchases_10',
+        ]);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+
+        $this->assertCount(12, $transactions);
+        $this->assertTrue($transactions->every(fn($t) => $t->is_planned));
+
+        foreach ($transactions as $transaction) {
+            $entries = $transaction->journalEntries;
+
+            $this->assertEquals(2, $entries->count());
+
+            $this->assertTrue($entries->contains(fn($e) => $e->tax_amount === 1000));
+            $this->assertTrue($entries->contains(fn($e) => $e->tax_type === 'taxable_purchases_10'));
+        }
+    }
+
+    #[Test]
+    public function day_of_monthが月末より大きい場合はその月の末日に調整される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '末日テスト事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $account = $unit->accounts()->where('name', '水道光熱費')->first();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '末日補正プラン',
+            'interval' => 'monthly',
+            'day_of_month' => 31,
+            'is_income' => false,
+            'debit_account_id' => $account->id,
+            'credit_account_id' => $account->id,
+            'amount' => 10000,
+            'tax_amount' => 1000,
+        ]);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+
+        $this->assertCount(12, $transactions);
+
+        $dates = $transactions->pluck('date')->sort()->values();
+
+        $this->assertEquals('2025-02-28', $dates[1]->toDateString());
+        $this->assertEquals('2025-04-30', $dates[3]->toDateString());
+        $this->assertEquals('2025-03-31', $dates[2]->toDateString());
+    }
+
+    #[Test]
+    public function bimonthlyプランでは年に6件の予定取引が生成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '隔月プラン事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $account = $unit->accounts()->where('name', '水道光熱費')->first();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '隔月プラン',
+            'interval' => 'bimonthly',
+            'day_of_month' => 15,
+            'is_income' => false,
+            'debit_account_id' => $account->id,
+            'credit_account_id' => $account->id,
+            'amount' => 5000,
+            'tax_amount' => 500,
+        ]);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+
+        $this->assertCount(6, $transactions);
+
+        $dates = $transactions->pluck('date')->sort()->values()->map(fn($d) => $d->toDateString());
+
+        $this->assertEquals([
+            '2025-01-15',
+            '2025-03-15',
+            '2025-05-15',
+            '2025-07-15',
+            '2025-09-15',
+            '2025-11-15',
+        ], $dates->toArray());
+    }
+
+    #[Test]
+    public function is_activeがfalseのプランでは予定取引が作成されない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '非アクティブ事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $account = $unit->accounts()->where('name', '水道光熱費')->first();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '非アクティブプラン',
+            'interval' => 'monthly',
+            'day_of_month' => 1,
+            'is_income' => false,
+            'debit_account_id' => $account->id,
+            'credit_account_id' => $account->id,
+            'amount' => 3000,
+            'tax_amount' => 300,
+            'is_active' => false,
+        ]);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+
+        $this->assertCount(0, $transactions);
+    }
+
+    #[Test]
+    public function 生成された取引にはrecurring_transaction_plan_idが設定される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'リンクテスト事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $account = $unit->accounts()->where(['name' => '水道光熱費'])->first();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => 'リンク付きプラン',
+            'interval' => 'monthly',
+            'day_of_month' => 1,
+            'is_income' => false,
+            'debit_account_id' => $account->id,
+            'credit_account_id' => $account->id,
+            'amount' => 8000,
+            'tax_amount' => 800,
+        ]);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+
+        $this->assertCount(12, $transactions);
+
+        foreach ($transactions as $transaction) {
+            $this->assertTrue($transaction->is_planned);
+            $this->assertEquals($plan->id, $transaction->recurring_transaction_plan_id);
+        }
+    }
 }

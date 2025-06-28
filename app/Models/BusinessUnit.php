@@ -6,7 +6,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use App\Models\RecurringTransactionPlan;
-use Illuminate\Validation\ValidationException;
+use App\Models\FiscalYear;
+use Illuminate\Support\Collection;
+use App\Services\TransactionRegistrar;
 
 class BusinessUnit extends Model
 {
@@ -196,5 +198,32 @@ class BusinessUnit extends Model
         return $this->recurringTransactionPlans()
             ->create($validated)
             ->refresh();
+    }
+
+    public function generatePlannedTransactionsForPlan(RecurringTransactionPlan $plan, FiscalYear $fiscalYear): Collection
+    {
+        if ($plan->business_unit_id !== $this->id) {
+            throw new \InvalidArgumentException('This plan does not belong to this business unit.');
+        }
+
+        if ($plan->is_active === false) {
+            return collect();
+        }
+
+        $transactions = collect();
+
+        foreach ($plan->getPlannedDatesIn($fiscalYear) as $date) {
+            $data = $plan->toTransactionData($date);
+
+            $transaction = app(TransactionRegistrar::class)->register(
+                $fiscalYear,
+                $data['transaction'],
+                $data['entries']
+            );
+
+            $transactions->push($transaction);
+        }
+
+        return $transactions;
     }
 }

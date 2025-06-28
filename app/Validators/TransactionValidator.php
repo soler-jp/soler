@@ -32,6 +32,7 @@ class TransactionValidator
             'remarks' => ['nullable', 'string'],
             'is_adjusting_entry' => ['boolean'],
             'is_planned' => ['nullable', 'boolean'],
+            'recurring_transaction_plan_id' => ['nullable', 'exists:recurring_transaction_plans,id'],
             'created_by' => ['nullable', 'exists:users,id'],
         ];
     }
@@ -48,6 +49,7 @@ class TransactionValidator
             'remarks' => '備考',
             'tax_type' => '消費税区分',
             'is_adjusting_entry' => '決算整理仕訳フラグ',
+            'recurring_transaction_plan_id' => '定期取引計画ID',
             'created_by' => '登録ユーザー',
         ];
     }

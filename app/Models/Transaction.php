@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\FiscalYear;
+use App\Models\RecurringTransactionPlan;
 
 class Transaction extends Model
 {
@@ -20,6 +22,7 @@ class Transaction extends Model
         'remarks',
         'is_adjusting_entry',
         'is_planned',
+        'recurring_transaction_plan_id',
         'created_by',
     ];
 
@@ -51,6 +54,11 @@ class Transaction extends Model
     public function journalEntries(): HasMany
     {
         return $this->hasMany(JournalEntry::class);
+    }
+
+    public function recurringTransactionPlan(): BelongsTo
+    {
+        return $this->belongsTo(RecurringTransactionPlan::class);
     }
 
     /**
