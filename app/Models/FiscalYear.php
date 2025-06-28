@@ -63,20 +63,43 @@ class FiscalYear extends Model
 
     public function calculateSummary(): array
     {
-        $income = $this->journalEntries()
+        // 実績（is_planned = false）
+        $actualIncome = $this->journalEntries()
+            ->whereHas('transaction', fn($q) => $q->where('is_planned', false))
             ->whereHas('account', fn($q) => $q->where('type', 'revenue'))
             ->where('type', 'credit')
             ->sum(\DB::raw('amount + COALESCE(tax_amount, 0)'));
 
-        $expense = $this->journalEntries()
+        $actualExpense = $this->journalEntries()
+            ->whereHas('transaction', fn($q) => $q->where('is_planned', false))
+            ->whereHas('account', fn($q) => $q->where('type', 'expense'))
+            ->where('type', 'debit')
+            ->sum(\DB::raw('amount + COALESCE(tax_amount, 0)'));
+
+        // 予定（is_planned = true）
+        $plannedIncome = $this->journalEntries()
+            ->whereHas('transaction', fn($q) => $q->where('is_planned', true))
+            ->whereHas('account', fn($q) => $q->where('type', 'revenue'))
+            ->where('type', 'credit')
+            ->sum(\DB::raw('amount + COALESCE(tax_amount, 0)'));
+
+        $plannedExpense = $this->journalEntries()
+            ->whereHas('transaction', fn($q) => $q->where('is_planned', true))
             ->whereHas('account', fn($q) => $q->where('type', 'expense'))
             ->where('type', 'debit')
             ->sum(\DB::raw('amount + COALESCE(tax_amount, 0)'));
 
         return [
-            'total_income' => (int) $income,
-            'total_expense' => (int) $expense,
-            'profit' => (int) ($income - $expense),
+            'actual' => [
+                'total_income' => (int) $actualIncome,
+                'total_expense' => (int) $actualExpense,
+                'profit' => (int) ($actualIncome - $actualExpense),
+            ],
+            'planned' => [
+                'total_income' => (int) $plannedIncome,
+                'total_expense' => (int) $plannedExpense,
+                'profit' => (int) ($plannedIncome - $plannedExpense),
+            ],
         ];
     }
 }
