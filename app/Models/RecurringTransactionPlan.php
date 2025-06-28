@@ -9,6 +9,9 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Contracts\Validation\Validator as ValidatorContract;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\BusinessUnit;
+use App\Models\Transaction;
 
 class RecurringTransactionPlan extends Model
 {

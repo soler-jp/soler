@@ -215,6 +215,14 @@ class BusinessUnit extends Model
         foreach ($plan->getPlannedDatesIn($fiscalYear) as $date) {
             $data = $plan->toTransactionData($date);
 
+            if (
+                $plan->transactions()
+                ->whereDate('date', $date)
+                ->where('is_planned', true)
+                ->exists()
+            ) {
+                continue;
+            }
             $transaction = app(TransactionRegistrar::class)->register(
                 $fiscalYear,
                 $data['transaction'],

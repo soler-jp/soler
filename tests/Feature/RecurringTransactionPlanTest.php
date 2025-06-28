@@ -382,4 +382,93 @@ class RecurringTransactionPlanTest extends TestCase
             $this->assertEquals($plan->id, $transaction->recurring_transaction_plan_id);
         }
     }
+
+    #[Test]
+    public function 同じ日付の予定取引が既に存在する場合は作成されない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '重複防止テスト事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $account = $unit->accounts()->where(['name' => '水道光熱費'])->first();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '重複チェックプラン',
+            'interval' => 'monthly',
+            'day_of_month' => 1,
+            'is_income' => false,
+            'debit_account_id' => $account->id,
+            'credit_account_id' => $account->id,
+            'amount' => 5000,
+            'tax_amount' => 500,
+        ]);
+
+        // 初回：すべて作成される（12件）
+        $firstRun = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+        $this->assertCount(12, $firstRun);
+
+        // 2回目：すでに存在しているためスキップ（0件作成）
+        $secondRun = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+        $this->assertCount(0, $secondRun);
+
+        // DB上も12件のままで増えていないこと
+        $this->assertEquals(
+            12,
+            $plan->transactions()
+                ->whereBetween('date', [$fiscalYear->start_date, $fiscalYear->end_date])
+                ->where('is_planned', true)
+                ->count()
+        );
+    }
+
+    #[Test]
+    public function 他のプランが同じ日に作成していても生成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '同日許可テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $account = $unit->accounts()->where(['name' => '水道光熱費'])->first();
+
+        $plan1 = $unit->createRecurringTransactionPlan([
+            'name' => 'プランA',
+            'interval' => 'monthly',
+            'day_of_month' => 1,
+            'is_income' => false,
+            'debit_account_id' => $account->id,
+            'credit_account_id' => $account->id,
+            'amount' => 3000,
+            'tax_amount' => 300,
+        ]);
+
+        $plan2 = $unit->createRecurringTransactionPlan([
+            'name' => 'プランB',
+            'interval' => 'monthly',
+            'day_of_month' => 1, // 同じ日付
+            'is_income' => false,
+            'debit_account_id' => $account->id,
+            'credit_account_id' => $account->id,
+            'amount' => 7000,
+            'tax_amount' => 700,
+        ]);
+
+        // 両方のプランで生成
+        $transactions1 = $unit->generatePlannedTransactionsForPlan($plan1, $fiscalYear);
+        $transactions2 = $unit->generatePlannedTransactionsForPlan($plan2, $fiscalYear);
+
+        // 両者とも12件ずつ生成されていること
+        $this->assertCount(12, $transactions1);
+        $this->assertCount(12, $transactions2);
+
+        // 各取引に適切な plan_id が設定されていること
+        $this->assertTrue($transactions1->every(fn($t) => $t->recurring_transaction_plan_id === $plan1->id));
+        $this->assertTrue($transactions2->every(fn($t) => $t->recurring_transaction_plan_id === $plan2->id));
+
+        // 合計24件生成されていること
+        $this->assertEquals(
+            24,
+            $fiscalYear->transactions()
+                ->where('is_planned', true)
+                ->whereBetween('date', [$fiscalYear->start_date, $fiscalYear->end_date])
+                ->count()
+        );
+    }
 }
