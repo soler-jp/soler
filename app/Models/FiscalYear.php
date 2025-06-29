@@ -29,6 +29,8 @@ class FiscalYear extends Model
     ];
 
     protected $casts = [
+        'is_taxable' => 'boolean',
+        'is_tax_exclusive' => 'boolean',
         'is_active' => 'boolean',
         'is_closed'  => 'boolean',
         'start_date' => 'date',
@@ -105,8 +107,12 @@ class FiscalYear extends Model
         ];
     }
 
-    public function registerOpeningEntry(array $openingEntries): Transaction
+    public function registerOpeningEntry(array $openingEntries): ?Transaction
     {
+        if ($openingEntries == []) {
+            return null;
+        }
+
         return DB::transaction(function () use ($openingEntries) {
 
             $allowedDebitAccounts = ['現金', '定期預金', 'その他の預金', '車両運搬具', '棚卸資'];

@@ -14,6 +14,19 @@ class RegisterOpeningEntryTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
+    public function 何も登録しない期首仕訳ができる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $txn = $fiscalYear->registerOpeningEntry([]);
+
+        $this->assertEquals(null, $txn);
+        $this->assertCount(0, $fiscalYear->journalEntries);
+    }
+
+    #[Test]
     public function 現金と定期預金で期首仕訳を登録できる()
     {
         $user = User::factory()->create();
