@@ -166,4 +166,25 @@ class BusinessUnitTest extends TestCase
 
         $unit->taxPaidAccount();
     }
+
+    #[Test]
+    public function currentFiscalYearを取得できる()
+    {
+        $user = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+
+        $fiscal2024 = $unit->createFiscalYear(2024);
+
+        $fiscal2025 = $unit->createFiscalYear(2025);
+
+        $unit->update([
+            'current_fiscal_year_id' => $fiscal2025->id,
+        ]);
+
+        $this->assertTrue($unit->currentFiscalYear->is($fiscal2025));
+        $this->assertEquals(2025, $unit->currentFiscalYear->year);
+    }
 }

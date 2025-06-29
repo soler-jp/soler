@@ -9,6 +9,7 @@ use App\Models\RecurringTransactionPlan;
 use App\Models\FiscalYear;
 use Illuminate\Support\Collection;
 use App\Services\TransactionRegistrar;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BusinessUnit extends Model
 {
@@ -35,6 +36,7 @@ class BusinessUnit extends Model
         'name',
         'type',
         'notes',
+        'current_fiscal_year_id',
     ];
 
     public function user()
@@ -233,5 +235,10 @@ class BusinessUnit extends Model
         }
 
         return $transactions;
+    }
+
+    public function currentFiscalYear(): BelongsTo
+    {
+        return $this->belongsTo(FiscalYear::class, 'current_fiscal_year_id');
     }
 }
