@@ -223,4 +223,32 @@ class BusinessUnitTest extends TestCase
 
         $unitA->setCurrentFiscalYear($foreignFiscalYear);
     }
+
+    #[Test]
+    public function createFiscalYearで初回年度が自動で選択される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '初期事業体']);
+
+        $fiscal = $unit->createFiscalYear(2025);
+
+        $this->assertTrue($unit->currentFiscalYear->is($fiscal));
+    }
+
+    #[Test]
+    public function 既にcurrentFiscalYearがあれば、createしても選択は変わらない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+
+        $fiscal2024 = $unit->createFiscalYear(2024);
+
+        // 既にcurrentFiscalYearが設定されている
+        $unit->setCurrentFiscalYear($fiscal2024);
+
+        // 新しい年度を作成してもcurrentFiscalYearは変わらない
+        $unit->createFiscalYear(2025);
+
+        $this->assertTrue($unit->currentFiscalYear->is($fiscal2024));
+    }
 }

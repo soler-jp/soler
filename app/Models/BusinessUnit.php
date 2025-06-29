@@ -131,6 +131,7 @@ class BusinessUnit extends Model
                 $businessUnit->createAccount($account);
             }
 
+
             return $businessUnit;
         });
     }
@@ -158,13 +159,17 @@ class BusinessUnit extends Model
 
         $hasActive = $this->fiscalYears()->where('is_active', true)->exists();
 
-        return $this->fiscalYears()->create([
+        $fiscalYear =  $this->fiscalYears()->create([
             'year' => $year,
             'start_date' => "$year-01-01",
             'end_date' => "$year-12-31",
             'is_closed' => false,
             'is_active' => !$hasActive,  // まだなければtrueにする
         ]);
+
+        $this->setCurrentFiscalYearIfNotSet($fiscalYear);
+
+        return $fiscalYear;
     }
 
     public function getAccountByName(string $name): ?Account
@@ -249,5 +254,12 @@ class BusinessUnit extends Model
         }
 
         $this->update(['current_fiscal_year_id' => $fiscalYear->id]);
+    }
+
+    public function setCurrentFiscalYearIfNotSet(FiscalYear $fiscalYear): void
+    {
+        if (is_null($this->current_fiscal_year_id)) {
+            $this->setCurrentFiscalYear($fiscalYear);
+        }
     }
 }
