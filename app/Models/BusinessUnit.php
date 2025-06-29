@@ -241,4 +241,13 @@ class BusinessUnit extends Model
     {
         return $this->belongsTo(FiscalYear::class, 'current_fiscal_year_id');
     }
+
+    public function setCurrentFiscalYear(FiscalYear $fiscalYear): void
+    {
+        if ($fiscalYear->business_unit_id !== $this->id) {
+            throw new \InvalidArgumentException('他の事業体の年度は選択できません。');
+        }
+
+        $this->update(['current_fiscal_year_id' => $fiscalYear->id]);
+    }
 }

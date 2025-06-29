@@ -187,4 +187,40 @@ class BusinessUnitTest extends TestCase
         $this->assertTrue($unit->currentFiscalYear->is($fiscal2025));
         $this->assertEquals(2025, $unit->currentFiscalYear->year);
     }
+
+    #[Test]
+    public function currentFiscalYearを設定できる()
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+
+        $fiscalYear2025 = $businessUnit->createFiscalYear(2025);
+
+        $businessUnit->setCurrentFiscalYear($fiscalYear2025);
+
+        $this->assertEquals($fiscalYear2025->id, $businessUnit->current_fiscal_year_id);
+        $this->assertTrue($businessUnit->currentFiscalYear->is($fiscalYear2025));
+    }
+
+    #[Test]
+    public function 他の事業体のFiscalYearを設定しようとすると例外が発生する()
+    {
+        $userA = User::factory()->create();
+        $userB = User::factory()->create();
+
+        $unitA = $userA->createBusinessUnitWithDefaults(['name' => '事業体A']);
+        $unitB = $userB->createBusinessUnitWithDefaults(['name' => '事業体B']);
+
+        $foreignFiscalYear = $unitB->fiscalYears()->create([
+            'year' => 2025,
+            'start_date' => '2025-01-01',
+            'end_date' => '2025-12-31',
+            'is_taxable_supplier' => false,
+            'is_tax_exclusive' => false,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $unitA->setCurrentFiscalYear($foreignFiscalYear);
+    }
 }
