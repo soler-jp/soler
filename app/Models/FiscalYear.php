@@ -8,6 +8,8 @@ use App\Services\TransactionRegistrar;
 use App\Models\Transaction;
 use App\Models\BusinessUnit;
 use App\Models\JournalEntry;
+use App\Models\SubAccount;
+use Illuminate\Support\Facades\DB;
 
 
 class FiscalYear extends Model
@@ -101,5 +103,73 @@ class FiscalYear extends Model
                 'profit' => (int) ($plannedIncome - $plannedExpense),
             ],
         ];
+    }
+
+    public function registerOpeningEntry(array $openingEntries): Transaction
+    {
+        return DB::transaction(function () use ($openingEntries) {
+
+            $allowedDebitAccounts = ['現金', '定期預金', 'その他の預金', '車両運搬具', '棚卸資'];
+
+            $transactionData = [
+                'date' => $this->start_date,
+                'description' => '期首残高設定',
+                'is_opening_entry' => true,
+                'fiscal_year_id' => $this->id,
+            ];
+
+            $journalEntriesData = [];
+            $totalAmount = 0;
+
+            $capitalAccount = $this->businessUnit->accounts()
+                ->where('name', '元入金')
+                ->firstOrFail();
+
+            foreach ($openingEntries as $entry) {
+                if (!in_array($entry['account_name'], $allowedDebitAccounts)) {
+                    throw new \InvalidArgumentException(
+                        '借方の勘定科目は「現金」「定期預金」「その他の預金」「車両運搬具」「棚卸資産」のみ使用できます。'
+                    );
+                }
+
+                if (!isset($entry['amount']) || !is_numeric($entry['amount']) || $entry['amount'] <= 0) {
+                    throw new \InvalidArgumentException("金額が不正です: {$entry['amount']}");
+                }
+
+                $account = $this->businessUnit->accounts()
+                    ->where('name', $entry['account_name'])
+                    ->firstOrFail();
+
+                $amount = (int) $entry['amount'];
+
+                $subAccountId = null;
+
+                if (!empty($entry['sub_account_name'])) {
+                    $subAccount = SubAccount::firstOrCreate([
+                        'account_id' => $account->id,
+                        'name' => $entry['sub_account_name'],
+                    ]);
+                    $subAccountId = $subAccount->id;
+                }
+
+                $journalEntriesData[] = [
+                    'account_id' => $account->id,
+                    'sub_account_id' => $subAccountId,
+                    'type' => 'debit',
+                    'amount' => $amount,
+                ];
+
+                $totalAmount += $amount;
+            }
+
+            $journalEntriesData[] = [
+                'account_id' => $capitalAccount->id,
+                'sub_account_id' => null,
+                'type' => 'credit',
+                'amount' => $totalAmount,
+            ];
+
+            return $this->registerTransaction($transactionData, $journalEntriesData);
+        });
     }
 }

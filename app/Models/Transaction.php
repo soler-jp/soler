@@ -20,6 +20,7 @@ class Transaction extends Model
         'date',
         'description',
         'remarks',
+        'is_opening_entry',
         'is_adjusting_entry',
         'is_planned',
         'recurring_transaction_plan_id',
