@@ -66,4 +66,16 @@ class User extends Authenticatable
     {
         return $this->belongsTo(BusinessUnit::class, 'current_business_unit_id');
     }
+
+
+    public function setSelectedBusinessUnit(BusinessUnit $unit): void
+    {
+        if ($unit->user_id !== $this->id) {
+            throw new \InvalidArgumentException('他人の事業体は選択できません');
+        }
+
+        $this->update([
+            'current_business_unit_id' => $unit->id,
+        ]);
+    }
 }

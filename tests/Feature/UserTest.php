@@ -49,4 +49,30 @@ class UserTest extends TestCase
 
         $this->assertNull($user->selectedBusinessUnit);
     }
+
+
+    #[Test]
+    public function setSelectedBusinessUnitで選択できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '設定対象']);
+
+        $user->setSelectedBusinessUnit($unit);
+
+        $this->assertEquals($unit->id, $user->current_business_unit_id);
+        $this->assertTrue($user->selectedBusinessUnit->is($unit));
+    }
+
+    #[Test]
+    public function 他人の事業体を選択しようとすると例外が発生する()
+    {
+        $userA = User::factory()->create();
+        $userB = User::factory()->create();
+
+        $unitB = $userB->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $userA->setSelectedBusinessUnit($unitB);
+    }
 }
