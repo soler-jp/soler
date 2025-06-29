@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use App\Models\BusinessUnit;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class User extends Authenticatable
 {
@@ -21,6 +22,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'current_business_unit_id',
     ];
 
     /**
@@ -58,5 +60,10 @@ class User extends Authenticatable
         return BusinessUnit::createWithDefaultAccounts(
             array_merge($attributes, ['user_id' => $this->id])
         );
+    }
+
+    public function selectedBusinessUnit(): BelongsTo
+    {
+        return $this->belongsTo(BusinessUnit::class, 'current_business_unit_id');
     }
 }
