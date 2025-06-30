@@ -14,13 +14,16 @@ class SetupWizardTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function 初期状態では全ての入力が空である()
+    public function 初期状態ではnameが入っている()
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
+        // テストの日付を変更
+        $this->travelTo('2024-01-01');
+
         Livewire::test(SetupWizard::class)
-            ->assertSet('name', '')
+            ->assertSet('name', '一般事業所')
             ->assertSet('business_type', 'general')
             ->assertSet('is_taxable', false)
             ->assertSet('is_tax_exclusive', false);
@@ -33,6 +36,8 @@ class SetupWizardTest extends TestCase
         $this->actingAs($user);
 
         Livewire::test(\App\Livewire\SetupWizard::class)
+            ->set('name', '')
+            ->set('year', '')
             ->call('submit')
             ->assertHasErrors(['name', 'year']);
     }
@@ -105,6 +110,7 @@ class SetupWizardTest extends TestCase
         $this->actingAs($user);
 
         Livewire::test(\App\Livewire\SetupWizard::class)
+            ->set('name', '')
             ->call('next')
             ->assertHasErrors(['name']);
     }
