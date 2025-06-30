@@ -9,14 +9,15 @@ class SetupWizard extends Component
 {
     public int $step = 1;
 
-    public string $name = '';
+    public string $name = '一般事業所';
     public string $business_type = 'general';
     public bool $is_taxable = false;
     public bool $is_tax_exclusive = false;
     public int|null $year = null;
-    public ?int $cash_balance = null;
+    public int|null $cash_balance = null;
     public array $bank_accounts = [];
     public array $other_assets = [];
+    public string $submitError = '';
 
     protected function rulesPerStep(): array
     {
@@ -59,6 +60,12 @@ class SetupWizard extends Component
         $allRules = collect($this->rulesPerStep())->collapse()->all();
         $this->validate($allRules);
 
+        if ($this->is_taxable || $this->is_tax_exclusive) {
+            $this->submitError = '現時点では免税事業者・税込経理のみ対応しています。';
+            throw new \InvalidArgumentException($this->submitError);
+        }
+
+
         $opening_entries = [];
 
         if (!is_null($this->cash_balance)) {
@@ -94,12 +101,53 @@ class SetupWizard extends Component
             'opening_entries' => $opening_entries,
         ];
 
-        $initializer = new GeneralBusinessInitializer();
-        $initializer->initialize(auth()->user(), $inputs);
+        try {
+            $initializer = new GeneralBusinessInitializer();
+            $initializer->initialize(auth()->user(), $inputs);
 
-        return redirect()->route('dashboard');
+            return $this->redirect(route('dashboard'));
+        } catch (\InvalidArgumentException $e) {
+            $this->submitError = $e->getMessage();
+        } catch (\Throwable $e) {
+            $this->submitError = '登録中に予期せぬエラーが発生しました。';
+            Log::error($e);
+        }
     }
 
+    public function addBankAccount()
+    {
+        $this->bank_accounts[] = [
+            'sub_account_name' => '',
+            'amount' => 0,
+        ];
+    }
+
+    public function removeBankAccount($index)
+    {
+        unset($this->bank_accounts[$index]);
+        $this->bank_accounts = array_values($this->bank_accounts);
+    }
+
+    public function addOtherAsset()
+    {
+        $this->other_assets[] = [
+            'account_name' => '',
+            'sub_account_name' => '',
+            'amount' => 0,
+        ];
+    }
+
+    public function removeOtherAsset($index)
+    {
+        unset($this->other_assets[$index]);
+        $this->other_assets = array_values($this->other_assets);
+    }
+
+
+    public function mount()
+    {
+        $this->year = (int)  date('Y');
+    }
 
     public function render()
     {

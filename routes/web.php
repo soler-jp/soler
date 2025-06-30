@@ -12,4 +12,10 @@ Route::view('profile', 'profile')
     ->middleware(['auth'])
     ->name('profile');
 
-require __DIR__.'/auth.php';
+Route::middleware(['auth'])->group(function () {
+
+    Route::get('/dashboard', \App\Http\Controllers\PortalController::class)->name('dashboard');
+    Route::get('/initialize', [\App\Http\Controllers\SetupController::class, 'initialize'])->name('initialize');
+});
+
+require __DIR__ . '/auth.php';
