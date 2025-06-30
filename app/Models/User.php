@@ -57,9 +57,17 @@ class User extends Authenticatable
 
     public function createBusinessUnitWithDefaults(array $attributes): BusinessUnit
     {
-        return BusinessUnit::createWithDefaultAccounts(
-            array_merge($attributes, ['user_id' => $this->id])
-        );
+
+        return \DB::transaction(function () use ($attributes) {
+            $bu = BusinessUnit::createWithDefaultAccounts(
+                array_merge($attributes, ['user_id' => $this->id])
+            );
+
+            $this->current_business_unit_id = $bu->id;
+            $this->save();
+
+            return $bu;
+        });
     }
 
     public function selectedBusinessUnit(): BelongsTo

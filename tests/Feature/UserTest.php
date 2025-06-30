@@ -27,6 +27,16 @@ class UserTest extends TestCase
     }
 
     #[Test]
+    public function createBusinessUnitWithDefaultsでCurrentBusinessUnitが設定される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '新規事業体']);
+
+        $this->assertEquals($unit->id, $user->current_business_unit_id);
+        $this->assertTrue($user->selectedBusinessUnit->is($unit));
+    }
+
+    #[Test]
     public function currentBusinessUnitが未設定の場合はnullを返す()
     {
         $user = User::factory()->create([
