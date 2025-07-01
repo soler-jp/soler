@@ -116,6 +116,11 @@ class BusinessUnit extends Model
         ['name' => '雑費', 'type' => Account::TYPE_EXPENSE],
     ];
 
+
+    public static array $defaultSubAccounts = [
+        ['name' => '源泉徴収',       'account_name' => '事業主貸'],
+    ];
+
     /**
      * BusinessUnitを作成し、標準勘定科目も同時に登録する
      *
@@ -131,6 +136,19 @@ class BusinessUnit extends Model
                 $businessUnit->createAccount($account);
             }
 
+            foreach (self::$defaultSubAccounts as $subAccount) {
+                $account = $businessUnit->accounts()
+                    ->where('name', $subAccount['account_name'])
+                    ->first();
+
+                if ($account) {
+                    $account->createSubAccount([
+                        'name' => $subAccount['name'],
+                    ]);
+                } else {
+                    throw new \InvalidArgumentException("勘定科目 '{$subAccount['account_name']}' が見つかりません。");
+                }
+            }
 
             return $businessUnit;
         });

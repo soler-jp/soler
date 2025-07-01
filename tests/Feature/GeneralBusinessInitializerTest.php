@@ -200,4 +200,29 @@ class GeneralBusinessInitializerTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $initializer->initialize($user, $inputs);
     }
+
+    #[Test]
+    public function 源泉徴収のSubAccountが生成される()
+    {
+        $user = User::factory()->create();
+        $initializer = new GeneralBusinessInitializer();
+        $unit = $initializer->initialize($user, [
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+        ]);
+
+        $drawAccount = $unit->accounts()->where('name', '事業主貸')->first();
+
+        $this->assertDatabaseHas('sub_accounts', [
+            'account_id' => $drawAccount->id,
+            'name' => '源泉徴収',
+        ]);
+    }
 }
