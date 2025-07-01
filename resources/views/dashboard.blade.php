@@ -33,9 +33,13 @@
             </div>
 
             <div class="py-6 px-4 sm:px-6 lg:px-8">
-                <h1 class="text-2xl font-bold mb-6">経費入力</h1>
                 <livewire:dashboard-expense-input />
             </div>
+
+            <div class="py-6 px-4 sm:px-6 lg:px-8">
+                <livewire:dashboard-revenue-input />
+            </div>
+
         </div>
     </div>
 </x-app-layout>
