@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Models\BusinessUnit;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -250,5 +251,50 @@ class BusinessUnitTest extends TestCase
         $unit->createFiscalYear(2025);
 
         $this->assertTrue($unit->currentFiscalYear->is($fiscal2024));
+    }
+
+    #[Test]
+    public function よく使う勘定科目のgetterテスト()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+
+        $names = [
+            '現金',
+            '事業主貸',
+            '事業主借',
+            '売上高',
+        ];
+
+        foreach ($names as $name) {
+            $account = $unit->getAccountByName($name);
+            $this->assertNotNull($account, "勘定科目 '{$name}' が見つかりません。");
+            $this->assertEquals($name, $account->name, "勘定科目の名前が期待と異なります。");
+        }
+    }
+
+    #[Test]
+    public function よく使うSubAccountのgetterテスト()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+
+        $names = [
+            '事業主貸' => [
+                '源泉徴収',
+            ]
+        ];
+
+        foreach ($names as $accountName => $subAccounts) {
+            $account = $unit->getAccountByName($accountName);
+            $this->assertNotNull($account, "勘定科目 '{$accountName}' が見つかりません。");
+
+
+            foreach ($subAccounts as $name) {
+                $subAccount = $unit->getSubAccountByName($accountName, $name);
+                $this->assertNotNull($subAccount, "サブ勘定科目 '{$name}' が見つかりません。");
+                $this->assertEquals($name, $subAccount->name, "サブ勘定科目の名前が期待と異なります。");
+            }
+        }
     }
 }

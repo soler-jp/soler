@@ -195,6 +195,17 @@ class BusinessUnit extends Model
         return $this->accounts()->where('name', $name)->first();
     }
 
+
+    public function getSubAccountByName(string $accountName, string $subAccountName): ?SubAccount
+    {
+        return $this->accounts()
+            ->where('name', $accountName)
+            ->first()
+            ->subAccounts()
+            ->where('name', $subAccountName)
+            ->first();
+    }
+
     public function taxPaidAccount(): Account
     {
         return $this->accounts()
