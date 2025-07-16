@@ -163,7 +163,15 @@ class BusinessUnit extends Model
      */
     public function createAccount(array $attributes): Account
     {
-        return $this->accounts()->create($attributes);
+        return \DB::transaction(function () use ($attributes) {
+            $account = $this->accounts()->create($attributes);
+
+            $account->subAccounts()->create([
+                'name' => $account->name,
+            ]);
+
+            return $account;
+        });
     }
 
     /**

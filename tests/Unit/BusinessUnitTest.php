@@ -297,4 +297,28 @@ class BusinessUnitTest extends TestCase
             }
         }
     }
+
+    #[Test]
+    public function 勘定科目を作成すると同名の補助科目が自動で作成される()
+    {
+        $user = User::factory()->create();
+
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業所',
+        ]);
+
+        $account = $businessUnit->createAccount([
+            'name' => '仮払金',
+            'type' => 'asset',
+        ]);
+
+        $this->assertDatabaseHas('accounts', [
+            'id' => $account->id,
+            'name' => '仮払金',
+        ]);
+
+        $this->assertCount(1, $account->subAccounts);
+
+        $this->assertSame('仮払金', $account->subAccounts->first()->name);
+    }
 }
