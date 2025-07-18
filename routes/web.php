@@ -18,4 +18,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/initialize', [\App\Http\Controllers\SetupController::class, 'initialize'])->name('initialize');
 });
 
+
+Route::middleware(['auth', 'admin'])
+    ->prefix('admin')
+    ->group(function () {
+        Route::get('/users',  [\App\Http\Controllers\Admin\UserController::class, 'index'])->name('admin.users');
+    });
+
 require __DIR__ . '/auth.php';

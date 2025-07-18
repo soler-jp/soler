@@ -59,3 +59,31 @@
 
 This project is licensed under the **GNU AGPL v3.0**.  
 商用利用可・改変可。ただしソースコードの公開が必要です。
+
+
+
+## 初期設定の手順
+
+αバージョンはユーザー登録機能を切っているので、
+1. 管理者の作成
+1. 管理者でログインして、一般ユーザーの作成
+をする必要がある。
+
+### 管理者アカウントの作成
+
+```
+$ sail tinker
+> \App\Models\User::create([
+    'name' => '管理者',
+    'email' => 'admin@example.com',
+    'password' => bcrypt('password'),
+    'is_admin' => true,
+]);
+```
+
+
+### 一般ユーザーの作成
+
+http://server/admin/users
+
+にアクセスして、ユーザーを管理。
