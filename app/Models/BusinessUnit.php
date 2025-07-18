@@ -10,6 +10,7 @@ use App\Models\FiscalYear;
 use Illuminate\Support\Collection;
 use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class BusinessUnit extends Model
 {
@@ -52,6 +53,18 @@ class BusinessUnit extends Model
     public function accounts()
     {
         return $this->hasMany(Account::class);
+    }
+
+    public function subAccounts(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            \App\Models\SubAccount::class,
+            \App\Models\Account::class,
+            'business_unit_id', // Foreign key on Account
+            'account_id',       // Foreign key on SubAccount
+            'id',               // Local key on BusinessUnit
+            'id'                // Local key on Account
+        );
     }
 
     // 初期勘定科目リスト

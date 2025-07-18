@@ -29,7 +29,6 @@ class FreelancerBookTest extends TestCase
 
         $this->fiscalYear = $this->unit->createFiscalYear(2024);
 
-        // アカウント名で取得しやすくする（キャッシュ）
         $names = [
             'bank' => '当座預金',
             'cash' => '現金',
@@ -46,9 +45,14 @@ class FreelancerBookTest extends TestCase
 
         $this->accounts = collect($names)->mapWithKeys(function ($name, $key) {
             return [
-                $key => $this->unit->accounts()->where('name', $name)->firstOrFail()
+                $key => $this->unit->accounts()->where('name', $name)->firstOrFail(),
             ];
         });
+    }
+
+    protected function subId(string $key): int
+    {
+        return $this->accounts[$key]->subAccounts->first()->id;
     }
 
     #[Test]
@@ -115,14 +119,14 @@ class FreelancerBookTest extends TestCase
 
             $journalEntriesData = [
                 [
-                    'account_id' => $this->accounts[$sample['debit'][0]]->id,
+                    'sub_account_id' => $this->subId($sample['debit'][0]),
                     'type' => 'debit',
                     'amount' => $sample['debit'][1],
                     'tax_amount' => $sample['debit'][2],
                     'tax_type' => $sample['debit'][3],
                 ],
                 [
-                    'account_id' => $this->accounts[$sample['credit'][0]]->id,
+                    'sub_account_id' => $this->subId($sample['credit'][0]),
                     'type' => 'credit',
                     'amount' => $sample['credit'][1],
                     'tax_amount' => $sample['credit'][2],
@@ -158,14 +162,14 @@ class FreelancerBookTest extends TestCase
 
         $journalEntriesData = [
             [
-                'account_id' => $this->accounts['consumables']->id,
+                'sub_account_id' => $this->subId('consumables'),
                 'type' => 'debit',
                 'amount' => 1000,
                 'tax_amount' => 0,
                 'tax_type' => 'non_taxable',
             ],
             [
-                'account_id' => $this->accounts['bank']->id,
+                'sub_account_id' => $this->subId('bank'),
                 'type' => 'credit',
                 'amount' => 2000,
                 'tax_amount' => 0,

@@ -18,23 +18,26 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
         {{-- 左ブロック：debit 勘定科目（grid配置） --}}
+        {{-- 借方補助科目選択 --}}
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">経費の種類</label>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
                 @foreach ($expenseAccounts as $account)
-                    <button type="button" wire:click="$set('debit_account_id', {{ $account->id }})"
-                        class="px-2 py-1.5 text-sm rounded-md shadow-sm text-center
-                                   @if ($debit_account_id === $account->id) bg-indigo-600 text-white
-                                   @else
-                                       bg-gray-100 text-gray-800 @endif">
-                        {{ $account->name }}
-                    </button>
+                    @foreach ($account->subAccounts as $subAccount)
+                        <button type="button" wire:click="$set('debit_sub_account_id', {{ $subAccount->id }})"
+                            class="px-2 py-1.5 text-sm rounded-md shadow-sm text-center
+                           @if ($debit_sub_account_id === $subAccount->id) bg-indigo-600 text-white
+                           @else bg-gray-100 text-gray-800 @endif">
+                            {{ $account->name === $subAccount->name ? $account->name : $account->name . ' - ' . $subAccount->name }}
+                             </button>
+                    @endforeach
                 @endforeach
             </div>
-            @error('debit_account_id')
+            @error('debit_sub_account_id')
                 <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
             @enderror
         </div>
+
 
         {{-- 右ブロック：日付・金額・摘要・credit・登録 --}}
         <div class="space-y-4">
@@ -71,20 +74,22 @@
             </div>
 
             {{-- 支払方法（credit ボタン群） --}}
+            {{-- 貸方補助科目選択 --}}
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">支払方法</label>
                 <div class="flex flex-wrap gap-2">
                     @foreach ($creditAccounts as $account)
-                        <button type="button" wire:click="$set('credit_account_id', {{ $account->id }})"
-                            class="px-3 py-1.5 text-sm rounded-md shadow-sm
-                                       @if ($credit_account_id === $account->id) bg-indigo-600 text-white
-                                       @else
-                                           bg-gray-100 text-gray-800 @endif">
-                            {{ $account->name }}
-                        </button>
+                        @foreach ($account->subAccounts as $subAccount)
+                            <button type="button" wire:click="$set('credit_sub_account_id', {{ $subAccount->id }})"
+                                class="px-3 py-1.5 text-sm rounded-md shadow-sm
+                           @if ($credit_sub_account_id === $subAccount->id) bg-indigo-600 text-white
+                           @else bg-gray-100 text-gray-800 @endif">
+                                {{ $account->name === $subAccount->name ? $account->name : $account->name . ' - ' . $subAccount->name }}
+                            </button>
+                        @endforeach
                     @endforeach
                 </div>
-                @error('credit_account_id')
+                @error('credit_sub_account_id')
                     <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
                 @enderror
             </div>

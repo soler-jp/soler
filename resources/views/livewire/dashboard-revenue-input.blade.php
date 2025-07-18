@@ -1,5 +1,4 @@
 <div class="bg-white shadow rounded-2xl p-6">
-
     <h2 class="text-lg font-bold text-gray-800 mb-4">売上の入力</h2>
 
     {{-- フラッシュメッセージ --}}
@@ -31,24 +30,27 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                             @foreach ($receiptGroups[$key] as $item)
                                 @php
-                                    $id = class_basename($item) . ':' . $item->id;
+                                    $subAccountId =
+                                        $item instanceof \App\Models\Account
+                                            ? optional($item->subAccounts->first())->id
+                                            : $item->id;
                                 @endphp
 
-                                <button type="button" wire:click="$set('selectedReceiptId', '{{ $id }}')"
-                                    class="w-full px-3 py-2 text-sm rounded-md shadow-sm text-center
-                            @if ($selectedReceiptId === $id) bg-indigo-600 text-white
-                            @else bg-gray-100 text-gray-800 @endif">
-                                    {{ $item->name }}
-                                </button>
+                                @if ($subAccountId)
+                                    <button type="button" wire:click="$set('receiptSubAccountId', {{ $subAccountId }})"
+                                        class="w-full px-3 py-2 text-sm rounded-md shadow-sm text-center
+                                        @if ($receiptSubAccountId === $subAccountId) bg-indigo-600 text-white
+                                        @else bg-gray-100 text-gray-800 @endif">
+                                        {{ $item->name }}
+                                    </button>
+                                @endif
                             @endforeach
                         </div>
                     </div>
                 @endforeach
             </div>
 
-
-
-            @error('selectedReceiptId')
+            @error('receiptSubAccountId')
                 <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
             @enderror
         </div>

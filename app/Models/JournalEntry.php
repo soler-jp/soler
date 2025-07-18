@@ -54,9 +54,9 @@ class JournalEntry extends Model
         return $this->belongsTo(Transaction::class);
     }
 
-    public function account(): BelongsTo
+    public function account(): Attribute
     {
-        return $this->belongsTo(Account::class);
+        return Attribute::get(fn() => $this->subAccount?->account);
     }
 
     public function subAccount(): BelongsTo

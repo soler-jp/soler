@@ -122,7 +122,7 @@ class TransactionRegistrar
 
         $zeroedEntries = $originalEntries->map(function ($entry) {
             return [
-                'account_id' => $entry->account_id,
+                'sub_account_id' => $entry->sub_account_id,
                 'type' => $entry->type,
                 'amount' => 0,
                 'tax_type' => null,

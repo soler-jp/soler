@@ -36,10 +36,12 @@ class RegisterOpeningEntryTest extends TestCase
         $txn = $fiscalYear->registerOpeningEntry([
             [
                 'account_name' => '現金',
+                'sub_account_name' => '現金',
                 'amount' => 100000,
             ],
             [
-                'account_name' => '定期預金',
+                'account_name' => 'その他の預金',
+                'sub_account_name' => '定期預金',
                 'amount' => 200000,
             ],
         ]);
@@ -58,8 +60,8 @@ class RegisterOpeningEntryTest extends TestCase
         $this->assertEquals(300000, $debits->sum('amount'));
         $this->assertEquals(300000, $credits->sum('amount'));
 
-        $this->assertEquals('equity', $credits->first()->account->type);
-        $this->assertEquals('元入金', $credits->first()->account->name);
+        $this->assertEquals('equity', $credits->first()->subAccount->account->type);
+        $this->assertEquals('元入金', $credits->first()->subAccount->account->name);
     }
 
 
@@ -72,25 +74,39 @@ class RegisterOpeningEntryTest extends TestCase
             'name' => 'テスト事業体',
         ]);
 
+        $orgSubAccounts = $unit->subAccounts->all();
+        $this->assertCount(50, $orgSubAccounts, '初期状態ではSubAccountがデフォルトの50');
+
+        $this->assertDatabaseMissing('sub_accounts', [
+            'name' => '事務所レジ',
+        ]);
+
+        $this->assertDatabaseMissing('sub_accounts', [
+            'name' => '地方信用金庫',
+        ]);
+
         $fiscalYear = $unit->createFiscalYear(2025);
 
         $transaction = $fiscalYear->registerOpeningEntry([
             [
-                'account_name' => '現金',
                 'amount' => 100000,
                 'sub_account_name' => '事務所レジ',
+                'account_name' => '現金',
             ],
             [
-                'account_name' => '定期預金',
                 'amount' => 200000,
                 'sub_account_name' => '地方信用金庫',
+                'account_name' => 'その他の預金',
             ],
         ]);
 
+
         $this->assertEquals(3, $transaction->journalEntries->count());
 
-        $subAccounts = SubAccount::all();
-        $this->assertCount(2, $subAccounts);
+        $unit->refresh();
+        $subAccounts = $unit->subAccounts->all();
+        $this->assertCount(52, $subAccounts, 'SubAccountが2つ追加されていることを確認');
+
 
         $this->assertDatabaseHas('sub_accounts', [
             'name' => '事務所レジ',
@@ -108,6 +124,8 @@ class RegisterOpeningEntryTest extends TestCase
         $this->assertContains('事務所レジ', $subAccountNames);
         $this->assertContains('地方信用金庫', $subAccountNames);
     }
+
+
     #[Test]
     public function 既存のSubAccountがある場合は再利用される()
     {
@@ -123,10 +141,10 @@ class RegisterOpeningEntryTest extends TestCase
             'name' => 'レジ現金',
         ]);
 
-        $existing = SubAccount::create([
-            'account_id' => $cashAccount->id,
+        $existing = $cashAccount->subAccounts()->create([
             'name' => 'レジ現金',
         ]);
+
 
         $transaction = $fiscalYear->registerOpeningEntry([
             [

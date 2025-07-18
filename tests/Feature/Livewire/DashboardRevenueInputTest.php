@@ -18,8 +18,8 @@ class DashboardRevenueInputTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
-        $initializer->initialize($user, [
+        $initializer = new GeneralBusinessInitializer();
+        $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
             'year' => 2025,
@@ -31,30 +31,30 @@ class DashboardRevenueInputTest extends TestCase
             'recurring_templates' => [],
         ]);
 
-        $unit = $user->selectedBusinessUnit;
-        $revenueAccount = $unit->getAccountByName('売上高');
-        $cashAccount = $unit->accounts()->where('name', '現金')->first();
+        $revenue = $unit->getAccountByName('売上高');
+        $revenueSub = $revenue->subAccounts()->first();
+        $cash = $unit->getAccountByName('現金');
+        $cashSub = $cash->subAccounts()->first();
 
         Livewire::actingAs($user)
             ->test('dashboard-revenue-input')
             ->set('date', '2025-04-01')
-            ->set('gross_amount', '10000')
+            ->set('gross_amount', 10000)
             ->set('description', '通常売上テスト')
-            ->set('revenueAccountId', $revenueAccount->id)
-            ->set('receiptAccountId', $cashAccount->id)
-            ->set('selectedReceiptId', 'Account:' . $cashAccount->id)
+            ->set('revenueSubAccountId', $revenueSub->id)
+            ->set('receiptSubAccountId', $cashSub->id)
             ->call('save')
             ->assertHasNoErrors()
             ->assertSee('売上を登録しました');
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $revenueAccount->id,
+            'sub_account_id' => $revenueSub->id,
             'type' => 'credit',
             'amount' => 10000,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $cashAccount->id,
+            'sub_account_id' => $cashSub->id,
             'type' => 'debit',
             'amount' => 10000,
         ]);
@@ -78,9 +78,8 @@ class DashboardRevenueInputTest extends TestCase
             'recurring_templates' => [],
         ]);
 
-        $revenueAccount = $unit->getAccountByName('売上高');
-        $cashAccount = $unit->getAccountByName('現金');
-        $withheldTaxAccount = $unit->getAccountByName('事業主貸');
+        $revenueSubAccount = $unit->getAccountByName('売上高')->subAccounts()->first();
+        $cashSubAccount = $unit->getAccountByName('現金')->subAccounts()->first();
         $withheldTaxSubAccount = $unit->getSubAccountByName('事業主貸', '源泉徴収');
 
         Livewire::actingAs($user)
@@ -90,29 +89,27 @@ class DashboardRevenueInputTest extends TestCase
             ->set('withholding', true)
             ->set('holding_amount', '1021') // 源泉徴収額          
             ->set('description', '源泉あり売上テスト')
-            ->set('revenueAccountId', $revenueAccount->id)
-            ->set('receiptAccountId', $cashAccount->id)
-            ->set('withheldTaxAccountId', $withheldTaxAccount->id)
+            ->set('revenueSubAccountId', $revenueSubAccount->id)
+            ->set('receiptSubAccountId', $cashSubAccount->id)
             ->set('withheldTaxSubAccountId', $withheldTaxSubAccount->id)
-            ->set('selectedReceiptId', 'Account:' . $cashAccount->id)
             ->call('save')
             ->assertHasNoErrors()
             ->assertSee('売上を登録しました');
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $revenueAccount->id,
+            'sub_account_id' => $revenueSubAccount->id,
             'type' => 'credit',
             'amount' => 10000,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $cashAccount->id,
+            'sub_account_id' => $cashSubAccount->id,
             'type' => 'debit',
             'amount' => 8979,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $withheldTaxAccount->id,
+            'sub_account_id' => $withheldTaxSubAccount->id,
             'type' => 'debit',
             'amount' => 1021,
         ]);
@@ -135,14 +132,12 @@ class DashboardRevenueInputTest extends TestCase
             'recurring_templates' => [],
         ]);
 
-        $revenueAccount = $unit->getAccountByName('売上高');
-        $withheldAccount = $unit->getAccountByName('事業主貸');
+        $revenueSubAccount = $unit->getAccountByName('売上高')->subAccounts()->first();
         $withheldSubAccount = $unit->getSubAccountByName('事業主貸', '源泉徴収');
 
         Livewire::actingAs($user)
             ->test('dashboard-revenue-input')
-            ->assertSet('revenueAccountId', $revenueAccount->id)
-            ->assertSet('withheldTaxAccountId', $withheldAccount->id)
+            ->assertSet('revenueSubAccountId', $revenueSubAccount->id)
             ->assertSet('withheldTaxSubAccountId', $withheldSubAccount->id);
     }
 
@@ -159,24 +154,24 @@ class DashboardRevenueInputTest extends TestCase
             'is_tax_exclusive' => false,
         ]);
 
-        $cashAccount = $user->selectedBusinessUnit->getAccountByName('現金');
+        $cashSubAccount = $user->selectedBusinessUnit->getSubAccountByName('現金', '現金');
 
         Livewire::actingAs($user)
             ->test('dashboard-revenue-input')
             ->set('date', 'yy') // 未入力
             ->set('gross_amount', 0) // 0円
-            ->set('revenueAccountId', 999999) // 存在しないID
-            ->set('selectedReceiptId', 'Account:' . $cashAccount->id) // 入金先は現金
+            ->set('revenueSubAccountId', 999999) // 存在しないID
+            ->set('receiptSubAccountId', $cashSubAccount->id) // 入金先は現金
             ->call('save')
             ->assertHasErrors([
                 'date',
                 'gross_amount' => 'min',
-                'revenueAccountId' => 'exists',
+                'revenueSubAccountId' => 'exists',
             ]);
     }
 
     #[Test]
-    public function 入金先としてsubAccountがある場合はsubAccountが表示され_ない場合はaccountが表示される()
+    public function 入金先としてsubAccountが表示される()
     {
         $user = User::factory()->create();
 
@@ -188,6 +183,8 @@ class DashboardRevenueInputTest extends TestCase
         ]);
 
         $cashAccount = $unit->getAccountByName('現金');
+        $cashSubAccount = $cashAccount->subAccounts()->first();
+
         $bankAccount = $unit->getAccountByName('その他の預金');
 
         $bankSubAccount_1 = $bankAccount->createSubAccount([
@@ -203,8 +200,8 @@ class DashboardRevenueInputTest extends TestCase
         $groups = $component->instance()->receiptGroups;
 
         // 現金（SubAccountなし → Accountで表示）
-        $this->assertContainsOnlyInstancesOf(\App\Models\Account::class, $groups['cash']);
-        $this->assertTrue(collect($groups['cash'])->contains(fn($c) => $c->id === $cashAccount->id));
+        $this->assertContainsOnlyInstancesOf(\App\Models\SubAccount::class, $groups['cash']);
+        $this->assertTrue(collect($groups['cash'])->contains(fn($c) => $c->id === $cashSubAccount->id));
 
         // その他の預金（SubAccountが2つ → SubAccountで表示）
         $this->assertContainsOnlyInstancesOf(\App\Models\SubAccount::class, $groups['bank']);
@@ -245,20 +242,19 @@ class DashboardRevenueInputTest extends TestCase
             'is_taxable_supplier' => false,
             'is_tax_exclusive' => false,
         ]);
-        $cashAccount = $user->selectedBusinessUnit->getAccountByName('現金');
+        $cashSubAccount = $user->selectedBusinessUnit->getAccountByName('現金')->subAccounts()->first();
 
         Livewire::actingAs($user)
             ->test('dashboard-revenue-input')
             ->set('date', 'invalid-date') // required, date
             ->set('gross_amount', null) // required, integer, min:1
-            ->set('revenueAccountId', null) // required
-            ->set('receiptAccountId', null) // required
-            ->set('selectedReceiptId', 'Account:' . $cashAccount->id) // 入金先は現金
+            ->set('revenueSubAccountId', null) // required
+            ->set('receiptSubAccountId', $cashSubAccount->id) // 入金先は現金
             ->call('save')
             ->assertHasErrors([
                 'date',
                 'gross_amount',
-                'revenueAccountId' => ['required'],
+                'revenueSubAccountId' => ['required'],
             ]);
     }
 
@@ -277,27 +273,27 @@ class DashboardRevenueInputTest extends TestCase
         $fy = $unit->createFiscalYear(2025);
         $unit->setCurrentFiscalYear($fy);
 
-        $revenueAccount = $unit->getAccountByName('売上高');
-        $cashAccount = $unit->getAccountByName('現金');
+        $revenueSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
 
         Livewire::actingAs($user)
             ->test('dashboard-revenue-input')
             ->set('date', '2025-04-01')
             ->set('gross_amount', 12000)
             ->set('description', '現金売上テスト')
-            ->set('selectedReceiptId', 'Account:' . $cashAccount->id)
+            ->set('receiptSubAccountId', $cashSubAccount->id)
             ->call('save')
             ->assertHasNoErrors()
             ->assertSee('売上を登録しました');
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $cashAccount->id,
+            'sub_account_id' => $cashSubAccount->id,
             'type' => 'debit',
             'amount' => 12000,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $revenueAccount->id,
+            'sub_account_id' => $revenueSubAccount->id,
             'type' => 'credit',
             'amount' => 12000,
         ]);
@@ -317,7 +313,7 @@ class DashboardRevenueInputTest extends TestCase
             'is_tax_exclusive' => false,
         ]);
 
-        $revenueAccount = $unit->getAccountByName('売上高');
+        $revenueSubAccount = $unit->getSubAccountByName('売上高', '売上高');
         $bankAccount = $unit->getAccountByName('その他の預金');
         $bankSubAccount = $bankAccount->subAccounts()->create([
             'name' => 'テスト銀行',
@@ -328,20 +324,19 @@ class DashboardRevenueInputTest extends TestCase
             ->set('date', '2025-04-02')
             ->set('gross_amount', 15000)
             ->set('description', '銀行売上テスト')
-            ->set('selectedReceiptId', 'SubAccount:' . $bankSubAccount->id)
+            ->set('receiptSubAccountId', $bankSubAccount->id)
             ->call('save')
             ->assertHasNoErrors()
             ->assertSee('売上を登録しました');
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $bankAccount->id,
             'sub_account_id' => $bankSubAccount->id,
             'type' => 'debit',
             'amount' => 15000,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $revenueAccount->id,
+            'sub_account_id' => $revenueSubAccount->id,
             'type' => 'credit',
             'amount' => 15000,
         ]);
@@ -366,8 +361,8 @@ class DashboardRevenueInputTest extends TestCase
             ->set('date', '2025-04-03')
             ->set('gross_amount', 10000)
             ->set('description', '入金先未選択テスト')
-            ->set('selectedReceiptId', null) // 入金先未選択
+            ->set('receiptSubAccountId', null) // 入金先を未選択
             ->call('save')
-            ->assertHasErrors(['selectedReceiptId' => 'required']);
+            ->assertHasErrors(['receiptSubAccountId' => 'required']);
     }
 }

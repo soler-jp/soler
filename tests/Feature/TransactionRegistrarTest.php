@@ -23,6 +23,8 @@ class TransactionRegistrarTest extends TestCase
         $fiscalYear = FiscalYear::factory()->create();
         $account = Account::factory()->create();
 
+        $subAccount = $account->subAccounts->first();
+
         $transactionData = [
             'date' => now()->toDateString(),
             'description' => '文房具を現金で購入',
@@ -30,12 +32,12 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntriesData = [
             [
-                'account_id' => $account->id,
+                'sub_account_id' => $subAccount->id,
                 'type' => 'debit',
                 'amount' => 1000,
             ],
             [
-                'account_id' => $account->id,
+                'sub_account_id' => $subAccount->id,
                 'type' => 'credit',
                 'amount' => 1000,
             ],
@@ -117,6 +119,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $fiscalYear = FiscalYear::factory()->create();
         $account = Account::factory()->create();
+        $subAccount = $account->subAccounts->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -127,12 +130,12 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntriesData = [
             [
-                'account_id' => $account->id,
+                'sub_account_id' => $subAccount->id,
                 'type' => 'debit',
                 'amount' => 1000,
             ],
             [
-                'account_id' => $account->id,
+                'sub_account_id' => $subAccount->id,
                 'type' => 'credit',
                 'amount' => 800, // バランスが崩れている
             ],
@@ -171,6 +174,7 @@ class TransactionRegistrarTest extends TestCase
 
         $fiscalYear = FiscalYear::factory()->create();
         $account = Account::factory()->create();
+        $subAccount = $account->subAccounts->first();
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -178,7 +182,7 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['account_id' => $account->id, 'type' => 'debit', 'amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'amount' => 1000],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -191,6 +195,7 @@ class TransactionRegistrarTest extends TestCase
 
         $fiscalYear = FiscalYear::factory()->create();
         $account = Account::factory()->create();
+        $subAccount = $account->subAccounts->first();
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -198,8 +203,8 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['account_id' => $account->id, 'type' => 'debit', 'amount' => 1000],
-            ['account_id' => $account->id, 'type' => 'credit', 'amount' => 900],
+            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'amount' => 900],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -212,6 +217,7 @@ class TransactionRegistrarTest extends TestCase
 
         $fiscalYear = FiscalYear::factory()->create();
         $account = Account::factory()->create();
+        $subAccount = $account->subAccounts->first();
 
         $transactionData = [
             'date' => 'invalid-date',
@@ -219,8 +225,8 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['account_id' => $account->id, 'type' => 'debit', 'amount' => 500],
-            ['account_id' => $account->id, 'type' => 'credit', 'amount' => 500],
+            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'amount' => 500],
+            ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'amount' => 500],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -254,6 +260,7 @@ class TransactionRegistrarTest extends TestCase
 
         $fiscalYear = FiscalYear::factory()->create();
         $account = Account::factory()->create();
+        $subAccount = $account->subAccounts->first();
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -261,8 +268,8 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['account_id' => $account->id, 'type' => 'invalid', 'amount' => 1000],
-            ['account_id' => $account->id, 'type' => 'credit', 'amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'invalid', 'amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'amount' => 1000],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -292,6 +299,7 @@ class TransactionRegistrarTest extends TestCase
 
         $fiscalYear = FiscalYear::factory()->create();
         $account = Account::factory()->create();
+        $subAccount = $account->subAccounts->first();
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -299,8 +307,8 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['account_id' => $account->id, 'type' => 'debit', 'amount' => 1000],
-            ['account_id' => $account->id, 'type' => 'debit', 'amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'amount' => 1000],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -312,8 +320,8 @@ class TransactionRegistrarTest extends TestCase
     public function tax_amount込みでもバランスが正しければ登録できる()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $debitAccount = Account::factory()->create();
-        $creditAccount = Account::factory()->create();
+        $debitSubAccount = Account::factory()->create()->subAccounts->first();
+        $creditSubAccount = Account::factory()->create()->subAccounts->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -324,14 +332,14 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntriesData = [
             [
-                'account_id' => $debitAccount->id,
+                'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
                 'amount' => 5000,
                 'tax_amount' => 500,
                 'tax_type' => 'taxable_purchases_10',
             ],
             [
-                'account_id' => $creditAccount->id,
+                'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'amount' => 5500,
                 'tax_amount' => 0,
@@ -351,8 +359,8 @@ class TransactionRegistrarTest extends TestCase
     public function tax_amountが不整合でバランスが崩れる場合は登録できない()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $debitAccount = Account::factory()->create();
-        $creditAccount = Account::factory()->create();
+        $debitSubAccount = Account::factory()->create()->subAccounts->first();
+        $creditSubAccount = Account::factory()->create()->subAccounts->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -363,14 +371,14 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntriesData = [
             [
-                'account_id' => $debitAccount->id,
+                'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
                 'amount' => 5000,
                 'tax_amount' => 500,
                 'tax_type' => 'taxable_purchases_10',
             ],
             [
-                'account_id' => $creditAccount->id,
+                'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'amount' => 5400,
                 'tax_amount' => 0,
@@ -388,8 +396,8 @@ class TransactionRegistrarTest extends TestCase
     public function tax_amountがマイナスだと登録できない()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $debitAccount = Account::factory()->create();
-        $creditAccount = Account::factory()->create();
+        $debitSubAccount = Account::factory()->create()->subAccounts->first();
+        $creditSubAccount = Account::factory()->create()->subAccounts->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -400,14 +408,14 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntriesData = [
             [
-                'account_id' => $debitAccount->id,
+                'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
                 'amount' => 5000,
                 'tax_amount' => -100,
                 'tax_type' => 'taxable_purchases_10',
             ],
             [
-                'account_id' => $creditAccount->id,
+                'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'amount' => 4900,
                 'tax_amount' => 0,
@@ -429,8 +437,8 @@ class TransactionRegistrarTest extends TestCase
         $this->expectExceptionMessage('消費税額');
 
         $fiscalYear = FiscalYear::factory()->create();
-        $debitAccount = Account::factory()->create();
-        $creditAccount = Account::factory()->create();
+        $debitSubAccount = Account::factory()->create()->subAccounts->first();
+        $creditSubAccount = Account::factory()->create()->subAccounts->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -441,14 +449,14 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntriesData = [
             [
-                'account_id' => $debitAccount->id,
+                'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
                 'amount' => 3000,
                 'tax_amount' => null,
                 'tax_type' => 'non_taxable',
             ],
             [
-                'account_id' => $creditAccount->id,
+                'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'amount' => 3000,
                 'tax_amount' => null,
@@ -468,8 +476,8 @@ class TransactionRegistrarTest extends TestCase
     public function tax_typeを記述していて、tax_amountが0だと登録できる()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $debitAccount = Account::factory()->create();
-        $creditAccount = Account::factory()->create();
+        $debitSubAccount = Account::factory()->create()->subAccounts->first();
+        $creditSubAccount = Account::factory()->create()->subAccounts->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -480,14 +488,14 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntriesData = [
             [
-                'account_id' => $debitAccount->id,
+                'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
                 'amount' => 3000,
                 'tax_amount' => 0,
                 'tax_type' => 'non_taxable',
             ],
             [
-                'account_id' => $creditAccount->id,
+                'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'amount' => 3000,
                 'tax_amount' => 0,
@@ -507,8 +515,8 @@ class TransactionRegistrarTest extends TestCase
     public function tax_amountが片方だけ指定された場合もバランスが取れていれば登録できる()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $debitAccount = Account::factory()->create();
-        $creditAccount = Account::factory()->create();
+        $debitSubAccount = Account::factory()->create()->subAccounts->first();
+        $creditSubAccount = Account::factory()->create()->subAccounts->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -519,14 +527,14 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntriesData = [
             [
-                'account_id' => $debitAccount->id,
+                'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
                 'amount' => 4500,
                 'tax_amount' => 500,
                 'tax_type' => 'taxable_purchases_10',
             ],
             [
-                'account_id' => $creditAccount->id,
+                'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'amount' => 5000,
             ],
@@ -552,6 +560,7 @@ class TransactionRegistrarTest extends TestCase
         $fiscalYear = $unit->createFiscalYear(2025);
 
         $account = $unit->accounts()->first(); // デフォルトAccountを利用
+        $subAccount = $account->subAccounts->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -563,12 +572,12 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntries = [
             [
-                'account_id' => $account->id,
+                'sub_account_id' => $subAccount->id,
                 'type' => 'debit',
                 'amount' => 1000,
             ],
             [
-                'account_id' => $account->id,
+                'sub_account_id' => $subAccount->id,
                 'type' => 'credit',
                 'amount' => 1000,
             ],
@@ -587,8 +596,14 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expenseAccount = $unit->accounts()->where('name', '通信費')->first();
-        $assetAccount = $unit->accounts()->where('name', '現金')->first();
+
+        $expenseSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', '通信費'))
+            ->first();
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', '現金'))
+            ->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -598,14 +613,14 @@ class TransactionRegistrarTest extends TestCase
             'is_planned' => true,
         ], [
             [
-                'account_id' => $expenseAccount->id,
+                'sub_account_id' => $expenseSubAccount->id,
                 'type' => 'debit',
                 'amount' => 1000,
                 'tax_type' => 'taxable_purchases_10',
                 'tax_amount' => 100,
             ],
             [
-                'account_id' => $assetAccount->id,
+                'sub_account_id' => $assetSubAccount->id,
                 'type' => 'credit',
                 'amount' => 1100,
             ],
@@ -618,14 +633,14 @@ class TransactionRegistrarTest extends TestCase
             'date' => '2025-04-02',
             'journal_entries' => [
                 [
-                    'account_id' => $expenseAccount->id,
+                    'sub_account_id' => $expenseSubAccount->id,
                     'type' => 'debit',
                     'amount' => 1000,
                     'tax_type' => 'taxable_purchases_10',
                     'tax_amount' => 100,
                 ],
                 [
-                    'account_id' => $assetAccount->id,
+                    'sub_account_id' => $assetSubAccount->id,
                     'type' => 'credit',
                     'amount' => 1100,
                 ],
@@ -645,9 +660,17 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expenseAccount = $unit->accounts()->where('name', '通信費')->first();
-        $assetAccount = $unit->accounts()->where('name', '現金')->first();
-        $liabilityAccount = $unit->accounts()->where('name', '未払金')->first();
+        $expenseSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', '通信費'))
+            ->first();
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', '現金'))
+            ->first();
+
+        $liabilitySubAccount = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', '未払金'))
+            ->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -657,14 +680,14 @@ class TransactionRegistrarTest extends TestCase
             'is_planned' => true,
         ], [
             [
-                'account_id' => $expenseAccount->id,
+                'sub_account_id' => $expenseSubAccount->id,
                 'type' => 'debit',
                 'amount' => 1000,
                 'tax_type' => 'taxable_purchases_10',
                 'tax_amount' => 100,
             ],
             [
-                'account_id' => $assetAccount->id,
+                'sub_account_id' => $assetSubAccount->id,
                 'type' => 'credit',
                 'amount' => 1100,
             ],
@@ -677,14 +700,14 @@ class TransactionRegistrarTest extends TestCase
             'date' => '2025-04-02',
             'journal_entries' => [
                 [
-                    'account_id' => $expenseAccount->id,
+                    'sub_account_id' => $expenseSubAccount->id,
                     'type' => 'debit',
                     'amount' => 2000,
                     'tax_type' => 'taxable_purchases_10',
                     'tax_amount' => 200,
                 ],
                 [
-                    'account_id' => $liabilityAccount->id,
+                    'sub_account_id' => $liabilitySubAccount->id,
                     'type' => 'credit',
                     'amount' => 2200,
                 ],
@@ -708,8 +731,13 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->accounts()->where('name', '通信費')->first();
-        $asset = $unit->accounts()->where('name', '現金')->first();
+        $expense = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', '通信費'))
+            ->first();
+
+        $asset = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', '現金'))
+            ->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -719,14 +747,14 @@ class TransactionRegistrarTest extends TestCase
             'is_planned' => true,
         ], [
             [
-                'account_id' => $expense->id,
+                'sub_account_id' => $expense->id,
                 'type' => 'debit',
                 'amount' => 1000,
                 'tax_type' => 'taxable_purchases_10',
                 'tax_amount' => 100,
             ],
             [
-                'account_id' => $asset->id,
+                'sub_account_id' => $asset->id,
                 'type' => 'credit',
                 'amount' => 1100,
             ],
@@ -750,8 +778,13 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->accounts()->where('name', '通信費')->first();
-        $asset = $unit->accounts()->where('name', '現金')->first();
+        $expense = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', '通信費'))
+            ->first();
+
+        $asset = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', '現金'))
+            ->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -761,12 +794,12 @@ class TransactionRegistrarTest extends TestCase
             'is_planned' => false,
         ], [
             [
-                'account_id' => $expense->id,
+                'sub_account_id' => $expense->id,
                 'type' => 'debit',
                 'amount' => 1000,
             ],
             [
-                'account_id' => $asset->id,
+                'sub_account_id' => $asset->id,
                 'type' => 'credit',
                 'amount' => 1000,
             ],

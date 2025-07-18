@@ -24,8 +24,8 @@ class GeneralLedgerServiceTest extends TestCase
 
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $debitAccount = $unit->getAccountByName('その他の預金');
-        $creditAccount = $unit->getAccountByName('事業主借');
+        $debitSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
+        $creditSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -37,19 +37,19 @@ class GeneralLedgerServiceTest extends TestCase
             ],
             journalEntriesData: [
                 [
-                    'account_id' => $debitAccount->id,
+                    'sub_account_id' => $debitSubAccount->id,
                     'type' => 'debit',
                     'amount' => 100000,
                 ],
                 [
-                    'account_id' => $creditAccount->id,
+                    'sub_account_id' => $creditSubAccount->id,
                     'type' => 'credit',
                     'amount' => 100000,
                 ],
             ]
         );
 
-        $ledger = (new GeneralLedgerService())->generate($debitAccount, $fiscalYear);
+        $ledger = (new GeneralLedgerService())->generate($debitSubAccount->account, $fiscalYear);
 
         $this->assertCount(1, $ledger);
         $this->assertSame('2025-01-10', $ledger[0]['date']);
@@ -58,6 +58,7 @@ class GeneralLedgerServiceTest extends TestCase
         $this->assertNull($ledger[0]['credit']);
         $this->assertSame(100000, $ledger[0]['balance']);
     }
+
 
     #[Test]
     public function 借方と貸方の複数仕訳が時系列順に表示される()
@@ -70,8 +71,8 @@ class GeneralLedgerServiceTest extends TestCase
 
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $cash = $unit->getAccountByName('その他の預金');
-        $owner = $unit->getAccountByName('事業主借');
+        $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
+        $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -84,12 +85,12 @@ class GeneralLedgerServiceTest extends TestCase
             ],
             journalEntriesData: [
                 [
-                    'account_id' => $cash->id,
+                    'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
                     'amount' => 100000,
                 ],
                 [
-                    'account_id' => $owner->id,
+                    'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'credit',
                     'amount' => 100000,
                 ],
@@ -105,12 +106,12 @@ class GeneralLedgerServiceTest extends TestCase
             ],
             journalEntriesData: [
                 [
-                    'account_id' => $cash->id,
+                    'sub_account_id' => $cashSubAccount->id,
                     'type' => 'credit',
                     'amount' => 30000,
                 ],
                 [
-                    'account_id' => $owner->id,
+                    'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'debit',
                     'amount' => 30000,
                 ],
@@ -126,19 +127,19 @@ class GeneralLedgerServiceTest extends TestCase
             ],
             journalEntriesData: [
                 [
-                    'account_id' => $cash->id,
+                    'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
                     'amount' => 50000,
                 ],
                 [
-                    'account_id' => $owner->id,
+                    'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'credit',
                     'amount' => 50000,
                 ],
             ]
         );
 
-        $ledger = (new GeneralLedgerService())->generate($cash, $fiscalYear);
+        $ledger = (new GeneralLedgerService())->generate($cashSubAccount->account, $fiscalYear);
 
         $this->assertCount(3, $ledger);
 
@@ -159,6 +160,7 @@ class GeneralLedgerServiceTest extends TestCase
     }
 
 
+
     #[Test]
     public function 異なる勘定科目の仕訳はLedgerに含まれない()
     {
@@ -170,12 +172,13 @@ class GeneralLedgerServiceTest extends TestCase
 
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $cash = $unit->getAccountByName('その他の預金');
-        $owner = $unit->getAccountByName('事業主借');
+        $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
+        $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         $registrar = new TransactionRegistrar();
 
         // 2件とも cash/owner を使った複式仕訳
+        // 1件目
         $registrar->register(
             fiscalYear: $fiscalYear,
             transactionData: [
@@ -184,18 +187,19 @@ class GeneralLedgerServiceTest extends TestCase
             ],
             journalEntriesData: [
                 [
-                    'account_id' => $cash->id,
+                    'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
                     'amount' => 50000,
                 ],
                 [
-                    'account_id' => $owner->id,
+                    'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'credit',
                     'amount' => 50000,
                 ],
             ]
         );
 
+        // 2件目
         $registrar->register(
             fiscalYear: $fiscalYear,
             transactionData: [
@@ -204,12 +208,12 @@ class GeneralLedgerServiceTest extends TestCase
             ],
             journalEntriesData: [
                 [
-                    'account_id' => $cash->id,
+                    'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
                     'amount' => 80000,
                 ],
                 [
-                    'account_id' => $owner->id,
+                    'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'credit',
                     'amount' => 80000,
                 ],
@@ -217,7 +221,7 @@ class GeneralLedgerServiceTest extends TestCase
         );
 
         // 事業主借のLedgerだけを生成
-        $ledger = (new GeneralLedgerService())->generate($owner, $fiscalYear);
+        $ledger = (new GeneralLedgerService())->generate($ownerSubAccount->account, $fiscalYear);
 
         $this->assertCount(2, $ledger);
 
@@ -232,6 +236,7 @@ class GeneralLedgerServiceTest extends TestCase
         $this->assertSame(-130000, $ledger[1]['balance']);
     }
 
+
     #[Test]
     public function 指定年度外の仕訳はLedgerに含まれない()
     {
@@ -244,8 +249,8 @@ class GeneralLedgerServiceTest extends TestCase
         $fiscal2024 = $unit->createFiscalYear(2024);
         $fiscal2025 = $unit->createFiscalYear(2025);
 
-        $cash = $unit->getAccountByName('その他の預金');
-        $owner = $unit->getAccountByName('事業主借');
+        $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
+        $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -258,12 +263,12 @@ class GeneralLedgerServiceTest extends TestCase
             ],
             journalEntriesData: [
                 [
-                    'account_id' => $cash->id,
+                    'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
                     'amount' => 10000,
                 ],
                 [
-                    'account_id' => $owner->id,
+                    'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'credit',
                     'amount' => 10000,
                 ],
@@ -279,19 +284,19 @@ class GeneralLedgerServiceTest extends TestCase
             ],
             journalEntriesData: [
                 [
-                    'account_id' => $cash->id,
+                    'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
                     'amount' => 50000,
                 ],
                 [
-                    'account_id' => $owner->id,
+                    'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'credit',
                     'amount' => 50000,
                 ],
             ]
         );
 
-        $ledger = (new GeneralLedgerService())->generate($cash, $fiscal2025);
+        $ledger = (new GeneralLedgerService())->generate($cashSubAccount->account, $fiscal2025);
 
         $this->assertCount(1, $ledger);
         $this->assertSame('2025-01-01', $ledger[0]['date']);
@@ -313,13 +318,14 @@ class GeneralLedgerServiceTest extends TestCase
 
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $cash = $unit->getAccountByName('その他の預金');
+        $subAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
 
-        $ledger = (new GeneralLedgerService())->generate($cash, $fiscalYear);
+        $ledger = (new GeneralLedgerService())->generate($subAccount->account, $fiscalYear);
 
         $this->assertIsArray($ledger);
         $this->assertCount(0, $ledger);
     }
+
 
     #[Test]
     public function 補助科目に紐づく仕訳のみがLedgerに表示される()
@@ -335,7 +341,7 @@ class GeneralLedgerServiceTest extends TestCase
         $subAccountA = $account->subAccounts()->create(['name' => 'レジ']);
         $subAccountB = $account->subAccounts()->create(['name' => '金庫']);
 
-        $otherAccount = $unit->getAccountByName('事業主借');
+        $otherSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -348,13 +354,12 @@ class GeneralLedgerServiceTest extends TestCase
             ],
             journalEntriesData: [
                 [
-                    'account_id' => $account->id,
                     'sub_account_id' => $subAccountA->id,
                     'type' => 'debit',
                     'amount' => 10000,
                 ],
                 [
-                    'account_id' => $otherAccount->id,
+                    'sub_account_id' => $otherSubAccount->id,
                     'type' => 'credit',
                     'amount' => 10000,
                 ],
@@ -370,13 +375,12 @@ class GeneralLedgerServiceTest extends TestCase
             ],
             journalEntriesData: [
                 [
-                    'account_id' => $account->id,
                     'sub_account_id' => $subAccountB->id,
                     'type' => 'debit',
                     'amount' => 5000,
                 ],
                 [
-                    'account_id' => $otherAccount->id,
+                    'sub_account_id' => $otherSubAccount->id,
                     'type' => 'credit',
                     'amount' => 5000,
                 ],
@@ -393,7 +397,6 @@ class GeneralLedgerServiceTest extends TestCase
         $this->assertSame(10000, $ledger[0]['balance']);
     }
 
-
     #[Test]
     public function 現金出納帳が現金勘定の仕訳のみを返す()
     {
@@ -405,8 +408,10 @@ class GeneralLedgerServiceTest extends TestCase
 
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $cash = $unit->getAccountByName('現金');
-        $other = $unit->getAccountByName('事業主借');
+        $cashAccount = $unit->getAccountByName('現金');
+        $cashSubAccount = $cashAccount->subAccounts()->first();
+
+        $otherSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -419,12 +424,12 @@ class GeneralLedgerServiceTest extends TestCase
             ],
             journalEntriesData: [
                 [
-                    'account_id' => $cash->id,
+                    'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
                     'amount' => 30000,
                 ],
                 [
-                    'account_id' => $other->id,
+                    'sub_account_id' => $otherSubAccount->id,
                     'type' => 'credit',
                     'amount' => 30000,
                 ],
@@ -440,12 +445,12 @@ class GeneralLedgerServiceTest extends TestCase
             ],
             journalEntriesData: [
                 [
-                    'account_id' => $cash->id,
+                    'sub_account_id' => $cashSubAccount->id,
                     'type' => 'credit',
                     'amount' => 10000,
                 ],
                 [
-                    'account_id' => $other->id,
+                    'sub_account_id' => $otherSubAccount->id,
                     'type' => 'debit',
                     'amount' => 10000,
                 ],

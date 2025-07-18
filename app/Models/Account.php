@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\BusinessUnit;
 use App\Models\SubAccount;
 use App\Models\JournalEntry;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Account extends Model
 {
@@ -43,9 +44,16 @@ class Account extends Model
         return $this->hasMany(SubAccount::class);
     }
 
-    public function journalEntries()
+    public function journalEntries(): HasManyThrough
     {
-        return $this->hasMany(JournalEntry::class);
+        return $this->hasManyThrough(
+            \App\Models\JournalEntry::class,
+            \App\Models\SubAccount::class,
+            'account_id',       // SubAccount が参照しているこの Account の ID
+            'sub_account_id',   // JournalEntry が参照している SubAccount の ID
+            'id',               // この Account の ID
+            'id'                // SubAccount の ID
+        );
     }
 
     public function createSubAccount(array $attributes): SubAccount

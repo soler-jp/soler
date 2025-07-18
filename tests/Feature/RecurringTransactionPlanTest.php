@@ -21,16 +21,22 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $debit = $unit->accounts()->where('name', '水道光熱費')->first();
-        $credit = $unit->accounts()->where('name', 'その他の預金')->first();
+        $debit = $unit->subAccounts()->whereHas('account', function ($q) {
+            $q->where('name', '水道光熱費');
+        })->first();
+
+        $credit = $unit->subAccounts()->whereHas('account', function ($q) {
+            $q->where('name', 'その他の預金');
+        })->first();
 
         $data = [
+            'business_unit_id' => $unit->id,
             'name' => '水道代',
             'interval' => 'monthly',
             'day_of_month' => 10,
             'is_income' => false,
-            'debit_account_id' => $debit->id,
-            'credit_account_id' => $credit->id,
+            'debit_sub_account_id' => $debit->id,
+            'credit_sub_account_id' => $credit->id,
             'amount' => 4000,
             'tax_amount' => 400,
             'tax_type' => 'taxable_10',
@@ -40,6 +46,7 @@ class RecurringTransactionPlanTest extends TestCase
 
         $this->assertDatabaseHas('recurring_transaction_plans', $data);
     }
+
 
     #[Test]
     public function 必須項目がなければ保存に失敗する()
@@ -54,6 +61,7 @@ class RecurringTransactionPlanTest extends TestCase
         $unit->createRecurringTransactionPlan([]);
     }
 
+
     #[Test]
     public function is_incomeとis_activeはbooleanとしてキャストされる()
     {
@@ -62,15 +70,17 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $account = $unit->accounts()->where('name', 'その他の預金')->first();
+        $subAccount = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => '定期収入',
             'interval' => 'monthly',
             'day_of_month' => 5,
             'is_income' => true,
-            'debit_account_id' => $account->id,
-            'credit_account_id' => $account->id,
+            'debit_sub_account_id' => $subAccount->id,
+            'credit_sub_account_id' => $subAccount->id,
             'amount' => 30000,
         ]);
 
@@ -86,15 +96,17 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $account = $unit->accounts()->where('name', 'その他の預金')->first();
+        $subAccount = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => '家賃',
             'interval' => 'monthly',
             'day_of_month' => 1,
             'is_income' => false,
-            'debit_account_id' => $account->id,
-            'credit_account_id' => $account->id,
+            'debit_sub_account_id' => $subAccount->id,
+            'credit_sub_account_id' => $subAccount->id,
             'amount' => 50000,
         ]);
 
@@ -107,16 +119,22 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $debit = $unit->accounts()->where('name', '水道光熱費')->first();
-        $credit = $unit->accounts()->where('name', 'その他の預金')->first();
 
-        $validated = RecurringTransactionPlan::validate([
+        $debit = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))
+            ->firstOrFail();
+
+        $credit = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $validated = \App\Models\RecurringTransactionPlan::validate([
             'name' => '水道代',
             'interval' => 'monthly',
             'day_of_month' => 10,
             'is_income' => false,
-            'debit_account_id' => $debit->id,
-            'credit_account_id' => $credit->id,
+            'debit_sub_account_id' => $debit->id,
+            'credit_sub_account_id' => $credit->id,
             'amount' => 3000,
             'business_unit_id' => $unit->id,
         ]);
@@ -141,7 +159,9 @@ class RecurringTransactionPlanTest extends TestCase
 
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $account = $unit->accounts()->where('name', 'その他の預金')->first();
+        $subAccount = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
 
         RecurringTransactionPlan::validate([
             'business_unit_id' => $unit->id,
@@ -149,8 +169,8 @@ class RecurringTransactionPlanTest extends TestCase
             'interval' => 'weekly',
             'day_of_month' => 1,
             'is_income' => false,
-            'debit_account_id' => $account->id,
-            'credit_account_id' => $account->id,
+            'debit_sub_account_id' => $subAccount->id,
+            'credit_sub_account_id' => $subAccount->id,
             'amount' => 1000,
             'business_unit_id' => $unit->id,
         ]);
@@ -161,7 +181,10 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $account = $unit->accounts()->where('name', 'その他の預金')->first();
+
+        $subAccount = $unit->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
 
         $unit->createRecurringTransactionPlan([
             'business_unit_id' => $unit->id,
@@ -169,8 +192,8 @@ class RecurringTransactionPlanTest extends TestCase
             'interval' => 'monthly',
             'day_of_month' => 1,
             'is_income' => false,
-            'debit_account_id' => $account->id,
-            'credit_account_id' => $account->id,
+            'debit_sub_account_id' => $subAccount->id,
+            'credit_sub_account_id' => $subAccount->id,
             'amount' => 1000,
         ]);
 
@@ -183,12 +206,11 @@ class RecurringTransactionPlanTest extends TestCase
             'interval' => 'monthly',
             'day_of_month' => 1,
             'is_income' => false,
-            'debit_account_id' => $account->id,
-            'credit_account_id' => $account->id,
+            'debit_sub_account_id' => $subAccount->id,
+            'credit_sub_account_id' => $subAccount->id,
             'amount' => 1000,
         ]);
     }
-
 
     #[Test]
     public function 異なる事業単位で同じnameが重複してもバリデーションエラーにならない()
@@ -196,8 +218,14 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $unit1 = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業1']);
         $unit2 = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業2']);
-        $account1 = $unit1->accounts()->where('name', 'その他の預金')->first();
-        $account2 = $unit2->accounts()->where('name', 'その他の預金')->first();
+
+        $sub1 = $unit1->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $sub2 = $unit2->subAccounts()
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
 
         $plan1 = $unit1->createRecurringTransactionPlan([
             'business_unit_id' => $unit1->id,
@@ -205,8 +233,8 @@ class RecurringTransactionPlanTest extends TestCase
             'interval' => 'monthly',
             'day_of_month' => 1,
             'is_income' => false,
-            'debit_account_id' => $account1->id,
-            'credit_account_id' => $account1->id,
+            'debit_sub_account_id' => $sub1->id,
+            'credit_sub_account_id' => $sub1->id,
             'amount' => 1000,
         ]);
         $this->assertNotNull($plan1);
@@ -218,23 +246,23 @@ class RecurringTransactionPlanTest extends TestCase
             'interval' => 'monthly',
             'day_of_month' => 1,
             'is_income' => false,
-            'debit_account_id' => $account2->id,
-            'credit_account_id' => $account2->id,
+            'debit_sub_account_id' => $sub2->id,
+            'credit_sub_account_id' => $sub2->id,
             'amount' => 1000,
         ]);
-
         $this->assertNotNull($plan2);
     }
+
 
     #[Test]
     public function tax付きのmonthlyプランで1年分の予定取引が生成される()
     {
         $user = User::factory()->create();
-
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業'])->refresh();
         $fiscalYear = $unit->createFiscalYear(2025)->refresh();
-        $debit_account = $unit->accounts()->where('name', '水道光熱費')->first();
-        $credit_account = $unit->accounts()->where('name', 'その他の預金')->first();
+
+        $debitSub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
+        $creditSub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'business_unit_id' => $unit->id,
@@ -242,8 +270,8 @@ class RecurringTransactionPlanTest extends TestCase
             'interval' => 'monthly',
             'day_of_month' => 10,
             'is_income' => false,
-            'debit_account_id' => $debit_account->id,
-            'credit_account_id' => $credit_account->id,
+            'debit_sub_account_id' => $debitSub->id,
+            'credit_sub_account_id' => $creditSub->id,
             'amount' => 10000,
             'tax_amount' => 1000,
             'tax_type' => 'taxable_purchases_10',
@@ -258,7 +286,6 @@ class RecurringTransactionPlanTest extends TestCase
             $entries = $transaction->journalEntries;
 
             $this->assertEquals(2, $entries->count());
-
             $this->assertTrue($entries->contains(fn($e) => $e->tax_amount === 1000));
             $this->assertTrue($entries->contains(fn($e) => $e->tax_type === 'taxable_purchases_10'));
         }
@@ -270,15 +297,16 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '末日テスト事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
-        $account = $unit->accounts()->where('name', '水道光熱費')->first();
+
+        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => '末日補正プラン',
             'interval' => 'monthly',
             'day_of_month' => 31,
             'is_income' => false,
-            'debit_account_id' => $account->id,
-            'credit_account_id' => $account->id,
+            'debit_sub_account_id' => $sub->id,
+            'credit_sub_account_id' => $sub->id,
             'amount' => 10000,
             'tax_amount' => 1000,
         ]);
@@ -290,8 +318,8 @@ class RecurringTransactionPlanTest extends TestCase
         $dates = $transactions->pluck('date')->sort()->values();
 
         $this->assertEquals('2025-02-28', $dates[1]->toDateString());
-        $this->assertEquals('2025-04-30', $dates[3]->toDateString());
         $this->assertEquals('2025-03-31', $dates[2]->toDateString());
+        $this->assertEquals('2025-04-30', $dates[3]->toDateString());
     }
 
     #[Test]
@@ -300,15 +328,16 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '隔月プラン事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
-        $account = $unit->accounts()->where('name', '水道光熱費')->first();
+
+        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => '隔月プラン',
             'interval' => 'bimonthly',
             'day_of_month' => 15,
             'is_income' => false,
-            'debit_account_id' => $account->id,
-            'credit_account_id' => $account->id,
+            'debit_sub_account_id' => $sub->id,
+            'credit_sub_account_id' => $sub->id,
             'amount' => 5000,
             'tax_amount' => 500,
         ]);
@@ -335,15 +364,15 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '非アクティブ事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
-        $account = $unit->accounts()->where('name', '水道光熱費')->first();
+        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => '非アクティブプラン',
             'interval' => 'monthly',
             'day_of_month' => 1,
             'is_income' => false,
-            'debit_account_id' => $account->id,
-            'credit_account_id' => $account->id,
+            'debit_sub_account_id' => $sub->id,
+            'credit_sub_account_id' => $sub->id,
             'amount' => 3000,
             'tax_amount' => 300,
             'is_active' => false,
@@ -360,15 +389,15 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'リンクテスト事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
-        $account = $unit->accounts()->where(['name' => '水道光熱費'])->first();
+        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => 'リンク付きプラン',
             'interval' => 'monthly',
             'day_of_month' => 1,
             'is_income' => false,
-            'debit_account_id' => $account->id,
-            'credit_account_id' => $account->id,
+            'debit_sub_account_id' => $sub->id,
+            'credit_sub_account_id' => $sub->id,
             'amount' => 8000,
             'tax_amount' => 800,
         ]);
@@ -389,15 +418,15 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '重複防止テスト事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
-        $account = $unit->accounts()->where(['name' => '水道光熱費'])->first();
+        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => '重複チェックプラン',
             'interval' => 'monthly',
             'day_of_month' => 1,
             'is_income' => false,
-            'debit_account_id' => $account->id,
-            'credit_account_id' => $account->id,
+            'debit_sub_account_id' => $sub->id,
+            'credit_sub_account_id' => $sub->id,
             'amount' => 5000,
             'tax_amount' => 500,
         ]);
@@ -426,15 +455,15 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '同日許可テスト']);
         $fiscalYear = $unit->createFiscalYear(2025);
-        $account = $unit->accounts()->where(['name' => '水道光熱費'])->first();
+        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan1 = $unit->createRecurringTransactionPlan([
             'name' => 'プランA',
             'interval' => 'monthly',
             'day_of_month' => 1,
             'is_income' => false,
-            'debit_account_id' => $account->id,
-            'credit_account_id' => $account->id,
+            'debit_sub_account_id' => $sub->id,
+            'credit_sub_account_id' => $sub->id,
             'amount' => 3000,
             'tax_amount' => 300,
         ]);
@@ -444,8 +473,8 @@ class RecurringTransactionPlanTest extends TestCase
             'interval' => 'monthly',
             'day_of_month' => 1, // 同じ日付
             'is_income' => false,
-            'debit_account_id' => $account->id,
-            'credit_account_id' => $account->id,
+            'debit_sub_account_id' => $sub->id,
+            'credit_sub_account_id' => $sub->id,
             'amount' => 7000,
             'tax_amount' => 700,
         ]);

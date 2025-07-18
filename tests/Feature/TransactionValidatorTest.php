@@ -13,7 +13,7 @@ class TransactionValidatorTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function is_plannedを省略した場合はバリデーション結果に含まれない()
+    public function is_plannedを省略した場合はバリデーションにnullが設定される()
     {
         $fiscalYear = FiscalYear::factory()->create();
 
@@ -25,7 +25,8 @@ class TransactionValidatorTest extends TestCase
 
         $validated = TransactionValidator::validate($data);
 
-        $this->assertArrayNotHasKey('is_planned', $validated);
+        $this->assertArrayHasKey('is_planned', $validated);
+        $this->assertSame(false, $validated['is_planned']);
     }
 
     #[Test]

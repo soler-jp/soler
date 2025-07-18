@@ -5,6 +5,7 @@ use App\Setup\Initializers\GeneralBusinessInitializer;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\SubAccount;
 
 class GeneralBusinessInitializerTest extends TestCase
 {
@@ -93,16 +94,29 @@ class GeneralBusinessInitializerTest extends TestCase
         $fiscalYear = $unit->currentFiscalYear;
 
         $bankAccount = $unit->accounts()->where('name', 'その他の預金')->first();
-        $equityAccount = $unit->accounts()->where('name', '元入金')->first();
+
+        $bankSubAccount = SubAccount::where('name', 'メインバンク')
+            ->whereHas('account', function ($query) use ($unit) {
+                $query->where('business_unit_id', $unit->id)
+                    ->where('name', 'その他の預金');
+            })
+            ->first();
+
+        $equitySubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query) {
+                $query->where('name', '元入金');
+            })
+            ->first();
+
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $bankAccount->id,
+            'sub_account_id' => $bankSubAccount->id,
             'type' => 'debit',
             'amount' => 30000,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $equityAccount->id,
+            'sub_account_id' => $equitySubAccount->id,
             'type' => 'credit',
             'amount' => 30000,
         ]);

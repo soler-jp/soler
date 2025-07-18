@@ -71,7 +71,7 @@ class SetupWizard extends Component
         if (!is_null($this->cash_balance)) {
             $opening_entries[] = [
                 'account_name' => '現金',
-                'sub_account_name' => null,
+                'sub_account_name' => '現金',
                 'amount' => $this->cash_balance,
             ];
         }

@@ -28,8 +28,18 @@ class DepreciationServiceTest extends TestCase
         $fiscalYear->update(['is_taxable_supplier' => false]);
         $fiscalYear->update(['is_tax_exclusive' => false]);
 
-        $assetAccount = $unit->accounts()->where('name', '機械装置')->first();
-        $paymentAccount = $unit->accounts()->where('name', 'その他の預金')->first();
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query) {
+                $query->where('name', '機械装置');
+            })
+            ->first();
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query) {
+                $query->where('name', 'その他の預金');
+            })
+            ->first();
+
 
         $fixedAssetData = [
             'name' => 'ノートPC',
@@ -49,8 +59,8 @@ class DepreciationServiceTest extends TestCase
 
         $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
             $fiscalYear,
-            $assetAccount,
-            $paymentAccount,
+            $assetSubAccount,
+            $paymentSubAccount,
             $fixedAssetData,
             $transactionData,
         );
@@ -76,7 +86,7 @@ class DepreciationServiceTest extends TestCase
             $transaction->journalEntries->contains(
                 fn($e) =>
                 $e->type === 'debit' &&
-                    $e->account_id === $assetAccount->id &&
+                    $e->sub_account_id === $assetSubAccount->id &&
                     $e->amount === 165000
             )
         );
@@ -85,7 +95,7 @@ class DepreciationServiceTest extends TestCase
             $transaction->journalEntries->contains(
                 fn($e) =>
                 $e->type === 'credit' &&
-                    $e->account_id === $paymentAccount->id &&
+                    $e->sub_account_id === $paymentSubAccount->id &&
                     $e->amount === 165000
             )
         );

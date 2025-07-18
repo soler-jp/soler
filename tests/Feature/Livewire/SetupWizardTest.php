@@ -249,6 +249,7 @@ class SetupWizardTest extends TestCase
             ->set('other_assets', [
                 [
                     'account_name' => '定期預金',
+                    'sub_account_name' => 'xx銀行',
                     'amount' => 120000,
                 ],
             ])

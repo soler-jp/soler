@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\BusinessUnit;
 use App\Models\Account;
+use App\Models\SubAccount;
 use App\Models\FiscalYear;
 use App\Models\FixedAsset;
 use App\Models\Transaction;
@@ -14,19 +15,18 @@ class DepreciationService
 
     public function registerFixedAsset(
         FiscalYear $fiscalYear,
-        Account $assetAccount,
-        Account $paymentAccount,
+        SubAccount $assetSubAccount,
+        SubAccount $paymentSubAccount,
         array $fixedAssetData,
         array $transactionData
     ): FixedAsset {
         return DB::transaction(function () use (
             $fiscalYear,
-            $assetAccount,
-            $paymentAccount,
+            $assetSubAccount,
+            $paymentSubAccount,
             $fixedAssetData,
             $transactionData
         ) {
-
             $acquisitionDate = $fixedAssetData['acquisition_date'];
             $businessUnit = $fiscalYear->businessUnit;
 
@@ -36,16 +36,14 @@ class DepreciationService
             $acquisitionCost = $taxableAmount + $taxAmount;
 
             // 3. 減価償却の基礎金額( 課税業者の場合は税抜価格、免税業者の場合は税込価格 )
-            if ($fiscalYear->is_taxable) {
-                $depreciationBaseAmount = $taxableAmount;
-            } else {
-                $depreciationBaseAmount = $acquisitionCost;
-            }
+            $depreciationBaseAmount = $fiscalYear->is_taxable
+                ? $taxableAmount
+                : $acquisitionCost;
 
             // 4. 固定資産登録
             $asset = FixedAsset::create([
                 'business_unit_id' => $businessUnit->id,
-                'account_id' => $assetAccount->id,
+                'account_id' => $assetSubAccount->account_id,
                 'name' => $fixedAssetData['name'],
                 'asset_category' => $fixedAssetData['asset_category'],
                 'acquisition_date' => $acquisitionDate,
@@ -66,12 +64,12 @@ class DepreciationService
 
             $transaction->journalEntries()->createMany([
                 [
-                    'account_id' => $assetAccount->id,
+                    'sub_account_id' => $assetSubAccount->id,
                     'type' => 'debit',
                     'amount' => $acquisitionCost,
                 ],
                 [
-                    'account_id' => $paymentAccount->id,
+                    'sub_account_id' => $paymentSubAccount->id,
                     'type' => 'credit',
                     'amount' => $acquisitionCost,
                 ],

@@ -2,9 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\Account;
 use App\Models\FiscalYear;
-use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use DomainException;
@@ -16,11 +15,29 @@ class FiscalYearTransactionTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function createSubAccount(): array
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+        ]);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $account = $unit->createAccount([
+            'name' => 'テスト科目',
+            'type' => 'asset',
+        ]);
+
+        return [$fiscalYear, $account->subAccounts->first()];
+    }
+
     #[Test]
     public function 取引と仕訳を正常に登録できる()
     {
-        $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
+        [$fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -28,16 +45,8 @@ class FiscalYearTransactionTest extends TestCase
         ];
 
         $journalEntriesData = [
-            [
-                'account_id' => $account->id,
-                'type' => 'debit',
-                'amount' => 1000,
-            ],
-            [
-                'account_id' => $account->id,
-                'type' => 'credit',
-                'amount' => 1000,
-            ],
+            ['sub_account_id' => $sub->id, 'type' => 'debit',  'amount' => 1000],
+            ['sub_account_id' => $sub->id, 'type' => 'credit', 'amount' => 1000],
         ];
 
         $transaction = $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
@@ -56,8 +65,7 @@ class FiscalYearTransactionTest extends TestCase
     {
         $this->expectException(DomainException::class);
 
-        $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
+        [$fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -65,16 +73,8 @@ class FiscalYearTransactionTest extends TestCase
         ];
 
         $journalEntriesData = [
-            [
-                'account_id' => $account->id,
-                'type' => 'debit',
-                'amount' => 1000,
-            ],
-            [
-                'account_id' => $account->id,
-                'type' => 'credit',
-                'amount' => 900,
-            ],
+            ['sub_account_id' => $sub->id, 'type' => 'debit',  'amount' => 1000],
+            ['sub_account_id' => $sub->id, 'type' => 'credit', 'amount' => 900],
         ];
 
         $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
@@ -85,7 +85,14 @@ class FiscalYearTransactionTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        $fiscalYear = FiscalYear::factory()->create();
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+        ]);
+        $fiscalYear = $unit->createFiscalYear(2025);
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -102,8 +109,7 @@ class FiscalYearTransactionTest extends TestCase
     {
         $this->expectException(ValidationException::class);
 
-        $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
+        [$fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
             'date' => null,
@@ -111,16 +117,8 @@ class FiscalYearTransactionTest extends TestCase
         ];
 
         $journalEntriesData = [
-            [
-                'account_id' => $account->id,
-                'type' => 'debit',
-                'amount' => 500,
-            ],
-            [
-                'account_id' => $account->id,
-                'type' => 'credit',
-                'amount' => 500,
-            ],
+            ['sub_account_id' => $sub->id, 'type' => 'debit',  'amount' => 500],
+            ['sub_account_id' => $sub->id, 'type' => 'credit', 'amount' => 500],
         ];
 
         $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
@@ -131,7 +129,14 @@ class FiscalYearTransactionTest extends TestCase
     {
         $this->expectException(ValidationException::class);
 
-        $fiscalYear = FiscalYear::factory()->create();
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+        ]);
+        $fiscalYear = $unit->createFiscalYear(2025);
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -139,16 +144,8 @@ class FiscalYearTransactionTest extends TestCase
         ];
 
         $journalEntriesData = [
-            [
-                'account_id' => null,
-                'type' => 'debit',
-                'amount' => 1000,
-            ],
-            [
-                'account_id' => null,
-                'type' => 'credit',
-                'amount' => 1000,
-            ],
+            ['sub_account_id' => null, 'type' => 'debit',  'amount' => 1000],
+            ['sub_account_id' => null, 'type' => 'credit', 'amount' => 1000],
         ];
 
         $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
@@ -157,8 +154,7 @@ class FiscalYearTransactionTest extends TestCase
     #[Test]
     public function fiscal_year_idが自動的に取引に設定される()
     {
-        $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
+        [$fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -166,16 +162,8 @@ class FiscalYearTransactionTest extends TestCase
         ];
 
         $journalEntriesData = [
-            [
-                'account_id' => $account->id,
-                'type' => 'debit',
-                'amount' => 1000,
-            ],
-            [
-                'account_id' => $account->id,
-                'type' => 'credit',
-                'amount' => 1000,
-            ],
+            ['sub_account_id' => $sub->id, 'type' => 'debit',  'amount' => 1000],
+            ['sub_account_id' => $sub->id, 'type' => 'credit', 'amount' => 1000],
         ];
 
         $transaction = $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
@@ -186,8 +174,7 @@ class FiscalYearTransactionTest extends TestCase
     #[Test]
     public function 仕訳が登録された取引に正しく紐づく()
     {
-        $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
+        [$fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -195,16 +182,8 @@ class FiscalYearTransactionTest extends TestCase
         ];
 
         $journalEntriesData = [
-            [
-                'account_id' => $account->id,
-                'type' => 'debit',
-                'amount' => 500,
-            ],
-            [
-                'account_id' => $account->id,
-                'type' => 'credit',
-                'amount' => 500,
-            ],
+            ['sub_account_id' => $sub->id, 'type' => 'debit',  'amount' => 500],
+            ['sub_account_id' => $sub->id, 'type' => 'credit', 'amount' => 500],
         ];
 
         $transaction = $fiscalYear->registerTransaction($transactionData, $journalEntriesData);

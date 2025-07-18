@@ -22,9 +22,11 @@ class JournalEntryTest extends TestCase
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
 
+        $subAccount = $account->subAccounts->first();
+
         $data = [
             'transaction_id' => $transaction->id,
-            'account_id' => $account->id,
+            'sub_account_id' => $subAccount->id,
             'type' => 'debit',
             'amount' => 1000,
         ];
@@ -71,9 +73,11 @@ class JournalEntryTest extends TestCase
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
 
+        $subAccount = $account->subAccounts->first();
+
         $data = [
             'transaction_id' => $transaction->id,
-            'account_id' => $account->id,
+            'sub_account_id' => $subAccount->id,
             'type' => null,
             'amount' => 1000,
         ];
@@ -88,9 +92,11 @@ class JournalEntryTest extends TestCase
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
 
+        $subAccount = $account->subAccounts->first();
+
         $data = [
             'transaction_id' => $transaction->id,
-            'account_id' => $account->id,
+            'sub_account_id' => $subAccount->id,
             'type' => 'debit',
             'amount' => null,
         ];
@@ -105,9 +111,11 @@ class JournalEntryTest extends TestCase
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
 
+        $subAccount = $account->subAccounts->first();
+
         $data = [
             'transaction_id' => $transaction->id,
-            'account_id' => $account->id,
+            'sub_account_id' => $subAccount->id,
             'type' => 'invalid',
             'amount' => 1000,
         ];
@@ -122,9 +130,11 @@ class JournalEntryTest extends TestCase
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
 
+        $subAccount = $account->subAccounts->first();
+
         $data = [
             'transaction_id' => $transaction->id,
-            'account_id' => $account->id,
+            'sub_account_id' => $subAccount->id,
             'type' => 'debit',
             'amount' => 0,
         ];
@@ -139,9 +149,11 @@ class JournalEntryTest extends TestCase
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
 
+        $subAccount = $account->subAccounts->first();
+
         $data = [
             'transaction_id' => $transaction->id,
-            'account_id' => $account->id,
+            'sub_account_id' => $subAccount->id,
             'type' => 'debit',
             'amount' => 1000,
             'tax_amount' => -100,
@@ -157,9 +169,11 @@ class JournalEntryTest extends TestCase
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
 
+        $subAccount = $account->subAccounts->first();
+
         $data = [
             'transaction_id' => $transaction->id,
-            'account_id' => $account->id,
+            'sub_account_id' => $subAccount->id,
             'type' => 'debit',
             'amount' => 1000,
             'tax_type' => 'wrong',
@@ -175,9 +189,11 @@ class JournalEntryTest extends TestCase
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
 
+        $subAccount = $account->subAccounts->first();
+
         $data = [
             'transaction_id' => $transaction->id,
-            'account_id' => $account->id,
+            'sub_account_id' => $subAccount->id,
             'type' => 'debit',
             'amount' => 1000,
             'is_effective' => 'yes',
@@ -188,17 +204,18 @@ class JournalEntryTest extends TestCase
     }
 
     #[Test]
-    public function sub_account_idがnullでもバリデーションが通る()
+    public function tax_amountが未入力でもバリデーションが通る()
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
 
+        $subAccount = $account->subAccounts->first();
+
         $data = [
             'transaction_id' => $transaction->id,
-            'account_id' => $account->id,
+            'sub_account_id' => $subAccount->id,
             'type' => 'debit',
             'amount' => 1000,
-            'sub_account_id' => null,
         ];
 
         $this->expectNotToPerformAssertions();
@@ -206,35 +223,18 @@ class JournalEntryTest extends TestCase
     }
 
     #[Test]
-    public function tax_amountがnullでもバリデーションが通る()
+    public function tax_typeが未入力でもバリデーションが通る()
     {
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
 
-        $data = [
-            'transaction_id' => $transaction->id,
-            'account_id' => $account->id,
-            'type' => 'debit',
-            'amount' => 1000,
-            'tax_amount' => null,
-        ];
-
-        $this->expectNotToPerformAssertions();
-        JournalEntryValidator::validate($data, true);
-    }
-
-    #[Test]
-    public function tax_typeがnullでもバリデーションが通る()
-    {
-        $transaction = Transaction::factory()->create();
-        $account = Account::factory()->create();
+        $subAccount = $account->subAccounts->first();
 
         $data = [
             'transaction_id' => $transaction->id,
-            'account_id' => $account->id,
+            'sub_account_id' => $subAccount->id,
             'type' => 'debit',
             'amount' => 1000,
-            'tax_type' => null,
         ];
 
         $this->expectNotToPerformAssertions();
@@ -247,9 +247,11 @@ class JournalEntryTest extends TestCase
         $transaction = Transaction::factory()->create();
         $account = Account::factory()->create();
 
+        $subAccount = $account->subAccounts->first();
+
         $data = [
             'transaction_id' => $transaction->id,
-            'account_id' => $account->id,
+            'sub_account_id' => $subAccount->id,
             'type' => 'debit',
             'amount' => 1000,
         ];
@@ -274,7 +276,10 @@ class JournalEntryTest extends TestCase
         $subB = $account->createSubAccount(['name' => '口座B']);
         $subC = $account->createSubAccount(['name' => '口座C']);
 
-        $equityAccount = $unit->accounts()->where('type', 'equity')->first();
+        $equitySubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query) {
+                $query->where('type', 'equity');
+            })->firstOrFail();
 
         $registrar = app(TransactionRegistrar::class);
 
@@ -286,7 +291,6 @@ class JournalEntryTest extends TestCase
             ],
             [
                 [
-                    'account_id' => $account->id,
                     'sub_account_id' => $subA->id,
                     'type' => 'debit',
                     'amount' => 10000,
@@ -294,7 +298,7 @@ class JournalEntryTest extends TestCase
                     'tax_type' => 'non_taxable',
                 ],
                 [
-                    'account_id' => $equityAccount->id,
+                    'sub_account_id' => $equitySubAccount->id,
                     'type' => 'credit',
                     'amount' => 10000,
                     'tax_amount' => 0,
@@ -311,7 +315,6 @@ class JournalEntryTest extends TestCase
             ],
             [
                 [
-                    'account_id' => $account->id,
                     'sub_account_id' => $subB->id,
                     'type' => 'debit',
                     'amount' => 20000,
@@ -319,7 +322,7 @@ class JournalEntryTest extends TestCase
                     'tax_type' => 'non_taxable',
                 ],
                 [
-                    'account_id' => $equityAccount->id,
+                    'sub_account_id' => $equitySubAccount->id,
                     'type' => 'credit',
                     'amount' => 20000,
                     'tax_amount' => 0,
@@ -336,7 +339,6 @@ class JournalEntryTest extends TestCase
             ],
             [
                 [
-                    'account_id' => $account->id,
                     'sub_account_id' => $subC->id,
                     'type' => 'debit',
                     'amount' => 30000,
@@ -344,7 +346,7 @@ class JournalEntryTest extends TestCase
                     'tax_type' => 'non_taxable',
                 ],
                 [
-                    'account_id' => $equityAccount->id,
+                    'sub_account_id' => $equitySubAccount->id,
                     'type' => 'credit',
                     'amount' => 30000,
                     'tax_amount' => 0,

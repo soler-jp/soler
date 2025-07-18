@@ -12,8 +12,8 @@ class DashboardExpenseInput extends Component
     public string $date;
     public string $description = '';
     public int|null $amount = null;
-    public int|null $debit_account_id = null;
-    public int|null $credit_account_id = null;
+    public int|null $debit_sub_account_id = null;
+    public int|null $credit_sub_account_id = null;
 
     public Collection $expenseAccounts; // type = 'expense'
     public Collection $creditAccounts; // name in ['現金', '普通預金', '事業主借']
@@ -26,12 +26,13 @@ class DashboardExpenseInput extends Component
         $unit = auth()->user()->selectedBusinessUnit;
 
         $this->expenseAccounts = $unit->accounts()
+            ->with('subAccounts')
             ->where('type', Account::TYPE_EXPENSE)
             ->orderBy('name')
             ->get();
 
-
         $this->creditAccounts = $unit->accounts()
+            ->with('subAccounts')
             ->whereIn('name', ['現金', '普通預金', '事業主借'])
             ->orderByRaw("FIELD(name, '現金', '普通預金', '事業主借')")
             ->get();
@@ -44,8 +45,8 @@ class DashboardExpenseInput extends Component
             'date' => ['required', 'date'],
             'description' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'integer', 'min:1'],
-            'debit_account_id' => ['required', 'exists:accounts,id'],
-            'credit_account_id' => ['required', 'exists:accounts,id'],
+            'debit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
+            'credit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
         ]);
 
         $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
@@ -56,19 +57,19 @@ class DashboardExpenseInput extends Component
                 'description' => $this->description,
             ], [
                 [
-                    'account_id' => $this->debit_account_id,
+                    'sub_account_id' => $this->debit_sub_account_id,
                     'type' => 'debit',
                     'amount' => $this->amount,
                 ],
                 [
-                    'account_id' => $this->credit_account_id,
+                    'sub_account_id' => $this->credit_sub_account_id,
                     'type' => 'credit',
                     'amount' => $this->amount,
                 ],
             ]);
 
             // 初期化 & 確認メッセージ
-            $this->reset(['description', 'amount', 'debit_account_id', 'credit_account_id']);
+            $this->reset(['description', 'amount', 'debit_sub_account_id', 'credit_sub_account_id']);
             session()->flash('message', '経費を登録しました');
         } catch (\Exception $e) {
             session()->flash('error', '経費の登録に失敗しました: ' . $e->getMessage());

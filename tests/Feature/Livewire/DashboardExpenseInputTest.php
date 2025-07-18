@@ -4,7 +4,6 @@ namespace Tests\Feature\Livewire;
 
 use App\Livewire\DashboardExpenseInput;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Livewire\Livewire;
 use Tests\TestCase;
 use App\Models\User;
@@ -57,8 +56,8 @@ class DashboardExpenseInputTest extends TestCase
             'recurring_templates' => [],
         ]);
 
-        $expenseAccount = $unit->accounts->where('name', '消耗品費')->first();
-        $creditAccount = $unit->accounts->where('name', '現金')->first();
+        $debit = $unit->getAccountByName('消耗品費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
 
         $this->actingAs($user);
 
@@ -67,19 +66,19 @@ class DashboardExpenseInputTest extends TestCase
             ->set('date', '2025-05-10')
             ->set('description', '文房具購入')
             ->set('amount', 1500)
-            ->set('debit_account_id', $expenseAccount->id)
-            ->set('credit_account_id', $creditAccount->id)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
             ->assertHasNoErrors();
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $expenseAccount->id,
+            'sub_account_id' => $debit->id,
             'type' => 'debit',
             'amount' => 1500,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
-            'account_id' => $creditAccount->id,
+            'sub_account_id' => $credit->id,
             'type' => 'credit',
             'amount' => 1500,
         ]);
@@ -105,16 +104,16 @@ class DashboardExpenseInputTest extends TestCase
 
         $this->actingAs($user);
 
-        $expenseAccount = $unit->accounts()->where('name', '旅費交通費')->first();
-        $creditAccount = $unit->accounts()->where('name', '現金')->first();
+        $debit = $unit->getAccountByName('旅費交通費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
 
         Livewire::actingAs($user)
             ->test('dashboard-expense-input')
             ->set('date', '')
             ->set('description', '交通費')
             ->set('amount', 1000)
-            ->set('debit_account_id', $expenseAccount->id)
-            ->set('credit_account_id', $creditAccount->id)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
             ->assertHasErrors(['date' => 'required']);
     }
@@ -139,16 +138,16 @@ class DashboardExpenseInputTest extends TestCase
 
         $this->actingAs($user);
 
-        $expenseAccount = $unit->accounts()->where('name', '接待交際費')->first();
-        $creditAccount = $unit->accounts()->where('name', '現金')->first();
+        $debit = $unit->getAccountByName('旅費交通費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
 
         Livewire::actingAs($user)
             ->test('dashboard-expense-input')
             ->set('date', '2025-05-10')
-            ->set('description', '') // ⬅️ intentionally blank
+            ->set('description', '')
             ->set('amount', 1000)
-            ->set('debit_account_id', $expenseAccount->id)
-            ->set('credit_account_id', $creditAccount->id)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
             ->assertHasErrors(['description' => 'required']);
     }
@@ -174,16 +173,16 @@ class DashboardExpenseInputTest extends TestCase
 
         $this->actingAs($user);
 
-        $expenseAccount = $unit->accounts()->where('type', 'expense')->first();
-        $creditAccount = $unit->accounts()->where('name', '現金')->first();
+        $debit = $unit->getAccountByName('旅費交通費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
 
         Livewire::actingAs($user)
             ->test('dashboard-expense-input')
             ->set('date', '2025-05-10')
             ->set('description', '通信費')
             ->set('amount', null)
-            ->set('debit_account_id', $expenseAccount->id)
-            ->set('credit_account_id', $creditAccount->id)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
             ->assertHasErrors(['amount' => 'required']);
     }
@@ -208,17 +207,17 @@ class DashboardExpenseInputTest extends TestCase
 
         $this->actingAs($user);
 
-        $creditAccount = $unit->accounts()->where('name', '現金')->first();
+        $credit = $unit->getSubAccountByName('現金', '現金');
 
         Livewire::actingAs($user)
             ->test('dashboard-expense-input')
             ->set('date', '2025-05-10')
             ->set('description', '水道光熱費')
             ->set('amount', 3000)
-            ->set('debit_account_id', null)
-            ->set('credit_account_id', $creditAccount->id)
+            ->set('debit_sub_account_id', null)
+            ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
-            ->assertHasErrors(['debit_account_id' => 'required']);
+            ->assertHasErrors(['debit_sub_account_id' => 'required']);
     }
 
     #[Test]
@@ -241,17 +240,17 @@ class DashboardExpenseInputTest extends TestCase
 
         $this->actingAs($user);
 
-        $expenseAccount = $unit->accounts()->where('type', 'expense')->first();
+        $expenseSubAccount = $unit->accounts()->where('type', 'expense')->first()->subAccounts()->first();
 
         Livewire::actingAs($user)
             ->test('dashboard-expense-input')
             ->set('date', '2025-05-10')
             ->set('description', '備品購入')
             ->set('amount', 2000)
-            ->set('debit_account_id', $expenseAccount->id)
-            ->set('credit_account_id', null)
+            ->set('debit_sub_account_id', $expenseSubAccount->id)
+            ->set('credit_sub_account_id', null)
             ->call('submit')
-            ->assertHasErrors(['credit_account_id' => 'required']);
+            ->assertHasErrors(['credit_sub_account_id' => 'required']);
     }
 
 
@@ -273,16 +272,16 @@ class DashboardExpenseInputTest extends TestCase
 
         $this->actingAs($user);
 
-        $expense = $unit->accounts()->where('type', 'expense')->first();
-        $credit = $unit->accounts()->where('name', '現金')->first();
+        $debit = $unit->getAccountByName('通信費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
 
         Livewire::actingAs($user)
             ->test('dashboard-expense-input')
             ->set('date', '2025-05-10')
             ->set('description', '交通費')
             ->set('amount', -100)
-            ->set('debit_account_id', $expense->id)
-            ->set('credit_account_id', $credit->id)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
             ->assertHasErrors(['amount' => 'min']);
     }
@@ -311,12 +310,12 @@ class DashboardExpenseInputTest extends TestCase
             ->set('date', '2025-05-10')
             ->set('description', '通信費')
             ->set('amount', 1000)
-            ->set('debit_account_id', 999999)
-            ->set('credit_account_id', 999998)
+            ->set('debit_sub_account_id', 999999)
+            ->set('credit_sub_account_id', 999998)
             ->call('submit')
             ->assertHasErrors([
-                'debit_account_id' => 'exists',
-                'credit_account_id' => 'exists',
+                'debit_sub_account_id' => 'exists',
+                'credit_sub_account_id' => 'exists',
             ]);
     }
 
@@ -339,21 +338,21 @@ class DashboardExpenseInputTest extends TestCase
 
         $this->actingAs($user);
 
-        $expense = $unit->accounts()->where('type', 'expense')->first();
-        $credit = $unit->accounts()->where('name', '現金')->first();
+        $expense = $unit->accounts()->where('type', 'expense')->first()->subAccounts()->first();
+        $credit = $unit->accounts()->where('name', '現金')->first()->subAccounts()->first();
 
         Livewire::actingAs($user)
             ->test('dashboard-expense-input')
             ->set('date', '2025-05-10')
             ->set('description', '備品購入')
             ->set('amount', 500)
-            ->set('debit_account_id', $expense->id)
-            ->set('credit_account_id', $credit->id)
+            ->set('debit_sub_account_id', $expense->id)
+            ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
             ->assertSet('description', '')
             ->assertSet('amount', null)
-            ->assertSet('debit_account_id', null)
-            ->assertSet('credit_account_id', null);
+            ->assertSet('debit_sub_account_id', null)
+            ->assertSet('credit_sub_account_id', null);
     }
 
 
@@ -375,16 +374,16 @@ class DashboardExpenseInputTest extends TestCase
 
         $this->actingAs($user);
 
-        $expense = $unit->accounts()->where('type', 'expense')->first();
-        $credit = $unit->accounts()->where('name', '現金')->first();
+        $expense = $unit->accounts()->where('type', 'expense')->first()->subAccounts()->first();
+        $credit = $unit->accounts()->where('name', '現金')->first()->subAccounts()->first();
 
         Livewire::actingAs($user)
             ->test('dashboard-expense-input')
             ->set('date', '2025-05-10')
             ->set('description', '消耗品購入')
             ->set('amount', 800)
-            ->set('debit_account_id', $expense->id)
-            ->set('credit_account_id', $credit->id)
+            ->set('debit_sub_account_id', $expense->id)
+            ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
             ->assertSee('経費を登録しました');
     }

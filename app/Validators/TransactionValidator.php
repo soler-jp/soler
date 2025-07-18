@@ -16,8 +16,13 @@ class TransactionValidator
      */
     public static function validate(array $data): array
     {
-        return Validator::make($data, self::rules(), [], self::attributes())
+        $validated = Validator::make($data, self::rules(), [], self::attributes())
             ->validate();
+
+        // 明示的に補正
+        $validated['is_planned'] = (bool) ($validated['is_planned'] ?? false);
+
+        return $validated;
     }
 
     /**

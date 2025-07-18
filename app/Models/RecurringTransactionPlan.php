@@ -24,8 +24,8 @@ class RecurringTransactionPlan extends Model
         'interval', // 'monthly', 'quarterly', 'yearly'
         'day_of_month',
         'is_income',
-        'debit_account_id',
-        'credit_account_id',
+        'debit_sub_account_id',
+        'credit_sub_account_id',
         'amount',
         'tax_amount',
         'tax_type', // 
@@ -59,8 +59,8 @@ class RecurringTransactionPlan extends Model
                 'interval' => ['required', 'in:monthly,bimonthly'],
                 'day_of_month' => ['required', 'integer', 'min:1', 'max:31'],
                 'is_income' => ['required', 'boolean'],
-                'debit_account_id' => ['required', 'exists:accounts,id'],
-                'credit_account_id' => ['required', 'exists:accounts,id'],
+                'debit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
+                'credit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
                 'amount' => ['required', 'integer', 'min:1'],
                 'tax_amount' => ['nullable', 'integer', 'min:0'],
                 'tax_type' => ['nullable', 'string', 'max:50'],
@@ -126,14 +126,14 @@ class RecurringTransactionPlan extends Model
             ],
             'entries' => [
                 [
-                    'account_id' => $this->debit_account_id,
+                    'sub_account_id' => $this->debit_sub_account_id,
                     'type' => 'debit',
                     'amount' => $this->amount,
                     'tax_amount' => $this->tax_amount,
                     'tax_type' => $this->tax_type,
                 ],
                 [
-                    'account_id' => $this->credit_account_id,
+                    'sub_account_id' => $this->credit_sub_account_id,
                     'type' => 'credit',
                     'amount' => $this->amount + (int) $this->tax_amount,
                 ],
