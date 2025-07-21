@@ -21,7 +21,8 @@ class RecurringTransactionPlan extends Model
     protected $fillable = [
         'business_unit_id',
         'name',
-        'interval', // 'monthly', 'quarterly', 'yearly'
+        'interval', // 'monthly', 'bimonthly', 'yearly'
+        'month_of_year', // for 'yearly' interval
         'day_of_month',
         'is_income',
         'debit_sub_account_id',
@@ -56,8 +57,9 @@ class RecurringTransactionPlan extends Model
             $attributes,
             [
                 'name' => ['required', 'string', 'max:255'],
-                'interval' => ['required', 'in:monthly,bimonthly'],
+                'interval' => ['required', 'in:monthly,bimonthly,yearly'],
                 'day_of_month' => ['required', 'integer', 'min:1', 'max:31'],
+                'month_of_year' => ['nullable', 'integer', 'min:1', 'max:12'],
                 'is_income' => ['required', 'boolean'],
                 'debit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
                 'credit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
@@ -102,6 +104,22 @@ class RecurringTransactionPlan extends Model
     public function getPlannedDatesIn(FiscalYear $fiscalYear): Collection
     {
         $dates = collect();
+
+
+        if ($this->interval === 'yearly') {
+            $month = $this->month_of_year ?? 1; // デフォルト: 1月
+            $day = $this->day_of_month ?? 1;    // デフォルト: 1日
+
+            $day = min($day, Carbon::create($fiscalYear->year, $month, 1)->daysInMonth);
+
+            $dates->push(
+                Carbon::create($fiscalYear->year, $month, $day)
+            );
+
+            return $dates;
+        }
+
+
         $date = Carbon::parse($fiscalYear->start_date)->startOfMonth();
 
         while ($date->lessThanOrEqualTo(Carbon::parse($fiscalYear->end_date))) {

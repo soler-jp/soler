@@ -359,6 +359,39 @@ class RecurringTransactionPlanTest extends TestCase
     }
 
     #[Test]
+    public function yearlyプランでは年に1件の予定取引が生成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '年一プラン事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '年1プラン',
+            'interval' => 'yearly',
+            'month_of_year' => 6,
+            'day_of_month' => 15,
+            'is_income' => false,
+            'debit_sub_account_id' => $sub->id,
+            'credit_sub_account_id' => $sub->id,
+            'amount' => 5000,
+            'tax_amount' => 500,
+        ]);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+
+        $this->assertCount(1, $transactions);
+
+        $dates = $transactions->pluck('date')->sort()->values()->map(fn($d) => $d->toDateString());
+
+        $this->assertEquals([
+            '2025-06-15',
+        ], $dates->toArray());
+    }
+
+
+    #[Test]
     public function is_activeがfalseのプランでは予定取引が作成されない()
     {
         $user = User::factory()->create();
