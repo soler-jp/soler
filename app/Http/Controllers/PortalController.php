@@ -23,4 +23,22 @@ class PortalController extends Controller
             'summary' => $fiscalYear->calculateSummary(),
         ]);
     }
+
+
+    public function fixedExpenses(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user->selectedBusinessUnit?->currentFiscalYear) {
+            return redirect()->route('initialize');
+        }
+
+        $unit = $user->selectedBusinessUnit;
+        $fiscalYear = $unit->currentFiscalYear;
+
+        return view('fixed-expenses.index', [
+            'unit' => $unit,
+            'fiscalYear' => $fiscalYear,
+        ]);
+    }
 }

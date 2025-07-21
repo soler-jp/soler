@@ -16,6 +16,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/dashboard', \App\Http\Controllers\PortalController::class)->name('dashboard');
     Route::get('/initialize', [\App\Http\Controllers\SetupController::class, 'initialize'])->name('initialize');
+
+    Route::get('/fixed-expenses', [\App\Http\Controllers\PortalController::class, 'fixedExpenses'])
+        ->name('fixed-expenses');
 });
 
 

@@ -15,6 +15,9 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('fixed-expenses')" :active="request()->routeIs('fixed-expenses')">
+                        固定費
+                    </x-nav-link>
                 </div>
             </div>
 
