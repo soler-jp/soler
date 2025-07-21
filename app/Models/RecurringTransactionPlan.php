@@ -23,6 +23,7 @@ class RecurringTransactionPlan extends Model
         'name',
         'interval', // 'monthly', 'bimonthly', 'yearly'
         'month_of_year', // for 'yearly' interval
+        'start_month', // for 'bimonthly' interval
         'day_of_month',
         'is_income',
         'debit_sub_account_id',
@@ -60,6 +61,7 @@ class RecurringTransactionPlan extends Model
                 'interval' => ['required', 'in:monthly,bimonthly,yearly'],
                 'day_of_month' => ['required', 'integer', 'min:1', 'max:31'],
                 'month_of_year' => ['nullable', 'integer', 'min:1', 'max:12'],
+                'start_month' => ['nullable', 'integer', 'min:1', 'max:12'],
                 'is_income' => ['required', 'boolean'],
                 'debit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
                 'credit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
@@ -105,28 +107,51 @@ class RecurringTransactionPlan extends Model
     {
         $dates = collect();
 
-
         if ($this->interval === 'yearly') {
             $month = $this->month_of_year ?? 1; // デフォルト: 1月
             $day = $this->day_of_month ?? 1;    // デフォルト: 1日
 
             $day = min($day, Carbon::create($fiscalYear->year, $month, 1)->daysInMonth);
 
-            $dates->push(
-                Carbon::create($fiscalYear->year, $month, $day)
-            );
+            $dates->push(Carbon::create($fiscalYear->year, $month, $day));
 
             return $dates;
         }
 
+        $day = $this->day_of_month ?? 1;
 
-        $date = Carbon::parse($fiscalYear->start_date)->startOfMonth();
+        $startDate = Carbon::parse($fiscalYear->start_date)->startOfMonth();
+        $endDate = Carbon::parse($fiscalYear->end_date);
 
-        while ($date->lessThanOrEqualTo(Carbon::parse($fiscalYear->end_date))) {
-            $day = min($this->day_of_month, $date->daysInMonth);
-            $dates->push($date->copy()->day($day));
+        if ($this->interval === 'bimonthly') {
 
-            $date->addMonths($this->interval === 'bimonthly' ? 2 : 1)->startOfMonth();
+            $year = $startDate->year;
+
+            if (is_null($this->start_month)) {
+                $first = Carbon::create($year, 1, 1);
+            } else {
+                $first = Carbon::create($year, $this->start_month, 1);
+            }
+
+            // その月以降、2ヶ月おきに追加
+            $date = $first->copy();
+
+            while ($date->lessThanOrEqualTo($endDate)) {
+                $dayToUse = min($day, $date->daysInMonth);
+                $dates->push($date->copy()->day($dayToUse));
+                $date->addMonths(2);
+            }
+
+            return $dates;
+        }
+
+        // monthly（毎月）の場合
+        $date = $startDate->copy();
+
+        while ($date->lessThanOrEqualTo($endDate)) {
+            $dayToUse = min($day, $date->daysInMonth);
+            $dates->push($date->copy()->day($dayToUse));
+            $date->addMonth()->startOfMonth();
         }
 
         return $dates;

@@ -533,4 +533,112 @@ class RecurringTransactionPlanTest extends TestCase
                 ->count()
         );
     }
+
+    #[Test]
+    public function start_monthが1の隔月プランは奇数月にのみ取引を生成する()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '隔月奇数月テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $subAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '隔月奇数月プラン',
+            'interval' => 'bimonthly',
+            'day_of_month' => 15,
+            'is_income' => false,
+            'debit_sub_account_id' => $subAccount->id,
+            'credit_sub_account_id' => $subAccount->id,
+            'amount' => 6000,
+            'tax_amount' => 600,
+            'start_month' => 1, // 1月から開始
+        ]);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+
+        // 奇数月にのみ取引が生成されることを確認
+        $this->assertCount(6, $transactions);
+        $dates = $transactions->pluck('date')->sort()->values()->map(fn($d) => $d->toDateString());
+
+        $this->assertEquals([
+            '2025-01-15',
+            '2025-03-15',
+            '2025-05-15',
+            '2025-07-15',
+            '2025-09-15',
+            '2025-11-15',
+        ], $dates->toArray());
+    }
+
+    #[Test]
+    public function start_monthが2の隔月プランは偶数月にのみ取引を生成する()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '隔月偶数月テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $subAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '隔月偶数月プラン',
+            'interval' => 'bimonthly',
+            'day_of_month' => 15,
+            'is_income' => false,
+            'debit_sub_account_id' => $subAccount->id,
+            'credit_sub_account_id' => $subAccount->id,
+            'amount' => 6000,
+            'tax_amount' => 600,
+            'start_month' => 2, // 2月から開始
+        ]);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+
+        // 偶数月にのみ取引が生成されることを確認
+        $this->assertCount(6, $transactions);
+        $dates = $transactions->pluck('date')->sort()->values()->map(fn($d) => $d->toDateString());
+
+        $this->assertEquals([
+            '2025-02-15',
+            '2025-04-15',
+            '2025-06-15',
+            '2025-08-15',
+            '2025-10-15',
+            '2025-12-15',
+        ], $dates->toArray());
+    }
+
+    #[Test]
+    public function start_monthがnullの場合は奇数月で取引が生成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '隔月nullテスト']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $subAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '隔月nullプラン',
+            'interval' => 'bimonthly',
+            'day_of_month' => 15,
+            'is_income' => false,
+            'debit_sub_account_id' => $subAccount->id,
+            'credit_sub_account_id' => $subAccount->id,
+            'amount' => 6000,
+            'tax_amount' => 600,
+            'start_month' => null, // start_month が null
+        ]);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+
+        // 奇数月にのみ取引が生成されることを確認
+        $this->assertCount(6, $transactions);
+        $dates = $transactions->pluck('date')->sort()->values()->map(fn($d) => $d->toDateString());
+
+        $this->assertEquals([
+            '2025-01-15',
+            '2025-03-15',
+            '2025-05-15',
+            '2025-07-15',
+            '2025-09-15',
+            '2025-11-15',
+        ], $dates->toArray());
+    }
 }
