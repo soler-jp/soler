@@ -18,7 +18,7 @@ class Form extends Component
         'debit_sub_account_id' => null,
         'credit_sub_account_id' => null,
         'amount' => null,
-        'tax_amount' => null,
+        'tax_amount' => 0,
         'tax_type' => null,
         'start_month_type' => 'odd',
     ];
@@ -55,6 +55,7 @@ class Form extends Component
             'form.debit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
             'form.credit_sub_account_id' => ['nullable', 'exists:sub_accounts,id'],
             'form.amount' => ['required', 'integer', 'min:0'],
+            'form.tax_amount' => ['required', 'integer', 'min:0'],
             'form.interval' => ['required', 'in:monthly,bimonthly,yearly'],
             'form.day_of_month' => ['required', 'integer', 'min:1', 'max:31'],
             'form.start_month_type' => ['required_if:form.interval,bimonthly', 'in:odd,even'],

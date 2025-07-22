@@ -91,4 +91,18 @@ class Transaction extends Model
             $transaction->entry_number = ($max ?? 0) + 1;
         });
     }
+
+    public function getTotalAmountAttribute(): int
+    {
+        return $this->journalEntries->where('type', 'credit')->sum('amount');
+    }
+
+    public function getCreditAccountsLabelAttribute(): string
+    {
+        return $this->journalEntries
+            ->where('type', 'credit')
+            ->map(fn($entry) => $entry->subAccount->account->name . ' / ' . $entry->subAccount->name)
+            ->unique()
+            ->implode(', ');
+    }
 }
