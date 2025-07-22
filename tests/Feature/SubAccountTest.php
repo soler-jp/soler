@@ -7,10 +7,11 @@ use App\Models\SubAccount;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class SubAccountTest extends TestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase;
 
     #[Test]
     public function 同じ勘定科目内では補助科目名の重複はできない()

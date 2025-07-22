@@ -8,10 +8,11 @@ use App\Services\DepreciationService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class DepreciationServiceTest extends TestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase;
 
     #[Test]
     public function 固定資産を登録すると取得仕訳も同時に登録される_免税事業者()

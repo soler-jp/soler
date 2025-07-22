@@ -8,10 +8,11 @@ use App\Models\User;
 use App\Setup\Initializers\GeneralBusinessInitializer;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use PHPUnit\Framework\Attributes\Test;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class DashboardRevenueInputTest extends TestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase;
 
     #[Test]
     public function 通常の売上が登録できる()
