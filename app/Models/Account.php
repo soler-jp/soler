@@ -41,7 +41,8 @@ class Account extends Model
 
     public function subAccounts()
     {
-        return $this->hasMany(SubAccount::class);
+        return $this->hasMany(SubAccount::class)
+            ->orderBy('id');
     }
 
     public function journalEntries(): HasManyThrough

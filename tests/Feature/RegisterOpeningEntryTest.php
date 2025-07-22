@@ -75,7 +75,7 @@ class RegisterOpeningEntryTest extends TestCase
         ]);
 
         $orgSubAccounts = $unit->subAccounts->all();
-        $this->assertCount(50, $orgSubAccounts, '初期状態ではSubAccountがデフォルトの50');
+        $this->assertCount(51, $orgSubAccounts, '初期状態ではSubAccountがデフォルトの50');
 
         $this->assertDatabaseMissing('sub_accounts', [
             'name' => '事務所レジ',
@@ -105,7 +105,7 @@ class RegisterOpeningEntryTest extends TestCase
 
         $unit->refresh();
         $subAccounts = $unit->subAccounts->all();
-        $this->assertCount(52, $subAccounts, 'SubAccountが2つ追加されていることを確認');
+        $this->assertCount(53, $subAccounts, 'SubAccountが2つ追加されていることを確認');
 
 
         $this->assertDatabaseHas('sub_accounts', [
@@ -138,11 +138,11 @@ class RegisterOpeningEntryTest extends TestCase
         // レジ現金がないことを確認
         $this->assertDatabaseMissing('sub_accounts', [
             'account_id' => $cashAccount->id,
-            'name' => 'レジ現金',
+            'name' => '金庫',
         ]);
 
         $existing = $cashAccount->subAccounts()->create([
-            'name' => 'レジ現金',
+            'name' => '金庫',
         ]);
 
 
@@ -150,7 +150,7 @@ class RegisterOpeningEntryTest extends TestCase
             [
                 'account_name' => '現金',
                 'amount' => 100000,
-                'sub_account_name' => 'レジ現金',
+                'sub_account_name' => '金庫',
             ],
         ]);
 
@@ -158,9 +158,9 @@ class RegisterOpeningEntryTest extends TestCase
         $this->assertEquals($existing->id, $usedSubAccountId);
 
         $count = SubAccount::where('account_id', $cashAccount->id)
-            ->where('name', 'レジ現金')
+            ->where('name', '金庫')
             ->count();
 
-        $this->assertEquals(1, $count); // 「レジ現金」が重複していない
+        $this->assertEquals(1, $count); // 「金庫」が重複していない
     }
 }

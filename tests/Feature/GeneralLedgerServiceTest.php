@@ -338,7 +338,7 @@ class GeneralLedgerServiceTest extends TestCase
         $fiscalYear = $unit->createFiscalYear(2025);
 
         $account = $unit->getAccountByName('現金');
-        $subAccountA = $account->subAccounts()->create(['name' => 'レジ']);
+        $subAccountA = $account->subAccounts()->create(['name' => 'レジ2']);
         $subAccountB = $account->subAccounts()->create(['name' => '金庫']);
 
         $otherSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();

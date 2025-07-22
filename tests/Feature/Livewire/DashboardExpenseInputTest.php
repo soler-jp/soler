@@ -207,7 +207,7 @@ class DashboardExpenseInputTest extends TestCase
 
         $this->actingAs($user);
 
-        $credit = $unit->getSubAccountByName('現金', '現金');
+        $credit = $unit->getSubAccountByName('現金', 'レジ現金');
 
         Livewire::actingAs($user)
             ->test('dashboard-expense-input')

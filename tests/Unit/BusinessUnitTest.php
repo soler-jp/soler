@@ -321,4 +321,46 @@ class BusinessUnitTest extends TestCase
 
         $this->assertSame('仮払金', $account->subAccounts->first()->name);
     }
+
+    #[Test]
+    public function 事業主貸のSubAccountに源泉徴収が自動で作成される()
+    {
+        $user = User::factory()->create();
+
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業所',
+        ]);
+
+
+        $drawAccount = $businessUnit->getAccountByName('事業主貸');
+
+        $this->assertNotNull($drawAccount, '事業主貸の勘定科目が見つかりません。');
+
+        $subAccounts = $drawAccount->subAccounts;
+
+        $this->assertCount(2, $subAccounts);
+        $this->assertEquals('事業主貸', $subAccounts->first()->name);
+        $this->assertEquals('源泉徴収', $subAccounts->last()->name);
+    }
+
+    #[Test]
+    public function 現金のSubAccountはレジ現金とその他現金()
+    {
+
+        $user = User::factory()->create();
+
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業所',
+        ]);
+
+        $cashAccount = $businessUnit->getAccountByName('現金');
+
+        $this->assertNotNull($cashAccount, '現金の勘定科目が見つかりません。');
+
+        $subAccounts = $cashAccount->subAccounts;
+
+        $this->assertCount(2, $subAccounts);
+        $this->assertEquals('レジ現金', $subAccounts->first()->name);
+        $this->assertEquals('その他現金', $subAccounts->last()->name);
+    }
 }

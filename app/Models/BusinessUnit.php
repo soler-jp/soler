@@ -131,7 +131,9 @@ class BusinessUnit extends Model
 
 
     public static array $defaultSubAccounts = [
-        ['name' => '源泉徴収',       'account_name' => '事業主貸'],
+        '事業主貸' => ['事業主貸', '源泉徴収'],
+        '現金' => ['レジ現金', 'その他現金'],
+        '売上高' => ['一般売上'],
     ];
 
     /**
@@ -147,20 +149,6 @@ class BusinessUnit extends Model
 
             foreach (self::$defaultAccounts as $account) {
                 $businessUnit->createAccount($account);
-            }
-
-            foreach (self::$defaultSubAccounts as $subAccount) {
-                $account = $businessUnit->accounts()
-                    ->where('name', $subAccount['account_name'])
-                    ->first();
-
-                if ($account) {
-                    $account->createSubAccount([
-                        'name' => $subAccount['name'],
-                    ]);
-                } else {
-                    throw new \InvalidArgumentException("勘定科目 '{$subAccount['account_name']}' が見つかりません。");
-                }
             }
 
             return $businessUnit;
@@ -179,9 +167,17 @@ class BusinessUnit extends Model
         return \DB::transaction(function () use ($attributes) {
             $account = $this->accounts()->create($attributes);
 
-            $account->subAccounts()->create([
-                'name' => $account->name,
-            ]);
+            if (isset(self::$defaultSubAccounts[$account->name])) {
+                foreach (self::$defaultSubAccounts[$account->name] as $subAccountName) {
+                    $account->subAccounts()->create([
+                        'name' => $subAccountName,
+                    ]);
+                }
+            } else {
+                $account->subAccounts()->create([
+                    'name' => $account->name,
+                ]);
+            }
 
             return $account;
         });

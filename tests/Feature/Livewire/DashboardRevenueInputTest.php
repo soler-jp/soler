@@ -154,7 +154,7 @@ class DashboardRevenueInputTest extends TestCase
             'is_tax_exclusive' => false,
         ]);
 
-        $cashSubAccount = $user->selectedBusinessUnit->getSubAccountByName('現金', '現金');
+        $cashSubAccount = $user->selectedBusinessUnit->getSubAccountByName('現金', 'レジ現金');
 
         Livewire::actingAs($user)
             ->test('dashboard-revenue-input')
@@ -273,8 +273,8 @@ class DashboardRevenueInputTest extends TestCase
         $fy = $unit->createFiscalYear(2025);
         $unit->setCurrentFiscalYear($fy);
 
-        $revenueSubAccount = $unit->getSubAccountByName('売上高', '売上高');
-        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $revenueSubAccount = $unit->getSubAccountByName('売上高', '一般売上');
+        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
 
         Livewire::actingAs($user)
             ->test('dashboard-revenue-input')
@@ -313,7 +313,7 @@ class DashboardRevenueInputTest extends TestCase
             'is_tax_exclusive' => false,
         ]);
 
-        $revenueSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+        $revenueSubAccount = $unit->getSubAccountByName('売上高', '一般売上');
         $bankAccount = $unit->getAccountByName('その他の預金');
         $bankSubAccount = $bankAccount->subAccounts()->create([
             'name' => 'テスト銀行',
