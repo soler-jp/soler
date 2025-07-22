@@ -547,30 +547,23 @@ class TransactionRegistrarTest extends TestCase
             'description' => 'tax_amount片側のみ',
         ]);
     }
-
     #[Test]
     public function is_plannedをtrueにして取引を登録できる()
     {
         $user = User::factory()->create();
-
-        $unit = $user->createBusinessUnitWithDefaults([
-            'name' => 'Test帳簿',
-        ]);
-
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'Test帳簿']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $account = $unit->accounts()->first(); // デフォルトAccountを利用
+        $account = $unit->accounts()->first();
         $subAccount = $account->subAccounts->first();
 
         $registrar = new TransactionRegistrar();
 
-        $transactionData = [
+        $transaction = $registrar->register($fiscalYear, [
             'date' => now()->toDateString(),
             'description' => '予定取引テスト',
             'is_planned' => true,
-        ];
-
-        $journalEntries = [
+        ], [
             [
                 'sub_account_id' => $subAccount->id,
                 'type' => 'debit',
@@ -581,13 +574,10 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'amount' => 1000,
             ],
-        ];
-
-        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntries);
+        ]);
 
         $this->assertTrue($transaction->is_planned);
     }
-
 
     #[Test]
     public function 予定取引を本登録に変更できる()
@@ -596,14 +586,8 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-
-        $expenseSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', '通信費'))
-            ->first();
-
-        $assetSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', '現金'))
-            ->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -613,40 +597,23 @@ class TransactionRegistrarTest extends TestCase
             'is_planned' => true,
         ], [
             [
-                'sub_account_id' => $expenseSubAccount->id,
+                'sub_account_id' => $expense->id,
                 'type' => 'debit',
                 'amount' => 1000,
                 'tax_type' => 'taxable_purchases_10',
                 'tax_amount' => 100,
             ],
             [
-                'sub_account_id' => $assetSubAccount->id,
+                'sub_account_id' => $asset->id,
                 'type' => 'credit',
                 'amount' => 1100,
             ],
         ]);
 
-        $this->assertTrue($transaction->is_planned);
+        $transaction->description = '本登録済み';
+        $transaction->date = '2025-04-02';
 
-        $confirmed = $registrar->confirmPlanned($transaction, [
-            'description' => '本登録済み',
-            'date' => '2025-04-02',
-            'journal_entries' => [
-                [
-                    'sub_account_id' => $expenseSubAccount->id,
-                    'type' => 'debit',
-                    'amount' => 1000,
-                    'tax_type' => 'taxable_purchases_10',
-                    'tax_amount' => 100,
-                ],
-                [
-                    'sub_account_id' => $assetSubAccount->id,
-                    'type' => 'credit',
-                    'amount' => 1100,
-                ],
-            ],
-        ]);
-
+        $confirmed = $registrar->confirmPlanned($transaction);
 
         $this->assertFalse($confirmed->is_planned);
         $this->assertSame('本登録済み', $confirmed->description);
@@ -654,23 +621,15 @@ class TransactionRegistrarTest extends TestCase
     }
 
     #[Test]
-    public function 本登録時に仕訳の内容を変更できて元の仕訳は削除される()
+    public function 本登録時に仕訳の内容を変更できて元の仕訳は上書きされる()
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expenseSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', '通信費'))
-            ->first();
-
-        $assetSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', '現金'))
-            ->first();
-
-        $liabilitySubAccount = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', '未払金'))
-            ->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
+        $liability = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '未払金'))->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -680,48 +639,47 @@ class TransactionRegistrarTest extends TestCase
             'is_planned' => true,
         ], [
             [
-                'sub_account_id' => $expenseSubAccount->id,
+                'sub_account_id' => $expense->id,
                 'type' => 'debit',
                 'amount' => 1000,
                 'tax_type' => 'taxable_purchases_10',
                 'tax_amount' => 100,
             ],
             [
-                'sub_account_id' => $assetSubAccount->id,
+                'sub_account_id' => $asset->id,
                 'type' => 'credit',
                 'amount' => 1100,
             ],
         ]);
 
-        $originalEntryIds = $transaction->journalEntries()->pluck('id')->toArray();
+        $originalIds = $transaction->journalEntries->pluck('id')->toArray();
 
-        $confirmed = $registrar->confirmPlanned($transaction, [
-            'description' => '本登録済み（仕訳変更）',
-            'date' => '2025-04-02',
-            'journal_entries' => [
-                [
-                    'sub_account_id' => $expenseSubAccount->id,
-                    'type' => 'debit',
-                    'amount' => 2000,
-                    'tax_type' => 'taxable_purchases_10',
-                    'tax_amount' => 200,
-                ],
-                [
-                    'sub_account_id' => $liabilitySubAccount->id,
-                    'type' => 'credit',
-                    'amount' => 2200,
-                ],
-            ],
-        ]);
+        $transaction->description = '本登録済み（仕訳変更）';
+        $transaction->date = '2025-04-02';
+
+        $debit = $transaction->journalEntries->firstWhere('type', 'debit');
+        $credit = $transaction->journalEntries->firstWhere('type', 'credit');
+
+        $debit->amount = 2000;
+        $debit->tax_amount = 200;
+
+        $credit->amount = 2200;
+        $credit->sub_account_id = $liability->id;
+
+        $confirmed = $registrar->confirmPlanned($transaction);
 
         $this->assertFalse($confirmed->is_planned);
         $this->assertSame('本登録済み（仕訳変更）', $confirmed->description);
         $this->assertSame('2025-04-02', $confirmed->date->toDateString());
         $this->assertCount(2, $confirmed->journalEntries);
 
-        foreach ($originalEntryIds as $id) {
-            $this->assertDatabaseMissing('journal_entries', ['id' => $id]);
+        foreach ($confirmed->journalEntries as $entry) {
+            $this->assertContains($entry->id, $originalIds);
         }
+
+        $this->assertSame(2000, $confirmed->journalEntries->firstWhere('type', 'debit')->amount);
+        $this->assertSame(2200, $confirmed->journalEntries->firstWhere('type', 'credit')->amount);
+        $this->assertSame($liability->id, $confirmed->journalEntries->firstWhere('type', 'credit')->sub_account_id);
     }
 
     #[Test]
@@ -731,13 +689,8 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', '通信費'))
-            ->first();
-
-        $asset = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', '現金'))
-            ->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
 
         $registrar = new TransactionRegistrar();
 
@@ -760,13 +713,24 @@ class TransactionRegistrarTest extends TestCase
             ],
         ]);
 
-        $cancelled = $registrar->cancelPlanned($transaction);
+        $originalIds = $transaction->journalEntries->pluck('id')->toArray();
+
+        foreach ($transaction->journalEntries as $entry) {
+            $entry->amount = 0;
+        }
+
+        $transaction->description = '取消予定取引（取消）';
+
+        $cancelled = $registrar->confirmPlanned($transaction);
 
         $this->assertFalse($cancelled->is_planned);
         $this->assertSame('取消予定取引（取消）', $cancelled->description);
-
         $this->assertCount(2, $cancelled->journalEntries);
         $this->assertTrue($cancelled->journalEntries->every(fn($e) => $e->amount === 0));
+
+        foreach ($cancelled->journalEntries as $entry) {
+            $this->assertContains($entry->id, $originalIds);
+        }
     }
 
     #[Test]
@@ -778,13 +742,8 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', '通信費'))
-            ->first();
-
-        $asset = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', '現金'))
-            ->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
 
         $registrar = new TransactionRegistrar();
 

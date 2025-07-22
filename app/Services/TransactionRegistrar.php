@@ -77,36 +77,24 @@ class TransactionRegistrar
     }
 
 
-    public function confirmPlanned(Transaction $transaction, array $updates): Transaction
+    public function confirmPlanned(Transaction $transaction): Transaction
     {
         if (! $transaction->is_planned) {
             throw new \InvalidArgumentException('この取引は既に本登録されています。');
         }
 
-        $journalEntries = $updates['journal_entries'] ?? null;
+        return DB::transaction(function () use ($transaction) {
+            $transaction->is_planned = false;
+            $transaction->save();
 
-        if (! is_array($journalEntries) || empty($journalEntries)) {
-            throw new \InvalidArgumentException('journal_entries が必要です。');
-        }
-
-        return DB::transaction(function () use ($transaction, $updates, $journalEntries) {
-            // 既存の仕訳削除
-            $transaction->journalEntries()->delete();
-
-            // 取引本体を更新（予定 → 本登録）
-            $transaction->update([
-                ...$updates,
-                'is_planned' => false,
-            ]);
-
-            // 新しい仕訳を作成
-            foreach ($journalEntries as $entryData) {
-                $transaction->journalEntries()->create($entryData);
+            foreach ($transaction->journalEntries as $entry) {
+                $entry->save();
             }
 
             return $transaction->fresh();
         });
     }
+
 
     public function cancelPlanned(Transaction $transaction): Transaction
     {
