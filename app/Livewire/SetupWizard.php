@@ -14,7 +14,7 @@ class SetupWizard extends Component
     public bool $is_taxable = false;
     public bool $is_tax_exclusive = false;
     public int|null $year = null;
-    public int|null $cash_balance = null;
+    public array $cash_accounts = [];
     public array $bank_accounts = [];
     public array $other_assets = [];
     public string $submitError = '';
@@ -32,7 +32,9 @@ class SetupWizard extends Component
                 'is_tax_exclusive' => ['required', 'boolean'],
             ],
             3 => [
-                'cash_balance' => ['nullable', 'integer', 'min:0'],
+                'cash_accounts.*.sub_account_name' => ['required', 'string'],
+                'cash_accounts.*.amount' => ['required', 'integer', 'min:0'],
+
             ],
             4 => [
                 'bank_accounts.*.sub_account_name' => ['required', 'string'],
@@ -68,13 +70,17 @@ class SetupWizard extends Component
 
         $opening_entries = [];
 
-        if (!is_null($this->cash_balance)) {
-            $opening_entries[] = [
-                'account_name' => '現金',
-                'sub_account_name' => '現金',
-                'amount' => $this->cash_balance,
-            ];
+        foreach ($this->cash_accounts as $cashAccount) {
+
+            if ($cashAccount['amount'] > 0) {
+                $opening_entries[] = [
+                    'account_name' => '現金',
+                    'sub_account_name' => $cashAccount['sub_account_name'],
+                    'amount' => $cashAccount['amount'],
+                ];
+            }
         }
+
 
         foreach ($this->bank_accounts as $bankAccount) {
             $opening_entries[] = [
@@ -108,9 +114,10 @@ class SetupWizard extends Component
             return $this->redirect(route('dashboard'));
         } catch (\InvalidArgumentException $e) {
             $this->submitError = $e->getMessage();
+            \Log::error($e);
         } catch (\Throwable $e) {
             $this->submitError = '登録中に予期せぬエラーが発生しました。';
-            Log::error($e);
+            \Log::error($e);
         }
     }
 
@@ -126,6 +133,20 @@ class SetupWizard extends Component
     {
         unset($this->bank_accounts[$index]);
         $this->bank_accounts = array_values($this->bank_accounts);
+    }
+
+    public function addCashSubAccount()
+    {
+        $this->cash_accounts[] = [
+            'sub_account_name' => '',
+            'amount' => 0,
+        ];
+    }
+
+    public function removeCashSubAccount($index)
+    {
+        unset($this->cash_accounts[$index]);
+        $this->cash_sub_accounts = array_values($this->cash_sub_accounts);
     }
 
     public function addOtherAsset()
@@ -147,6 +168,14 @@ class SetupWizard extends Component
     public function mount()
     {
         $this->year = (int)  date('Y');
+
+        $bu = auth()->user()->selectedBusinessUnit;
+
+        $this->cash_accounts[] = [
+            'sub_account_name' => 'レジ現金',
+            'amount' => 0,
+            'is_locked' => true,
+        ];
     }
 
     public function render()

@@ -1,5 +1,12 @@
 <div class="max-w-2xl mx-auto mt-10 space-y-6">
 
+    @if ($submitError)
+        <div class="text-sm text-red-600 mt-4">
+            {{ $submitError }}
+        </div>
+    @endif
+
+
     {{-- ステップインジケーター --}}
     <div class="flex justify-between text-sm text-gray-500">
         <div class="{{ $step === 1 ? 'font-bold text-blue-600' : '' }}">1. 基本情報</div>
@@ -14,6 +21,11 @@
         @if ($step === 1)
             <div>
                 <label class="block font-bold mb-2">事業体名</label>
+                <p>
+                    複数の事業を行う場合に区別するための名称です。<br>
+                    1つしか事業を行わない場合は、任意の文字列で構いません。<br>
+                    後から変更も可能です。
+                </p>
                 <input type="text" wire:model="name" class="w-full border rounded px-3 py-2">
                 @error('name')
                     <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
@@ -89,9 +101,35 @@
 
         @if ($step === 3)
             <div>
-                <label class="block font-bold mb-2">今年の事業開始時の、事業専用の現金(レジや金庫など)の金額を入力してください</label>
-                <input type="number" wire:model="cash_balance" class="w-full border rounded px-3 py-2">
-                @error('cash_balance')
+                <label class="block font-bold mb-2">今年の事業開始時の、<strong>事業専用の現金</strong>を設定します。</label>
+                <p class="text-sm text-gray-600 mb-4">
+                    レジや金庫などで管理している<strong>事業専用の現金</strong>の金額を入力してください(個人の財布などは含めません)<br>
+                    既に「<strong>レジ現金</strong>」「<strong>その他現金</strong>」という現金の内訳が用意されています。必要に応じて「金庫」「両替用小銭入れ」などを追加することもできます。<br>
+                </p>
+
+                @foreach ($cash_accounts as $index => $cash)
+                    <div class="flex items-center gap-4 mb-2">
+                        @if ($cash['is_locked'] ?? false)
+                            <div class="flex-1 px-3 py-2 border rounded bg-gray-100 text-gray-700">
+                                {{ $cash['sub_account_name'] }}
+                            </div>
+                        @else
+                            <input type="text" wire:model="cash_accounts.{{ $index }}.sub_account_name"
+                                placeholder="名称（例：レジ現金）" class="flex-1 border rounded px-3 py-2">
+                        @endif
+
+                        <input type="number" wire:model="cash_sub_accounts.{{ $index }}.amount"
+                            placeholder="金額" class="w-32 border rounded px-3 py-2">
+                        @if (empty($cash['is_locked']))
+                            <button type="button" wire:click="removeCashSubAccount({{ $index }})"
+                                class="text-red-600">削除</button>
+                        @endif
+
+                    </div>
+                @endforeach
+                <button type="button" wire:click="addCashSubAccount" class="mt-2 text-blue-600">＋ 追加</button>
+
+                @error('cash_sub_accounts.*.amount')
                     <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
                 @enderror
             </div>
@@ -100,6 +138,7 @@
                 <button wire:click="next" class="px-6 py-3 bg-blue-600 text-white rounded">次へ</button>
             </div>
         @endif
+
 
         @if ($step === 4)
             <div>
@@ -157,7 +196,15 @@
                     <li><strong>事業体名:</strong> {{ $name }}</li>
                     <li><strong>事業種別:</strong> {{ $business_type }}</li>
                     <li><strong>会計年度:</strong> {{ $year }} 年</li>
-                    <li><strong>現金残高:</strong> {{ number_format($cash_balance) }} 円</li>
+                    <li>
+                        <strong>現金残高:</strong>
+                        <ul class="ml-4 list-disc">
+                            @foreach ($cash_accounts as $account)
+                                <li>{{ $account['sub_account_name'] }}: {{ number_format($account['amount']) }} 円</li>
+                            @endforeach
+                        </ul>
+
+                    </li>
                     <li>
                         <strong>銀行口座:</strong>
                         <ul class="ml-4 list-disc">

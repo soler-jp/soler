@@ -148,25 +148,6 @@ class SetupWizardTest extends TestCase
     }
 
     #[Test]
-    public function Step3で現金残高を入力すればopening_entriesに反映される()
-    {
-        $user = User::factory()->create();
-        $this->actingAs($user);
-
-        $component = Livewire::test(\App\Livewire\SetupWizard::class)
-            ->set('name', '現金事業体')
-            ->set('business_type', 'general')
-            ->call('next') // Step1 → Step2
-            ->set('year', 2025)
-            ->set('is_taxable', false)
-            ->set('is_tax_exclusive', false)
-            ->call('next') // Step2 → Step3
-            ->set('cash_balance', 30000);
-
-        $this->assertSame(30000, $component->get('cash_balance'));
-    }
-
-    #[Test]
     public function Step4で銀行口座を1件追加できる()
     {
         $user = User::factory()->create();
@@ -238,7 +219,10 @@ class SetupWizardTest extends TestCase
             ->set('is_tax_exclusive', false)
             ->call('next')
             // Step 3
-            ->set('cash_balance', 30000)
+            ->set('cash_accounts', [
+                ['sub_account_name' => 'レジ現金', 'amount' => 5000],
+                ['sub_account_name' => 'イベント用現金', 'amount' => 3000],
+            ])
             ->call('next')
             // Step 4
             ->set('bank_accounts', [
@@ -276,6 +260,63 @@ class SetupWizardTest extends TestCase
 
         $this->assertDatabaseHas('sub_accounts', [
             'name' => 'メインバンク',
+        ]);
+    }
+
+    #[Test]
+    public function cashAccount画面で、デフォルトの「レジ現金」が表示される()
+    {
+        $user = User::factory()->create();
+        $bu = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $this->actingAs($user);
+
+        Livewire::test(\App\Livewire\SetupWizard::class)
+            ->set('name', 'テスト事業体')
+            ->set('business_type', 'general')
+            ->call('next') // Step1 → Step2
+            ->set('year', 2025)
+            ->set('is_taxable', false)
+            ->set('is_tax_exclusive', false)
+            ->call('next') // Step2 → Step3
+            ->assertSet('cash_accounts.0.sub_account_name', 'レジ現金');
+    }
+
+    #[Test]
+    public function cashAccountに入力した内容がOpeningEntryとして渡される()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(\App\Livewire\SetupWizard::class)
+            ->set('name', 'テスト事業所')
+            ->set('business_type', 'general')
+            ->call('next') // step1 → 2
+            ->set('year', 2025)
+            ->set('is_taxable', false)
+            ->set('is_tax_exclusive', false)
+            ->call('next') // step2 → 3
+            ->set('cash_accounts', [
+                ['sub_account_name' => 'レジ現金', 'amount' => 5000],
+                ['sub_account_name' => 'イベント用現金', 'amount' => 3000],
+            ])
+            ->call('next') // step3 → 4
+            ->call('next') // step4 → 5
+            ->call('next') // step5 → 6
+            ->call('submit');
+
+        $this->assertDatabaseHas('transactions', [
+            'description' => '期首残高設定',
+            'is_opening_entry' => true,
+        ]);
+
+        $user->refresh();
+
+        $bu = $user->selectedBusinessUnit;
+
+        $cashSubAccount = $bu->getSubAccountByName('現金', 'レジ現金');
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $cashSubAccount->id,
+            'amount' => 5000, // レジ現金5000
         ]);
     }
 }
