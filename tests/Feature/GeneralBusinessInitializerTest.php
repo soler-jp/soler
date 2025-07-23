@@ -239,4 +239,38 @@ class GeneralBusinessInitializerTest extends TestCase
             'name' => '源泉徴収',
         ]);
     }
+
+    #[Test]
+    public function 売上高SubAccountが生成される()
+    {
+        $user = User::factory()->create();
+        $initializer = new GeneralBusinessInitializer();
+        $unit = $initializer->initialize($user, [
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+            'revenue_sub_accounts' => [
+                ['name' => '株式会社aaa'],
+                ['name' => 'bbb商事'],
+            ],
+        ]);
+
+        $salesAccount = $unit->accounts()->where('name', '売上高')->first();
+
+        $this->assertDatabaseHas('sub_accounts', [
+            'account_id' => $salesAccount->id,
+            'name' => '株式会社aaa',
+        ]);
+
+        $this->assertDatabaseHas('sub_accounts', [
+            'account_id' => $salesAccount->id,
+            'name' => 'bbb商事',
+        ]);
+    }
 }

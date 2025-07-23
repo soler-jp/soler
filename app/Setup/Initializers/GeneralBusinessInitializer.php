@@ -32,6 +32,17 @@ class GeneralBusinessInitializer
 
         $fiscalYear->registerOpeningEntry($inputs['opening_entries'] ?? []);
 
+        $revenueAccount = $unit->getAccountByName('売上高');
+
+        if (isset($inputs['revenue_sub_accounts']) && $revenueAccount) {
+            foreach ($inputs['revenue_sub_accounts'] as $subAccount) {
+                $revenueAccount->subAccounts()->create([
+                    'name' => $subAccount['name'],
+                ]);
+            }
+        }
+
+
         return $unit->refresh();
     }
 }

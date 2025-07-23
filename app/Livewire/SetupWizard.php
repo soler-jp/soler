@@ -18,6 +18,7 @@ class SetupWizard extends Component
     public array $bank_accounts = [];
     public array $other_assets = [];
     public string $submitError = '';
+    public array $revenue_sub_accounts = [];
 
     protected function rulesPerStep(): array
     {
@@ -44,6 +45,9 @@ class SetupWizard extends Component
                 'other_assets.*.account_name' => ['required', 'string'],
                 'other_assets.*.sub_account_name' => ['nullable', 'string'],
                 'other_assets.*.amount' => ['required', 'integer', 'min:0'],
+            ],
+            6 => [
+                'revenue_sub_accounts.*.name' => ['required', 'string'],
             ],
 
         ];
@@ -93,9 +97,20 @@ class SetupWizard extends Component
         foreach ($this->other_assets as $asset) {
             $opening_entries[] = [
                 'account_name' => $asset['account_name'],
-                'sub_account_name' => $asset['sub_account_name'] ?? null,
+                'sub_account_name' => trim($asset['sub_account_name'] ?? '') === ''
+                    ? $asset['account_name']
+                    : $asset['sub_account_name'],
                 'amount' => $asset['amount'],
             ];
+        }
+
+        $revenue_sub_accounts = [];
+        foreach ($this->revenue_sub_accounts as $subAccount) {
+            if (!$subAccount['is_locked'] && $subAccount['name']) {
+                $revenue_sub_accounts[] = [
+                    'name' => $subAccount['name'],
+                ];
+            }
         }
 
         $inputs = [
@@ -105,6 +120,7 @@ class SetupWizard extends Component
             'is_taxable' => $this->is_taxable,
             'is_tax_exclusive' => $this->is_tax_exclusive,
             'opening_entries' => $opening_entries,
+            'revenue_sub_accounts' => $revenue_sub_accounts,
         ];
 
         try {
@@ -164,6 +180,20 @@ class SetupWizard extends Component
         $this->other_assets = array_values($this->other_assets);
     }
 
+    public function addRevenueSubAccount()
+    {
+        $this->revenue_sub_accounts[] = [
+            'name' => '',
+            'is_locked' => false,
+        ];
+    }
+
+    public function removeRevenueSubAccount($index)
+    {
+        unset($this->revenue_sub_accounts[$index]);
+        $this->revenue_sub_accounts = array_values($this->revenue_sub_accounts);
+    }
+
 
     public function mount()
     {
@@ -174,6 +204,11 @@ class SetupWizard extends Component
         $this->cash_accounts[] = [
             'sub_account_name' => 'レジ現金',
             'amount' => 0,
+            'is_locked' => true,
+        ];
+
+        $this->revenue_sub_accounts[] = [
+            'name' => '一般売上',
             'is_locked' => true,
         ];
     }

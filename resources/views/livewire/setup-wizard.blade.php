@@ -14,7 +14,8 @@
         <div class="{{ $step === 3 ? 'font-bold text-blue-600' : '' }}">3. 現金残高</div>
         <div class="{{ $step === 4 ? 'font-bold text-blue-600' : '' }}">4. 銀行口座</div>
         <div class="{{ $step === 5 ? 'font-bold text-blue-600' : '' }}">5. その他資産</div>
-        <div class="{{ $step === 6 ? 'font-bold text-blue-600' : '' }}">6. 確認</div>
+        <div class="{{ $step === 6 ? 'font-bold text-blue-600' : '' }}">6. 売上の分類</div>
+        <div class="{{ $step === 7 ? 'font-bold text-blue-600' : '' }}">7. 確認</div>
     </div>
 
     <div class="max-w-3xl mx-auto p-6 space-y-6">
@@ -104,7 +105,7 @@
                 <label class="block font-bold mb-2">今年の事業開始時の、<strong>事業専用の現金</strong>を設定します。</label>
                 <p class="text-sm text-gray-600 mb-4">
                     レジや金庫などで管理している<strong>事業専用の現金</strong>の金額を入力してください(個人の財布などは含めません)<br>
-                    既に「<strong>レジ現金</strong>」「<strong>その他現金</strong>」という現金の内訳が用意されています。必要に応じて「金庫」「両替用小銭入れ」などを追加することもできます。<br>
+                    既に「<strong>レジ現金</strong>」という内訳が用意されています。必要に応じて「金庫」「両替用小銭入れ」など追加してください。<br>
                 </p>
 
                 @foreach ($cash_accounts as $index => $cash)
@@ -189,7 +190,41 @@
             </div>
         @endif
 
+
         @if ($step === 6)
+            <div>
+                <label class="block font-bold mb-2">売上の分類（任意）</label>
+                <p class="text-sm text-gray-600 mb-4">
+                    売上をあとで見返しやすくするために、あらかじめ分類（例：ネット販売、顧客A など）を登録しておくことができます。<br>
+                    既に「<strong>一般売上</strong>」という分類が1つ用意されています。必要に応じて追加してください。
+                </p>
+
+                @foreach ($revenue_sub_accounts as $index => $sub)
+                    <div class="flex items-center gap-4 mb-2">
+                        @if ($sub['is_locked'] ?? false)
+                            <div
+                                class="flex-1 px-3 py-2 border rounded bg-gray-100 text-gray-700 italic cursor-not-allowed">
+                                {{ $sub['name'] }}
+                            </div>
+                        @else
+                            <input type="text" wire:model="revenue_sub_accounts.{{ $index }}.name"
+                                placeholder="名称（例：ネット販売）" class="flex-1 border rounded px-3 py-2">
+                            <button type="button" wire:click="removeRevenueSubAccount({{ $index }})"
+                                class="text-red-600">削除</button>
+                        @endif
+                    </div>
+                @endforeach
+
+                <button type="button" wire:click="addRevenueSubAccount" class="mt-2 text-blue-600">＋ 追加</button>
+            </div>
+
+            <div class="mt-6 flex justify-between">
+                <button wire:click="$set('step', 5)" class="px-6 py-3 bg-gray-300 rounded">戻る</button>
+                <button wire:click="next" class="px-6 py-3 bg-blue-600 text-white rounded">次へ</button>
+            </div>
+        @endif
+
+        @if ($step === 7)
             <div>
                 <h2 class="text-xl font-bold mb-4">以下の内容で初期設定を行います</h2>
                 <ul class="space-y-2">
@@ -223,12 +258,20 @@
                         </ul>
                     </li>
                 </ul>
-            </div>
+                <hr>
+                <div>
+                    売上の分類:
+                    <ul class="ml-4 list-disc">
+                        @foreach ($revenue_sub_accounts as $sub)
+                            <li>{{ $sub['name'] }}</li>
+                        @endforeach
+                    </ul>
+                </div>
 
-            <div class="mt-6 flex justify-between">
-                <button wire:click="$set('step', 5)" class="px-6 py-3 bg-gray-300 rounded">戻る</button>
-                <button wire:click="submit" class="px-6 py-3 bg-green-600 text-white rounded">この内容で登録</button>
-            </div>
+                <div class="mt-6 flex justify-between">
+                    <button wire:click="$set('step', 5)" class="px-6 py-3 bg-gray-300 rounded">戻る</button>
+                    <button wire:click="submit" class="px-6 py-3 bg-green-600 text-white rounded">この内容で登録</button>
+                </div>
         @endif
 
     </div>

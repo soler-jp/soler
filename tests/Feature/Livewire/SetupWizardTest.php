@@ -8,6 +8,8 @@ use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\BusinessUnit;
+use App\Models\Account;
 
 class SetupWizardTest extends TestCase
 {
@@ -317,6 +319,77 @@ class SetupWizardTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $cashSubAccount->id,
             'amount' => 5000, // レジ現金5000
+        ]);
+    }
+
+    #[Test]
+    public function 売上高の補助科目を追加できる()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(\App\Livewire\SetupWizard::class)
+            ->set('name', '売上高補助科目テスト')
+            ->set('business_type', 'general')
+            ->call('next') // Step1 → Step2
+            ->set('year', 2025)
+            ->set('is_taxable', false)
+            ->set('is_tax_exclusive', false)
+            ->call('next') // Step2 → Step3
+            ->call('next') // Step3 → Step4
+            ->call('next') // Step4 → Step5
+            ->set('revenue_sub_accounts', [
+                [
+                    'name' => '株式会社xxx',
+                    'is_locked' => false,
+                ],
+            ])
+            ->call('submit');
+
+        $revenueAccount = Account::where('name', '売上高')->first();
+        $this->assertDatabaseHas('sub_accounts', [
+            'account_id' => $revenueAccount->id,
+            'name' => '株式会社xxx',
+        ]);
+    }
+
+    #[Test]
+    public function 棚卸資産で名称が空白でも登録できる()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(\App\Livewire\SetupWizard::class)
+            ->set('name', '棚卸資産空白テスト')
+            ->set('business_type', 'general')
+            ->call('next') // Step1 → Step2
+            ->set('year', 2025)
+            ->set('is_taxable', false)
+            ->set('is_tax_exclusive', false)
+            ->call('next') // Step2 → Step3
+            ->call('next') // Step3 → Step4
+            ->call('next') // Step4 → Step5
+            ->set('other_assets', [
+                [
+                    'account_name' => '棚卸資産',
+                    'sub_account_name' => '', // 空白の棚卸資産
+                    'amount' => 100000,
+                ],
+            ])
+            ->call('submit');
+
+        $this->assertDatabaseHas('transactions', [
+            'description' => '期首残高設定',
+            'is_opening_entry' => true,
+        ]);
+
+        $user->refresh();
+        $bu = $user->selectedBusinessUnit;
+
+        $inventorySubAccount = $bu->getSubAccountByName('棚卸資産', '棚卸資産');
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $inventorySubAccount->id,
+            'amount' => 100000, // 棚卸資産100000
         ]);
     }
 }
