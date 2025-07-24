@@ -114,6 +114,9 @@ class DashboardRevenueInput extends Component
                 $unit->getAccountByName('売掛金'),
                 $unit->getAccountByName('事業主貸'),
             ],
+
+            'revenue' => $unit->getAccountByName('売上高')->subAccounts->all(),
+
         ];
     }
 

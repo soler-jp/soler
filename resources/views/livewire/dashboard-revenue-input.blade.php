@@ -80,6 +80,26 @@
                 </div>
             </div>
 
+            {{-- 売上の補助科目（credit側）の選択 --}}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">売上（収益）</label>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    @foreach ($receiptGroups['revenue'] ?? [] as $item)
+                        <button type="button" wire:click="$set('revenueSubAccountId', {{ $item->id }})"
+                            class="w-full px-3 py-2 text-sm rounded-md shadow-sm text-center
+                @if ($revenueSubAccountId === $item->id) bg-indigo-600 text-white
+                @else bg-gray-100 text-gray-800 @endif">
+                            {{ $item->name }}
+                        </button>
+                    @endforeach
+                </div>
+
+                @error('revenueSubAccountId')
+                    <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
+                @enderror
+            </div>
+
             {{-- 摘要 --}}
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">摘要</label>
