@@ -30,7 +30,7 @@
 
 ## 📦 技術スタック（予定）
 
-- Laravel 11
+- Laravel 12
 - Livewire 3
 - MySQL
 - Tailwind CSS
