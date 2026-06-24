@@ -40,6 +40,13 @@ class BusinessUnit extends Model
         'current_fiscal_year_id',
     ];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (BusinessUnit $businessUnit): void {
+            $businessUnit->accounts->each->delete();
+        });
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

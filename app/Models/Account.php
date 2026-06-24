@@ -34,6 +34,13 @@ class Account extends Model
         'type',
     ];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (Account $account): void {
+            $account->subAccounts()->delete();
+        });
+    }
+
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class);
