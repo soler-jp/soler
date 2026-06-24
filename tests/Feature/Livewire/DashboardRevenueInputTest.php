@@ -117,6 +117,56 @@ class DashboardRevenueInputTest extends TestCase
     }
 
     #[Test]
+    public function 他ユーザー事業体の補助科目は売上登録に使えない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $unit = $initializer->initialize($user, [
+            'name' => '自分の事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+        ]);
+        $otherUnit = $initializer->initialize($otherUser, [
+            'name' => '他人の事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+        ]);
+
+        $ownRevenue = $unit->getAccountByName('売上高')->subAccounts()->first();
+        $foreignReceipt = $otherUnit->getAccountByName('現金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test('dashboard-revenue-input')
+            ->set('date', '2025-04-01')
+            ->set('gross_amount', 10000)
+            ->set('description', '不正な売上登録')
+            ->set('revenueSubAccountId', $ownRevenue->id)
+            ->set('receiptSubAccountId', $foreignReceipt->id)
+            ->call('save')
+            ->assertHasErrors(['receiptSubAccountId']);
+
+        $this->assertDatabaseMissing('journal_entries', [
+            'sub_account_id' => $foreignReceipt->id,
+            'type' => 'debit',
+            'amount' => 10000,
+        ]);
+    }
+
+    #[Test]
     public function mount時に売上高と源泉徴収の科目を自動取得できる()
     {
         $user = User::factory()->create();

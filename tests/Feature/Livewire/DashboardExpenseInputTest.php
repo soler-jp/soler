@@ -85,6 +85,56 @@ class DashboardExpenseInputTest extends TestCase
     }
 
     #[Test]
+    public function 他ユーザー事業体の補助科目は経費登録に使えない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $unit = $initializer->initialize($user, [
+            'name' => '自分の事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+        ]);
+        $otherUnit = $initializer->initialize($otherUser, [
+            'name' => '他人の事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+        ]);
+
+        $ownCredit = $unit->getAccountByName('現金')->subAccounts()->first();
+        $foreignDebit = $otherUnit->getAccountByName('消耗品費')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test('dashboard-expense-input')
+            ->set('date', '2025-05-10')
+            ->set('description', '不正な経費登録')
+            ->set('amount', 1500)
+            ->set('debit_sub_account_id', $foreignDebit->id)
+            ->set('credit_sub_account_id', $ownCredit->id)
+            ->call('submit')
+            ->assertHasErrors(['debit_sub_account_id']);
+
+        $this->assertDatabaseMissing('journal_entries', [
+            'sub_account_id' => $foreignDebit->id,
+            'type' => 'debit',
+            'amount' => 1500,
+        ]);
+    }
+
+    #[Test]
     public function 日付が未入力だとバリデーションエラーになる()
     {
         $user = User::factory()->create();

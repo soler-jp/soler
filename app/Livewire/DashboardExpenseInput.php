@@ -41,15 +41,17 @@ class DashboardExpenseInput extends Component
 
     public function submit()
     {
+        $unit = auth()->user()->selectedBusinessUnit;
+
         $this->validate([
             'date' => ['required', 'date'],
             'description' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'integer', 'min:1'],
-            'debit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
-            'credit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
+            'debit_sub_account_id' => ['required', $unit->subAccountExistsRule()],
+            'credit_sub_account_id' => ['required', $unit->subAccountExistsRule()],
         ]);
 
-        $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
+        $fiscalYear = $unit->currentFiscalYear;
 
         try {
             app(TransactionRegistrar::class)->register($fiscalYear, [

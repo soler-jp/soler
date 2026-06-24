@@ -11,6 +11,8 @@ use Illuminate\Support\Collection;
 use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 
 class BusinessUnit extends Model
 {
@@ -293,6 +295,19 @@ class BusinessUnit extends Model
         }
 
         return $transactions;
+    }
+
+    public function hasSubAccount(int $subAccountId): bool
+    {
+        return $this->subAccounts()
+            ->whereKey($subAccountId)
+            ->exists();
+    }
+
+    public function subAccountExistsRule(): Exists
+    {
+        return Rule::exists('sub_accounts', 'id')
+            ->where(fn($query) => $query->whereIn('account_id', $this->accounts()->select('id')));
     }
 
     public function currentFiscalYear(): BelongsTo

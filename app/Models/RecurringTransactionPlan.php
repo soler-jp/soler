@@ -54,6 +54,10 @@ class RecurringTransactionPlan extends Model
 
     public static function validator(array $attributes): ValidatorContract
     {
+        $businessUnit = isset($attributes['business_unit_id'])
+            ? BusinessUnit::find($attributes['business_unit_id'])
+            : null;
+
         $validator = Validator::make(
             $attributes,
             [
@@ -84,6 +88,20 @@ class RecurringTransactionPlan extends Model
                         'name',
                         "【{$attributes['name']}】はすでに使われているので使用できません"
                     );
+                }
+            }
+        });
+
+        $validator->after(function ($validator) use ($attributes, $businessUnit) {
+            if (!$businessUnit) {
+                return;
+            }
+
+            foreach (['debit_sub_account_id', 'credit_sub_account_id'] as $field) {
+                $subAccountId = $attributes[$field] ?? null;
+
+                if ($subAccountId && !$businessUnit->hasSubAccount((int) $subAccountId)) {
+                    $validator->errors()->add($field, '選択中の事業体に属する補助科目を指定してください。');
                 }
             }
         });

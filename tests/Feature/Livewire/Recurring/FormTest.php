@@ -111,4 +111,56 @@ class FormTest extends TestCase
             'interval' => 'bimonthly',
         ]);
     }
+
+    #[Test]
+    public function 他ユーザー事業体の補助科目は定期支出登録に使えない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $unit = $initializer->initialize($user, [
+            'name' => '自分の事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+        ]);
+        $otherUnit = $initializer->initialize($otherUser, [
+            'name' => '他人の事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+        ]);
+
+        $ownCredit = $unit->getAccountByName('現金')->subAccounts()->first();
+        $foreignDebit = $otherUnit->getAccountByName('消耗品費')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Form::class)
+            ->set('form.name', '不正な定期支出')
+            ->set('form.debit_sub_account_id', $foreignDebit->id)
+            ->set('form.credit_sub_account_id', $ownCredit->id)
+            ->set('form.amount', 1100)
+            ->set('form.tax_amount', 0)
+            ->set('form.tax_type', null)
+            ->set('form.interval', 'monthly')
+            ->set('form.day_of_month', 1)
+            ->call('save')
+            ->assertHasErrors(['form.debit_sub_account_id']);
+
+        $this->assertDatabaseMissing('recurring_transaction_plans', [
+            'business_unit_id' => $unit->id,
+            'name' => '不正な定期支出',
+        ]);
+    }
 }

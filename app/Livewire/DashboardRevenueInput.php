@@ -20,14 +20,16 @@ class DashboardRevenueInput extends Component
 
     public function save()
     {
+        $unit = auth()->user()->selectedBusinessUnit;
+
         $this->validate([
             'date' => ['required', 'date'],
             'gross_amount' => ['required', 'integer', 'min:1'],
-            'revenueSubAccountId' => ['required', 'exists:sub_accounts,id'],
-            'receiptSubAccountId' => ['required', 'exists:sub_accounts,id'],
+            'revenueSubAccountId' => ['required', $unit->subAccountExistsRule()],
+            'receiptSubAccountId' => ['required', $unit->subAccountExistsRule()],
         ]);
 
-        $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
+        $fiscalYear = $unit->currentFiscalYear;
 
         $journalEntries = [];
         if ($this->withholding) {

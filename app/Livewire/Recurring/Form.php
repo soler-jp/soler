@@ -52,8 +52,8 @@ class Form extends Component
 
         $validated = $this->validate([
             'form.name' => ['required', 'string', 'max:255'],
-            'form.debit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
-            'form.credit_sub_account_id' => ['nullable', 'exists:sub_accounts,id'],
+            'form.debit_sub_account_id' => ['required', $unit->subAccountExistsRule()],
+            'form.credit_sub_account_id' => ['nullable', $unit->subAccountExistsRule()],
             'form.amount' => ['required', 'integer', 'min:0'],
             'form.tax_amount' => ['required', 'integer', 'min:0'],
             'form.interval' => ['required', 'in:monthly,bimonthly,yearly'],

@@ -39,6 +39,8 @@ class TransactionRegistrar
             $validatedEntries[] = JournalEntryValidator::validate($entry, false);
         }
 
+        $this->ensureEntriesBelongToBusinessUnit($fiscalYear, $validatedEntries);
+
 
         if (empty($journalEntriesData)) {
             throw new \InvalidArgumentException('仕訳データが空です。');
@@ -74,6 +76,19 @@ class TransactionRegistrar
     function totalWithTax(array $entries): int
     {
         return collect($entries)->sum(fn($e) => (int) ($e['amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
+    }
+
+    protected function ensureEntriesBelongToBusinessUnit(FiscalYear $fiscalYear, array $validatedEntries): void
+    {
+        $businessUnit = $fiscalYear->businessUnit;
+
+        foreach ($validatedEntries as $index => $entry) {
+            if (!$businessUnit->hasSubAccount((int) $entry['sub_account_id'])) {
+                throw ValidationException::withMessages([
+                    "journal_entries.$index.sub_account_id" => ['選択中の事業体に属する補助科目を指定してください。'],
+                ]);
+            }
+        }
     }
 
 
