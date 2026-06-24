@@ -7,11 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Contracts\Validation\Validator as ValidatorContract;
-use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\BusinessUnit;
 use App\Models\Transaction;
+use Illuminate\Support\Carbon;
 
 class RecurringTransactionPlan extends Model
 {
@@ -200,5 +200,49 @@ class RecurringTransactionPlan extends Model
                 ],
             ],
         ];
+    }
+
+    public function confirmTransaction(int $transactionId, array $attributes): ?Transaction
+    {
+        $transaction = $this->transactions()
+            ->with('journalEntries')
+            ->whereKey($transactionId)
+            ->first();
+
+        if (!$transaction || !$transaction->is_planned) {
+            return null;
+        }
+
+        $creditSubAccountId = (int) $attributes['credit_sub_account_id'];
+
+        if (!$this->businessUnit->hasSubAccount($creditSubAccountId)) {
+            throw ValidationException::withMessages([
+                'credit_sub_account_id' => ['選択中の事業体に属する補助科目を指定してください。'],
+            ]);
+        }
+
+        $debitEntry = $transaction->journalEntries->firstWhere('type', 'debit');
+        $creditEntry = $transaction->journalEntries->firstWhere('type', 'credit');
+
+        if (!$debitEntry || !$creditEntry) {
+            return null;
+        }
+
+        $debitEntry->amount = $attributes['amount'];
+        $debitEntry->save();
+
+        $creditEntry->amount = $attributes['amount'];
+        $creditEntry->sub_account_id = $creditSubAccountId;
+        $creditEntry->save();
+
+        $transaction->is_planned = false;
+
+        if (!empty($attributes['date'])) {
+            $transaction->date = Carbon::parse($attributes['date']);
+        }
+
+        $transaction->save();
+
+        return $transaction->fresh(['journalEntries']);
     }
 }

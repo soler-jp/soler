@@ -3,11 +3,9 @@
 namespace App\Livewire\Recurring;
 
 use App\Models\RecurringTransactionPlan;
-use App\Models\SubAccount;
-use App\Models\Transaction;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
-use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class TabList extends Component
 {
@@ -44,39 +42,33 @@ class TabList extends Component
             'date' => ['nullable', 'date'],
         ])->validate();
 
-        $transaction = Transaction::with('journalEntries')
-            ->whereKey($transactionId)
-            ->where('fiscal_year_id', $fiscalYear->id)
-            ->whereHas('recurringTransactionPlan', fn($query) => $query->where('business_unit_id', $unit->id))
+        $plan = $unit->recurringTransactionPlans()
+            ->where('is_income', false)
+            ->whereHas('transactions', function ($query) use ($transactionId, $fiscalYear) {
+                $query->whereKey($transactionId)
+                    ->where('fiscal_year_id', $fiscalYear->id);
+            })
             ->first();
+
+        if (!$plan) {
+            return;
+        }
+
+        try {
+            $transaction = $plan->confirmTransaction($transactionId, $validated);
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $field => $messages) {
+                foreach ($messages as $message) {
+                    $this->addError("inputs.$transactionId.$field", $message);
+                }
+            }
+
+            return;
+        }
 
         if (!$transaction) {
             return;
         }
-
-        if (! $transaction->is_planned) {
-            return;
-        }
-
-        $debitEntry = $transaction->journalEntries->firstWhere('type', 'debit');
-        $creditEntry = $transaction->journalEntries->firstWhere('type', 'credit');
-
-        if (! $debitEntry || ! $creditEntry) {
-            return;
-        }
-
-        $debitEntry->amount = $validated['amount'];
-        $debitEntry->save();
-
-        $creditEntry->amount = $validated['amount'];
-        $creditEntry->sub_account_id = $validated['credit_sub_account_id'];
-        $creditEntry->save();
-
-        $transaction->is_planned = false;
-        if (!empty($validated['date'])) {
-            $transaction->date = Carbon::parse($validated['date']);
-        }
-        $transaction->save();
 
         unset($this->inputs[$transactionId]);
     }

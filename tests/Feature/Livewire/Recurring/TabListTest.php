@@ -175,4 +175,58 @@ class TabListTest extends TestCase
             'sub_account_id' => $otherCredit->id,
         ]);
     }
+
+    #[Test]
+    public function 他ユーザー事業体の貸方補助科目では確定できない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
+        $otherUnit->createFiscalYear(2025);
+
+        $debitSubAccount = $unit->subAccounts()->first();
+        $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->first();
+        $foreignCredit = $otherUnit->getAccountByName('現金')->subAccounts()->first();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => 'サーバー代',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'amount' => 1100,
+            'tax_amount' => 0,
+            'is_income' => false,
+            'debit_sub_account_id' => $debitSubAccount->id,
+            'credit_sub_account_id' => $creditSubAccount->id,
+        ]);
+
+        $tx = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->first();
+
+        Livewire::actingAs($user)
+            ->test(TabList::class)
+            ->set('inputs', [
+                $tx->id => [
+                    'date' => '2025-12-10',
+                    'amount' => 1400,
+                    'credit_sub_account_id' => $foreignCredit->id,
+                ],
+            ])
+            ->call('confirm', $tx->id)
+            ->assertHasErrors(['credit_sub_account_id']);
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $tx->id,
+            'is_planned' => true,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $tx->id,
+            'type' => 'credit',
+            'amount' => 1100,
+            'sub_account_id' => $creditSubAccount->id,
+        ]);
+    }
 }

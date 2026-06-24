@@ -641,4 +641,203 @@ class RecurringTransactionPlanTest extends TestCase
             '2025-11-15',
         ], $dates->toArray());
     }
+
+    #[Test]
+    public function planned_transactionを確定できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '確認テスト事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
+        $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $newCreditSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => 'サーバー代',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'is_income' => false,
+            'debit_sub_account_id' => $debitSubAccount->id,
+            'credit_sub_account_id' => $creditSubAccount->id,
+            'amount' => 1100,
+            'tax_amount' => 0,
+        ]);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->firstOrFail();
+
+        $confirmed = $plan->confirmTransaction($transaction->id, [
+            'date' => '2025-12-10',
+            'amount' => 1400,
+            'credit_sub_account_id' => $newCreditSubAccount->id,
+        ]);
+
+        $this->assertNotNull($confirmed);
+        $this->assertFalse($confirmed->is_planned);
+        $this->assertSame('2025-12-10', $confirmed->date->toDateString());
+
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $transaction->id,
+            'type' => 'debit',
+            'amount' => 1400,
+            'sub_account_id' => $debitSubAccount->id,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $transaction->id,
+            'type' => 'credit',
+            'amount' => 1400,
+            'sub_account_id' => $newCreditSubAccount->id,
+        ]);
+    }
+
+    #[Test]
+    public function planned_transaction確定時に貸方補助科目を変更できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '貸方変更テスト事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
+        $originalCreditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $newCreditSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '貸方変更プラン',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'is_income' => false,
+            'debit_sub_account_id' => $debitSubAccount->id,
+            'credit_sub_account_id' => $originalCreditSubAccount->id,
+            'amount' => 1100,
+            'tax_amount' => 0,
+        ]);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->firstOrFail();
+
+        $plan->confirmTransaction($transaction->id, [
+            'date' => $transaction->date->toDateString(),
+            'amount' => 1100,
+            'credit_sub_account_id' => $newCreditSubAccount->id,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $transaction->id,
+            'type' => 'credit',
+            'amount' => 1100,
+            'sub_account_id' => $newCreditSubAccount->id,
+        ]);
+
+        $this->assertDatabaseMissing('journal_entries', [
+            'transaction_id' => $transaction->id,
+            'type' => 'credit',
+            'amount' => 1100,
+            'sub_account_id' => $originalCreditSubAccount->id,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $transaction->id,
+            'type' => 'debit',
+            'amount' => 1100,
+            'sub_account_id' => $debitSubAccount->id,
+        ]);
+    }
+
+    #[Test]
+    public function 他のプランのtransactionは確定できない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '確認テスト事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $subAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
+
+        $plan1 = $unit->createRecurringTransactionPlan([
+            'name' => 'プランA',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'is_income' => false,
+            'debit_sub_account_id' => $subAccount->id,
+            'credit_sub_account_id' => $subAccount->id,
+            'amount' => 1100,
+            'tax_amount' => 0,
+        ]);
+
+        $plan2 = $unit->createRecurringTransactionPlan([
+            'name' => 'プランB',
+            'interval' => 'monthly',
+            'day_of_month' => 15,
+            'is_income' => false,
+            'debit_sub_account_id' => $subAccount->id,
+            'credit_sub_account_id' => $subAccount->id,
+            'amount' => 2200,
+            'tax_amount' => 0,
+        ]);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan2, $fiscalYear)->firstOrFail();
+
+        $result = $plan1->confirmTransaction($transaction->id, [
+            'date' => '2025-12-10',
+            'amount' => 1400,
+            'credit_sub_account_id' => $subAccount->id,
+        ]);
+
+        $this->assertNull($result);
+        $this->assertDatabaseHas('transactions', [
+            'id' => $transaction->id,
+            'is_planned' => true,
+        ]);
+    }
+
+    #[Test]
+    public function 他事業体の貸方補助科目では確定できない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
+        $otherUnit->createFiscalYear(2025);
+
+        $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
+        $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $foreignCreditSubAccount = $otherUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => 'サーバー代',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'is_income' => false,
+            'debit_sub_account_id' => $debitSubAccount->id,
+            'credit_sub_account_id' => $creditSubAccount->id,
+            'amount' => 1100,
+            'tax_amount' => 0,
+        ]);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->firstOrFail();
+
+        try {
+            $plan->confirmTransaction($transaction->id, [
+                'date' => '2025-12-10',
+                'amount' => 1400,
+                'credit_sub_account_id' => $foreignCreditSubAccount->id,
+            ]);
+
+            $this->fail('ValidationException was not thrown.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('credit_sub_account_id', $e->errors());
+        }
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $transaction->id,
+            'is_planned' => true,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $transaction->id,
+            'type' => 'credit',
+            'amount' => 1100,
+            'sub_account_id' => $creditSubAccount->id,
+        ]);
+    }
 }
