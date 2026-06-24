@@ -34,15 +34,25 @@ class TabList extends Component
 
     public function confirm(int $transactionId)
     {
+        $unit = Auth::user()->selectedBusinessUnit;
+        $fiscalYear = $unit->currentFiscalYear;
         $data = $this->inputs[$transactionId] ?? [];
 
         $validated = validator($data, [
             'amount' => ['required', 'integer', 'min:1'],
-            'credit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
+            'credit_sub_account_id' => ['required', $unit->subAccountExistsRule()],
             'date' => ['nullable', 'date'],
         ])->validate();
 
-        $transaction = Transaction::with('journalEntries')->findOrFail($transactionId);
+        $transaction = Transaction::with('journalEntries')
+            ->whereKey($transactionId)
+            ->where('fiscal_year_id', $fiscalYear->id)
+            ->whereHas('recurringTransactionPlan', fn($query) => $query->where('business_unit_id', $unit->id))
+            ->first();
+
+        if (!$transaction) {
+            return;
+        }
 
         if (! $transaction->is_planned) {
             return;

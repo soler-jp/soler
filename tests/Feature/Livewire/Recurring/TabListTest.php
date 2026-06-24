@@ -122,4 +122,57 @@ class TabListTest extends TestCase
             'sub_account_id' => $newCreditSubAccount->id,
         ]);
     }
+
+    #[Test]
+    public function 他ユーザーの予定取引は確定できない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
+        $unit->createFiscalYear(2025);
+
+        $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
+        $otherFiscalYear = $otherUnit->createFiscalYear(2025);
+
+        $otherDebit = $otherUnit->subAccounts()->first();
+        $otherCredit = $otherUnit->getAccountByName('現金')->subAccounts()->first();
+
+        $plan = $otherUnit->createRecurringTransactionPlan([
+            'name' => '他人の固定費',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'amount' => 1100,
+            'tax_amount' => 0,
+            'is_income' => false,
+            'debit_sub_account_id' => $otherDebit->id,
+            'credit_sub_account_id' => $otherCredit->id,
+        ]);
+
+        $otherTx = $otherUnit->generatePlannedTransactionsForPlan($plan, $otherFiscalYear)->first();
+        $ownCredit = $unit->getAccountByName('事業主借')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(TabList::class)
+            ->set('inputs', [
+                $otherTx->id => [
+                    'date' => '2025-12-10',
+                    'amount' => 1400,
+                    'credit_sub_account_id' => $ownCredit->id,
+                ],
+            ])
+            ->call('confirm', $otherTx->id);
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $otherTx->id,
+            'is_planned' => true,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $otherTx->id,
+            'type' => 'credit',
+            'amount' => 1100,
+            'sub_account_id' => $otherCredit->id,
+        ]);
+    }
 }
