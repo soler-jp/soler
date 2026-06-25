@@ -30,6 +30,7 @@ class JournalEntryValidator
     public static function rules(bool $requireTransactionId = true): array
     {
         return array_merge([
+            'account_id'       => ['missing'],
             'sub_account_id'   => ['required', 'exists:sub_accounts,id'],
             'type'             => ['required', 'in:debit,credit'],
             'net_amount'       => ['required', 'integer', 'min:1'],
@@ -48,6 +49,7 @@ class JournalEntryValidator
     {
         return [
             'transaction_id'   => '取引ID',
+            'account_id'       => '勘定科目ID',
             'sub_account_id'   => '勘定科目の補助科目',
             'type'             => '区分',
             'net_amount'       => '税抜金額',

@@ -4,14 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\FiscalYear;
-use App\Models\Transaction;
 use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Illuminate\Validation\ValidationException;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 
 class TransactionRegistrarTest extends TestCase
 {
@@ -105,6 +103,8 @@ class TransactionRegistrarTest extends TestCase
     {
         $this->expectException(ValidationException::class);
 
+        $fiscalYear = FiscalYear::factory()->create();
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
         $registrar = new TransactionRegistrar();
 
         $transactionData = [
@@ -114,12 +114,12 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntriesData = [
             [
-                'account_id' => 1,
+                'sub_account_id' => $subAccount->id,
                 'type' => 'debit',
                 'net_amount' => 1000,
             ],
             [
-                'account_id' => 1,
+                'sub_account_id' => $subAccount->id,
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
@@ -140,22 +140,48 @@ class TransactionRegistrarTest extends TestCase
             'description' => '不正な仕訳テスト',
         ];
 
-        $account = Account::factory()->create();
+        [, $validSubAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $journalEntriesData = [
             [
-                'account_id' => $account->id,
+                'sub_account_id' => $validSubAccount->id,
                 'type' => 'debit',
                 'net_amount' => 1000,
             ],
             [
-                'account_id' => 99999, // 存在しないID
+                'sub_account_id' => 99999,
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
         ];
 
         $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+    }
+
+    #[Test]
+    public function journal_entryにaccount_idを渡すと登録できない()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+
+        $this->expectException(ValidationException::class);
+
+        (new TransactionRegistrar())->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => 'account_id混入テスト',
+        ], [
+            [
+                'account_id' => $debitSubAccount->account_id,
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
     }
 
     #[Test]
@@ -191,11 +217,12 @@ class TransactionRegistrarTest extends TestCase
     }
 
     #[Test]
-    public function journal_entryのaccount_idがnullだと登録できない()
+    public function journal_entryのsub_account_idがnullだと登録できない()
     {
         $this->expectException(ValidationException::class);
 
         $fiscalYear = FiscalYear::factory()->create();
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -203,8 +230,8 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['account_id' => null, 'type' => 'debit', 'net_amount' => 1000],
-            ['account_id' => 1, 'type' => 'credit', 'net_amount' => 1000],
+            ['sub_account_id' => null, 'type' => 'debit', 'net_amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -278,7 +305,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -286,8 +313,8 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['account_id' => $account->id, 'type' => 'debit', 'net_amount' => 0],
-            ['account_id' => $account->id, 'type' => 'credit', 'net_amount' => 0],
+            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'net_amount' => 0],
+            ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 0],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -579,6 +606,39 @@ class TransactionRegistrarTest extends TestCase
             'description' => 'tax_amount片側のみ',
         ]);
     }
+
+    #[Test]
+    public function 他事業体の補助科目はregisterで拒否される()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
+        $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $ownExpense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
+        $foreignAsset = $otherUnit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('選択中の事業体に属する補助科目を指定してください。');
+
+        (new TransactionRegistrar())->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '他事業体の補助科目テスト',
+        ], [
+            [
+                'sub_account_id' => $ownExpense->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $foreignAsset->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+    }
+
     #[Test]
     public function is_plannedをtrueにして取引を登録できる()
     {

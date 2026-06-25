@@ -58,11 +58,12 @@ class JournalEntryTest extends TestCase
     #[Test]
     public function transaction_idがnullの場合はバリデーションエラー()
     {
-        Account::factory()->create();
+        $account = Account::factory()->create();
+        $subAccount = $account->subAccounts->first();
 
         $data = [
             'transaction_id' => null,
-            'account_id' => 1,
+            'sub_account_id' => $subAccount->id,
             'type' => 'debit',
             'net_amount' => 1000,
         ];
@@ -72,13 +73,32 @@ class JournalEntryTest extends TestCase
     }
 
     #[Test]
-    public function account_idがnullの場合はバリデーションエラー()
+    public function sub_account_idがnullの場合はバリデーションエラー()
     {
         Transaction::factory()->create();
 
         $data = [
             'transaction_id' => 1,
-            'account_id' => null,
+            'sub_account_id' => null,
+            'type' => 'debit',
+            'net_amount' => 1000,
+        ];
+
+        $this->expectException(ValidationException::class);
+        JournalEntryValidator::validate($data, true);
+    }
+
+    #[Test]
+    public function account_idを渡すとバリデーションエラー()
+    {
+        $transaction = Transaction::factory()->create();
+        $account = Account::factory()->create();
+        $subAccount = $account->subAccounts->first();
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
+            'sub_account_id' => $subAccount->id,
             'type' => 'debit',
             'net_amount' => 1000,
         ];

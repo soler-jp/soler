@@ -15,7 +15,7 @@ class TransactionRegistrar
      * 取引と仕訳の登録を行う
      *
      * @param  array  $transactionData  取引情報（例: fiscal_year_id, date, description）
-     * @param  array  $journalEntriesData  仕訳情報（複数）（例: account_id, type, net_amount, ...）
+     * @param  array  $journalEntriesData  仕訳情報（複数）（例: sub_account_id, type, net_amount, ...）
      * @return Transaction
      *
      * @throws \Illuminate\Validation\ValidationException
