@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -470,5 +471,40 @@ class FiscalYearSummaryTest extends TestCase
             'tax_amount' => 400,
             'gross_amount' => 4400,
         ], $summary['planned']['expenses']);
+    }
+
+    #[Test]
+    public function only_full_group_byが有効でもダッシュボードを表示できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'ダッシュボード表示テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
+        $asset = $this->subAccountByTypeOrName($unit, 'asset');
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '売上取引',
+        ], [
+            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 10000],
+            ['sub_account_id' => $asset->id, 'type' => 'debit', 'net_amount' => 10000],
+        ]);
+
+        $executedQueries = [];
+
+        DB::listen(function ($query) use (&$executedQueries): void {
+            $executedQueries[] = $query->sql;
+        });
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertOk();
+
+        $this->assertFalse(
+            collect($executedQueries)->contains(
+                fn (string $sql): bool => str_contains($sql, 'laravel_through_key')
+            )
+        );
     }
 }

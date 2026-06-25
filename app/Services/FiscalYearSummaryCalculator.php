@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\FiscalYear;
+use App\Models\JournalEntry;
 use Illuminate\Database\Eloquent\Builder;
 
 class FiscalYearSummaryCalculator
@@ -71,8 +72,12 @@ class FiscalYearSummaryCalculator
         string $accountType,
         string $entryType
     ): array {
-        $totals = $fiscalYear->journalEntries()
-            ->whereHas('transaction', fn (Builder $query) => $query->where('is_planned', $isPlanned))
+        $totals = JournalEntry::query()
+            ->whereHas('transaction', function (Builder $query) use ($fiscalYear, $isPlanned): void {
+                $query
+                    ->whereBelongsTo($fiscalYear)
+                    ->where('is_planned', $isPlanned);
+            })
             ->whereHas('subAccount.account', fn (Builder $query) => $query->where('type', $accountType))
             ->where('type', $entryType)
             ->selectRaw('COALESCE(SUM(net_amount), 0) as summary_net_amount')
