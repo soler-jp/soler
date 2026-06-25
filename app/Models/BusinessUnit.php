@@ -154,7 +154,9 @@ class BusinessUnit extends Model
     public static function createWithDefaultAccounts(array $attributes): self
     {
         return DB::transaction(function () use ($attributes) {
-            $businessUnit = self::create($attributes);
+            $businessUnit = self::create(array_merge([
+                'type' => self::TYPE_GENERAL,
+            ], $attributes));
 
             foreach (self::$defaultAccounts as $account) {
                 $businessUnit->createAccount($account);

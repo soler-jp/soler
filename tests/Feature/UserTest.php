@@ -3,13 +3,13 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
 use App\Models\User;
 use PHPUnit\Framework\Attributes\Test;
 
 class UserTest extends TestCase
 {
+    use RefreshDatabase;
 
     #[Test]
     public function selectedBusinessUnitを取得できる()

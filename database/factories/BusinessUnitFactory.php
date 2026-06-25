@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\BusinessUnit;
 use App\Models\User;
 
 /**
@@ -19,7 +20,8 @@ class BusinessUnitFactory extends Factory
     {
         return [
             'name' => $this->faker->company,
-            'user_id' => User::factory(), // ← 🔑 これを追加
+            'type' => BusinessUnit::TYPE_GENERAL,
+            'user_id' => User::factory(),
         ];
     }
 }

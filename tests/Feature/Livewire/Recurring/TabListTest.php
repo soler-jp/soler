@@ -100,8 +100,9 @@ class TabListTest extends TestCase
 
         $tx->refresh();
 
+        $this->assertSame('2025-12-10', $tx->date->toDateString());
+
         $this->assertDatabaseHas('transactions', [
-            'date' => '2025-12-10',
             'id' => $tx->id,
             'is_planned' => false,
         ]);

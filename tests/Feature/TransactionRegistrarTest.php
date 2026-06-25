@@ -17,13 +17,28 @@ class TransactionRegistrarTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function createSubAccountForFiscalYear(FiscalYear $fiscalYear): array
+    {
+        $account = Account::factory()->create([
+            'business_unit_id' => $fiscalYear->business_unit_id,
+        ]);
+
+        return [$account, $account->subAccounts->first()];
+    }
+
+    private function createTwoSubAccountsForFiscalYear(FiscalYear $fiscalYear): array
+    {
+        [, $debitSubAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+        [, $creditSubAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        return [$debitSubAccount, $creditSubAccount];
+    }
+
     #[Test]
     public function 単一仕訳で取引が登録できる()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
-
-        $subAccount = $account->subAccounts->first();
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -118,8 +133,7 @@ class TransactionRegistrarTest extends TestCase
     public function 仕訳の金額バランスが崩れている場合は登録できない()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
-        $subAccount = $account->subAccounts->first();
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $registrar = new TransactionRegistrar();
 
@@ -173,8 +187,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectException(\DomainException::class);
 
         $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
-        $subAccount = $account->subAccounts->first();
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -194,8 +207,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectException(\DomainException::class);
 
         $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
-        $subAccount = $account->subAccounts->first();
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -216,8 +228,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
-        $subAccount = $account->subAccounts->first();
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transactionData = [
             'date' => 'invalid-date',
@@ -259,8 +270,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
-        $subAccount = $account->subAccounts->first();
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -298,8 +308,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectException(\DomainException::class);
 
         $fiscalYear = FiscalYear::factory()->create();
-        $account = Account::factory()->create();
-        $subAccount = $account->subAccounts->first();
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -320,8 +329,7 @@ class TransactionRegistrarTest extends TestCase
     public function tax_amount込みでもバランスが正しければ登録できる()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $debitSubAccount = Account::factory()->create()->subAccounts->first();
-        $creditSubAccount = Account::factory()->create()->subAccounts->first();
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
 
         $registrar = new TransactionRegistrar();
 
@@ -359,8 +367,7 @@ class TransactionRegistrarTest extends TestCase
     public function tax_amountが不整合でバランスが崩れる場合は登録できない()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $debitSubAccount = Account::factory()->create()->subAccounts->first();
-        $creditSubAccount = Account::factory()->create()->subAccounts->first();
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
 
         $registrar = new TransactionRegistrar();
 
@@ -396,8 +403,7 @@ class TransactionRegistrarTest extends TestCase
     public function tax_amountがマイナスだと登録できない()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $debitSubAccount = Account::factory()->create()->subAccounts->first();
-        $creditSubAccount = Account::factory()->create()->subAccounts->first();
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
 
         $registrar = new TransactionRegistrar();
 
@@ -437,8 +443,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectExceptionMessage('消費税額');
 
         $fiscalYear = FiscalYear::factory()->create();
-        $debitSubAccount = Account::factory()->create()->subAccounts->first();
-        $creditSubAccount = Account::factory()->create()->subAccounts->first();
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
 
         $registrar = new TransactionRegistrar();
 
@@ -476,8 +481,7 @@ class TransactionRegistrarTest extends TestCase
     public function tax_typeを記述していて、tax_amountが0だと登録できる()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $debitSubAccount = Account::factory()->create()->subAccounts->first();
-        $creditSubAccount = Account::factory()->create()->subAccounts->first();
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
 
         $registrar = new TransactionRegistrar();
 
@@ -515,8 +519,7 @@ class TransactionRegistrarTest extends TestCase
     public function tax_amountが片方だけ指定された場合もバランスが取れていれば登録できる()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $debitSubAccount = Account::factory()->create()->subAccounts->first();
-        $creditSubAccount = Account::factory()->create()->subAccounts->first();
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
 
         $registrar = new TransactionRegistrar();
 
