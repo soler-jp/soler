@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -474,6 +475,7 @@ class FiscalYearSummaryTest extends TestCase
     }
 
     #[Test]
+    #[Group('mysql')]
     public function only_full_group_byが有効でもダッシュボードを表示できる()
     {
         $user = User::factory()->create();

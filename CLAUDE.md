@@ -191,5 +191,10 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - To run all tests: `vendor/bin/sail artisan test --compact`.
 - To run all tests in a file: `vendor/bin/sail artisan test --compact tests/Feature/ExampleTest.php`.
 - To filter on a particular test name: `vendor/bin/sail artisan test --compact --filter=testName` (recommended after making a change to a related file).
+- Default test execution uses SQLite via `phpunit.xml` for speed.
+- Tests that cover MySQL-specific query behavior MUST also be added to the `mysql` PHPUnit group.
+- MySQL-specific query behavior includes aggregate queries using `selectRaw`, `groupBy`, `having`, database functions, locking such as `lockForUpdate`, date SQL helpers such as `whereDate`, and raw SQL clauses such as `orderByRaw`, `whereRaw`, or `havingRaw`.
+- When adding or changing code in these areas, keep the normal SQLite test green and also verify the relevant `mysql`-grouped tests with `composer test:mysql`.
+- The `mysql` group is additive: grouped tests still run in the normal SQLite suite unless explicitly excluded.
 
 </laravel-boost-guidelines>

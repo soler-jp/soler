@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Validators\TransactionValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -90,6 +91,7 @@ class TransactionTest extends TestCase
     }
 
     #[Test]
+    #[Group('mysql')]
     public function entry_numberは年度ごとに連番で採番される()
     {
         $fy = FiscalYear::factory()->create();
@@ -114,6 +116,7 @@ class TransactionTest extends TestCase
     }
 
     #[Test]
+    #[Group('mysql')]
     public function entry_numberは別の年度ではリセットされる()
     {
         $user = User::factory()->create();

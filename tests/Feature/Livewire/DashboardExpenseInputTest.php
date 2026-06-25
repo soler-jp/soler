@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Setup\Initializers\GeneralBusinessInitializer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -82,6 +83,36 @@ class DashboardExpenseInputTest extends TestCase
             'type' => 'credit',
             'net_amount' => 1500,
         ]);
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function 貸方勘定科目が想定順で表示される()
+    {
+        $user = User::factory()->create();
+
+        $initializer = new GeneralBusinessInitializer;
+        $initializer->initialize($user, [
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+        ]);
+
+        $creditAccountNames = Livewire::actingAs($user)
+            ->test('dashboard-expense-input')
+            ->instance()
+            ->creditAccounts
+            ->pluck('name')
+            ->values()
+            ->all();
+
+        $this->assertSame(['現金', '事業主借'], $creditAccountNames);
     }
 
     #[Test]

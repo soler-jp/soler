@@ -6,6 +6,7 @@ use App\Models\RecurringTransactionPlan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -442,6 +443,7 @@ class RecurringTransactionPlanTest extends TestCase
     }
 
     #[Test]
+    #[Group('mysql')]
     public function 同じ日付の予定取引が既に存在する場合は作成されない()
     {
         $user = User::factory()->create();
