@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\FiscalYear;
+use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Validators\JournalEntryValidator;
 use App\Validators\TransactionValidator;
@@ -32,9 +33,10 @@ class TransactionRegistrar
         $transactionData['fiscal_year_id'] = $fiscalYear->id;
         $transactionData = TransactionValidator::validate($transactionData);
 
+        $normalizedEntries = $this->normalizeEntries($fiscalYear, $journalEntriesData);
         $validatedEntries = [];
 
-        foreach ($journalEntriesData as $entry) {
+        foreach ($normalizedEntries as $entry) {
             $validatedEntries[] = JournalEntryValidator::validate($entry, false);
         }
 
@@ -45,8 +47,8 @@ class TransactionRegistrar
         }
 
         // ドメインロジック: 仕訳の金額がバランスしているか確認
-        $totalDebit = $this->totalWithTax(array_filter($journalEntriesData, fn ($e) => $e['type'] === 'debit'));
-        $totalCredit = $this->totalWithTax(array_filter($journalEntriesData, fn ($e) => $e['type'] === 'credit'));
+        $totalDebit = $this->totalWithTax(array_filter($validatedEntries, fn ($e) => $e['type'] === JournalEntry::TYPE_DEBIT));
+        $totalCredit = $this->totalWithTax(array_filter($validatedEntries, fn ($e) => $e['type'] === JournalEntry::TYPE_CREDIT));
 
         if ($totalDebit !== $totalCredit) {
             $diff = $totalDebit - $totalCredit;
@@ -73,6 +75,72 @@ class TransactionRegistrar
     public function totalWithTax(array $entries): int
     {
         return collect($entries)->sum(fn ($e) => (int) ($e['net_amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
+    }
+
+    protected function normalizeEntries(FiscalYear $fiscalYear, array $journalEntriesData): array
+    {
+        return array_map(fn (array $entry) => $this->normalizeEntry($fiscalYear, $entry), $journalEntriesData);
+    }
+
+    protected function normalizeEntry(FiscalYear $fiscalYear, array $entry): array
+    {
+        if (! array_key_exists('gross_amount', $entry) || array_key_exists('net_amount', $entry)) {
+            return $entry;
+        }
+
+        $grossAmount = (int) $entry['gross_amount'];
+        $taxType = $entry['tax_type'] ?? null;
+
+        if ($taxType === null && $fiscalYear->is_taxable) {
+            throw ValidationException::withMessages([
+                'tax_type' => ['課税事業者の税込入力では消費税区分が必須です。'],
+            ]);
+        }
+
+        $taxType ??= $this->defaultTaxTypeForExemptBusiness($entry['type'] ?? null);
+        [$netAmount, $taxAmount] = $this->splitGrossAmount($grossAmount, $taxType);
+
+        unset($entry['gross_amount']);
+
+        return array_merge($entry, [
+            'net_amount' => $netAmount,
+            'tax_amount' => $taxAmount,
+            'tax_type' => $taxType,
+        ]);
+    }
+
+    protected function defaultTaxTypeForExemptBusiness(?string $entryType): string
+    {
+        return match ($entryType) {
+            JournalEntry::TYPE_CREDIT => JournalEntry::TAX_TYPE_DEEMED_TAXABLE_SALES_10,
+            default => JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10,
+        };
+    }
+
+    protected function splitGrossAmount(int $grossAmount, string $taxType): array
+    {
+        $rate = match ($taxType) {
+            JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+            JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            JournalEntry::TAX_TYPE_DEEMED_TAXABLE_SALES_10,
+            JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10 => 10,
+            JournalEntry::TAX_TYPE_TAXABLE_SALES_8,
+            JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8 => 8,
+            JournalEntry::TAX_TYPE_NON_TAXABLE,
+            JournalEntry::TAX_TYPE_TAX_FREE => 0,
+            default => throw ValidationException::withMessages([
+                'tax_type' => ['未対応の消費税区分です。'],
+            ]),
+        };
+
+        if ($rate === 0) {
+            return [$grossAmount, 0];
+        }
+
+        $netAmount = intdiv($grossAmount * 100, 100 + $rate);
+        $taxAmount = $grossAmount - $netAmount;
+
+        return [$netAmount, $taxAmount];
     }
 
     protected function ensureEntriesBelongToBusinessUnit(FiscalYear $fiscalYear, array $validatedEntries): void

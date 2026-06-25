@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\FiscalYear;
+use App\Models\JournalEntry;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -30,6 +31,16 @@ class TransactionRegistrarTest extends TestCase
         [, $creditSubAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         return [$debitSubAccount, $creditSubAccount];
+    }
+
+    private function createBusinessUnitFiscalYear(array $attributes = []): FiscalYear
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(array_merge([
+            'name' => 'テスト事業体',
+        ], $attributes));
+
+        return $unit->createFiscalYear(2025);
     }
 
     #[Test]
@@ -397,14 +408,14 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 5000,
                 'tax_amount' => 500,
-                'tax_type' => 'taxable_purchases_10',
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'net_amount' => 5500,
                 'tax_amount' => 0,
-                'tax_type' => 'non_taxable',
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
             ],
         ];
 
@@ -435,14 +446,14 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 5000,
                 'tax_amount' => 500,
-                'tax_type' => 'taxable_purchases_10',
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'net_amount' => 5400,
                 'tax_amount' => 0,
-                'tax_type' => 'non_taxable',
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
             ],
         ];
 
@@ -471,14 +482,14 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 5000,
                 'tax_amount' => -100,
-                'tax_type' => 'taxable_purchases_10',
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'net_amount' => 4900,
                 'tax_amount' => 0,
-                'tax_type' => 'non_taxable',
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
             ],
         ];
 
@@ -511,14 +522,14 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 3000,
                 'tax_amount' => null,
-                'tax_type' => 'non_taxable',
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'net_amount' => 3000,
                 'tax_amount' => null,
-                'tax_type' => 'non_taxable',
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
             ],
         ];
 
@@ -549,14 +560,14 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 3000,
                 'tax_amount' => 0,
-                'tax_type' => 'non_taxable',
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'net_amount' => 3000,
                 'tax_amount' => 0,
-                'tax_type' => 'non_taxable',
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
             ],
         ];
 
@@ -587,7 +598,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 4500,
                 'tax_amount' => 500,
-                'tax_type' => 'taxable_purchases_10',
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
@@ -602,6 +613,479 @@ class TransactionRegistrarTest extends TestCase
             'id' => $transaction->id,
             'description' => 'tax_amount片側のみ',
         ]);
+    }
+
+    #[Test]
+    public function tax_typeがありtax_amountキーが未指定なら0で補完される()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => 'tax_amount自動補完',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 3000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 3000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $this->assertSame(0, $transaction->journalEntries()->where('type', 'debit')->first()->tax_amount);
+        $this->assertSame(0, $transaction->journalEntries()->where('type', 'credit')->first()->tax_amount);
+    }
+
+    #[Test]
+    public function 免税事業者はgross_amount入力を見なし10パーセントで分解して保存できる()
+    {
+        $fiscalYear = FiscalYear::factory()->create([
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+        ]);
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '免税事業者の税込入力',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'gross_amount' => 1100,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $debit = $transaction->journalEntries()->where('type', 'debit')->firstOrFail();
+        $credit = $transaction->journalEntries()->where('type', 'credit')->firstOrFail();
+
+        $this->assertSame(1000, $debit->net_amount);
+        $this->assertSame(100, $debit->tax_amount);
+        $this->assertSame(1100, $debit->gross_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10, $debit->tax_type);
+
+        $this->assertSame(1100, $credit->net_amount);
+        $this->assertSame(0, $credit->tax_amount);
+        $this->assertSame(1100, $credit->gross_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_NON_TAXABLE, $credit->tax_type);
+    }
+
+    #[Test]
+    public function 免税事業者は非課税取引のgross_amount入力を税額ゼロで保存できる()
+    {
+        $fiscalYear = FiscalYear::factory()->create([
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+        ]);
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '免税事業者の非課税取引',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'gross_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'gross_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $this->assertTrue($transaction->journalEntries->every(function ($entry) {
+            return $entry->net_amount === 1000
+                && $entry->tax_amount === 0
+                && $entry->gross_amount === 1000
+                && $entry->tax_type === JournalEntry::TAX_TYPE_NON_TAXABLE;
+        }));
+    }
+
+    #[Test]
+    public function 課税事業者はgross_amountとtax_type入力を正しく分解して保存できる()
+    {
+        $fiscalYear = FiscalYear::factory()->create([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '課税事業者の税込入力',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+            ],
+        ]);
+
+        $debit = $transaction->journalEntries()->where('type', 'debit')->firstOrFail();
+        $credit = $transaction->journalEntries()->where('type', 'credit')->firstOrFail();
+
+        $this->assertSame(1100, $debit->net_amount);
+        $this->assertSame(0, $debit->tax_amount);
+        $this->assertSame(1100, $debit->gross_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_NON_TAXABLE, $debit->tax_type);
+
+        $this->assertSame(1000, $credit->net_amount);
+        $this->assertSame(100, $credit->tax_amount);
+        $this->assertSame(1100, $credit->gross_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_SALES_10, $credit->tax_type);
+    }
+
+    #[Test]
+    public function 課税事業者はnon_taxableのgross_amount入力を税額ゼロで保存できる()
+    {
+        $fiscalYear = FiscalYear::factory()->create([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '課税事業者の非課税取引',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'gross_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'gross_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $this->assertTrue($transaction->journalEntries->every(function ($entry) {
+            return $entry->net_amount === 1000
+                && $entry->tax_amount === 0
+                && $entry->gross_amount === 1000
+                && $entry->tax_type === JournalEntry::TAX_TYPE_NON_TAXABLE;
+        }));
+    }
+
+    #[Test]
+    public function 免税事業者が税込2200円の売上をレジ現金に保存できる()
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        $fiscalYear->update([
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+        ]);
+
+        $unit = $fiscalYear->businessUnit;
+        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '一般売上');
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '免税事業者のレジ売上',
+        ], [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 2200,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $salesSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 2200,
+            ],
+        ]);
+
+        $cashEntry = $transaction->journalEntries()->where('sub_account_id', $cashSubAccount->id)->firstOrFail();
+        $salesEntry = $transaction->journalEntries()->where('sub_account_id', $salesSubAccount->id)->firstOrFail();
+
+        $this->assertSame(2200, $cashEntry->net_amount);
+        $this->assertSame(0, $cashEntry->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_NON_TAXABLE, $cashEntry->tax_type);
+
+        $this->assertSame(2000, $salesEntry->net_amount);
+        $this->assertSame(200, $salesEntry->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_DEEMED_TAXABLE_SALES_10, $salesEntry->tax_type);
+    }
+
+    #[Test]
+    public function 免税事業者が税込1100円の通信費をレジ現金で保存できる()
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        $fiscalYear->update([
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+        ]);
+
+        $unit = $fiscalYear->businessUnit;
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-04-02',
+            'description' => '免税事業者の通信費',
+        ], [
+            [
+                'sub_account_id' => $expenseSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 1100,
+            ],
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $expenseEntry = $transaction->journalEntries()->where('sub_account_id', $expenseSubAccount->id)->firstOrFail();
+        $cashEntry = $transaction->journalEntries()->where('sub_account_id', $cashSubAccount->id)->firstOrFail();
+
+        $this->assertSame(1000, $expenseEntry->net_amount);
+        $this->assertSame(100, $expenseEntry->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10, $expenseEntry->tax_type);
+
+        $this->assertSame(1100, $cashEntry->net_amount);
+        $this->assertSame(0, $cashEntry->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_NON_TAXABLE, $cashEntry->tax_type);
+    }
+
+    #[Test]
+    public function 課税事業者が税込2200円の売上をレジ現金に保存できる()
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        $fiscalYear->update([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+
+        $unit = $fiscalYear->businessUnit;
+        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '一般売上');
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-04-03',
+            'description' => '課税事業者のレジ売上',
+        ], [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 2200,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $salesSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 2200,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+            ],
+        ]);
+
+        $salesEntry = $transaction->journalEntries()->where('sub_account_id', $salesSubAccount->id)->firstOrFail();
+
+        $this->assertSame(2000, $salesEntry->net_amount);
+        $this->assertSame(200, $salesEntry->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_SALES_10, $salesEntry->tax_type);
+    }
+
+    #[Test]
+    public function 課税事業者が税込1100円の通信費をレジ現金で保存できる()
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        $fiscalYear->update([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+
+        $unit = $fiscalYear->businessUnit;
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-04-04',
+            'description' => '課税事業者の通信費',
+        ], [
+            [
+                'sub_account_id' => $expenseSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            ],
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $expenseEntry = $transaction->journalEntries()->where('sub_account_id', $expenseSubAccount->id)->firstOrFail();
+
+        $this->assertSame(1000, $expenseEntry->net_amount);
+        $this->assertSame(100, $expenseEntry->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10, $expenseEntry->tax_type);
+    }
+
+    #[Test]
+    public function 課税事業者が税込1080円の軽減税率経費をレジ現金で保存できる()
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        $fiscalYear->update([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+
+        $unit = $fiscalYear->businessUnit;
+        $expenseSubAccount = $unit->getSubAccountByName('雑費', '雑費');
+        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-04-05',
+            'description' => '課税事業者の軽減税率経費',
+        ], [
+            [
+                'sub_account_id' => $expenseSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 1080,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8,
+            ],
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 1080,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $expenseEntry = $transaction->journalEntries()->where('sub_account_id', $expenseSubAccount->id)->firstOrFail();
+
+        $this->assertSame(1000, $expenseEntry->net_amount);
+        $this->assertSame(80, $expenseEntry->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8, $expenseEntry->tax_type);
+    }
+
+    #[Test]
+    public function 課税事業者が軽減税率8パーセントと10パーセントが混在する仕入れを保存できる()
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        $fiscalYear->update([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+
+        $unit = $fiscalYear->businessUnit;
+        $purchaseSubAccount = $unit->getSubAccountByName('仕入金額', '仕入金額');
+        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-04-06',
+            'description' => 'スーパーで魚とビールを仕入れ',
+        ], [
+            [
+                'sub_account_id' => $purchaseSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 2160,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8,
+            ],
+            [
+                'sub_account_id' => $purchaseSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 5500,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            ],
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 7660,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $reducedRateEntry = $transaction->journalEntries()
+            ->where('tax_type', JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8)
+            ->firstOrFail();
+        $standardRateEntry = $transaction->journalEntries()
+            ->where('tax_type', JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10)
+            ->firstOrFail();
+        $cashEntry = $transaction->journalEntries()
+            ->where('sub_account_id', $cashSubAccount->id)
+            ->firstOrFail();
+
+        $this->assertSame(2000, $reducedRateEntry->net_amount);
+        $this->assertSame(160, $reducedRateEntry->tax_amount);
+
+        $this->assertSame(5000, $standardRateEntry->net_amount);
+        $this->assertSame(500, $standardRateEntry->tax_amount);
+
+        $this->assertSame(7660, $cashEntry->net_amount);
+        $this->assertSame(0, $cashEntry->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_NON_TAXABLE, $cashEntry->tax_type);
+    }
+
+    #[Test]
+    public function 課税事業者が税込1000円の非課税経費をレジ現金で保存できる()
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        $fiscalYear->update([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+
+        $unit = $fiscalYear->businessUnit;
+        $expenseSubAccount = $unit->getSubAccountByName('地代家賃', '地代家賃');
+        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-04-07',
+            'description' => '課税事業者の非課税経費',
+        ], [
+            [
+                'sub_account_id' => $expenseSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $expenseEntry = $transaction->journalEntries()->where('sub_account_id', $expenseSubAccount->id)->firstOrFail();
+
+        $this->assertSame(1000, $expenseEntry->net_amount);
+        $this->assertSame(0, $expenseEntry->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_NON_TAXABLE, $expenseEntry->tax_type);
     }
 
     #[Test]
@@ -689,7 +1173,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $expense->id,
                 'type' => 'debit',
                 'net_amount' => 1000,
-                'tax_type' => 'taxable_purchases_10',
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
                 'tax_amount' => 100,
             ],
             [
@@ -731,7 +1215,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $expense->id,
                 'type' => 'debit',
                 'net_amount' => 1000,
-                'tax_type' => 'taxable_purchases_10',
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
                 'tax_amount' => 100,
             ],
             [
@@ -792,7 +1276,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $expense->id,
                 'type' => 'debit',
                 'net_amount' => 1000,
-                'tax_type' => 'taxable_purchases_10',
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
                 'tax_amount' => 100,
             ],
             [

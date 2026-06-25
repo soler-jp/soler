@@ -2,6 +2,7 @@
 
 namespace App\Validators;
 
+use App\Models\JournalEntry;
 use Illuminate\Support\Facades\Validator;
 
 class JournalEntryValidator
@@ -36,7 +37,7 @@ class JournalEntryValidator
             'type' => ['required', 'in:debit,credit'],
             'net_amount' => ['required', 'integer', 'min:1'],
             'tax_amount' => ['required_with:tax_type', 'numeric', 'min:0'],
-            'tax_type' => ['nullable', 'in:taxable_sales_10,taxable_sales_8,taxable_purchases_10,non_taxable,tax_free'],
+            'tax_type' => ['nullable', 'in:'.implode(',', JournalEntry::TAX_TYPES)],
             'is_effective' => ['boolean'],
         ], $requireTransactionId ? [
             'transaction_id' => ['required', 'exists:transactions,id'],

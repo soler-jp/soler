@@ -44,6 +44,12 @@ class JournalEntry extends Model
 
     public const TAX_TYPE_TAXABLE_PURCHASES_10 = 'taxable_purchases_10';
 
+    public const TAX_TYPE_TAXABLE_PURCHASES_8 = 'taxable_purchases_8';
+
+    public const TAX_TYPE_DEEMED_TAXABLE_SALES_10 = 'deemed_taxable_sales_10';
+
+    public const TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10 = 'deemed_taxable_purchases_10';
+
     public const TAX_TYPE_NON_TAXABLE = 'non_taxable';
 
     public const TAX_TYPE_TAX_FREE = 'tax_free';
@@ -52,6 +58,9 @@ class JournalEntry extends Model
         self::TAX_TYPE_TAXABLE_SALES_10,
         self::TAX_TYPE_TAXABLE_SALES_8,
         self::TAX_TYPE_TAXABLE_PURCHASES_10,
+        self::TAX_TYPE_TAXABLE_PURCHASES_8,
+        self::TAX_TYPE_DEEMED_TAXABLE_SALES_10,
+        self::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10,
         self::TAX_TYPE_NON_TAXABLE,
         self::TAX_TYPE_TAX_FREE,
     ];
