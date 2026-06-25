@@ -94,7 +94,7 @@ class Transaction extends Model
 
     public function getTotalAmountAttribute(): int
     {
-        return $this->journalEntries->where('type', 'credit')->sum('amount');
+        return $this->journalEntries->where('type', 'credit')->sum('net_amount');
     }
 
     public function getCreditAccountsLabelAttribute(): string

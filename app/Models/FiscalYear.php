@@ -72,26 +72,26 @@ class FiscalYear extends Model
             ->whereHas('transaction', fn($q) => $q->where('is_planned', false))
             ->whereHas('subAccount.account', fn($q) => $q->where('type', 'revenue'))
             ->where('type', 'credit')
-            ->sum(\DB::raw('amount + COALESCE(tax_amount, 0)'));
+            ->sum(\DB::raw('net_amount + COALESCE(tax_amount, 0)'));
 
         $actualExpense = $this->journalEntries()
             ->whereHas('transaction', fn($q) => $q->where('is_planned', false))
             ->whereHas('subAccount.account', fn($q) => $q->where('type', 'expense'))
             ->where('type', 'debit')
-            ->sum(\DB::raw('amount + COALESCE(tax_amount, 0)'));
+            ->sum(\DB::raw('net_amount + COALESCE(tax_amount, 0)'));
 
         // 予定（is_planned = true）
         $plannedIncome = $this->journalEntries()
             ->whereHas('transaction', fn($q) => $q->where('is_planned', true))
             ->whereHas('subAccount.account', fn($q) => $q->where('type', 'revenue'))
             ->where('type', 'credit')
-            ->sum(\DB::raw('amount + COALESCE(tax_amount, 0)'));
+            ->sum(\DB::raw('net_amount + COALESCE(tax_amount, 0)'));
 
         $plannedExpense = $this->journalEntries()
             ->whereHas('transaction', fn($q) => $q->where('is_planned', true))
             ->whereHas('subAccount.account', fn($q) => $q->where('type', 'expense'))
             ->where('type', 'debit')
-            ->sum(\DB::raw('amount + COALESCE(tax_amount, 0)'));
+            ->sum(\DB::raw('net_amount + COALESCE(tax_amount, 0)'));
 
         return [
             'actual' => [
@@ -172,7 +172,7 @@ class FiscalYear extends Model
                 $journalEntriesData[] = [
                     'sub_account_id' => $subAccount->id,
                     'type' => 'debit',
-                    'amount' => (int) $entry['amount'],
+                    'net_amount' => (int) $entry['amount'],
 
                 ];
 
@@ -182,7 +182,7 @@ class FiscalYear extends Model
             $journalEntriesData[] = [
                 'sub_account_id' => $capitalSub->id,
                 'type' => 'credit',
-                'amount' => $totalAmount,
+                'net_amount' => $totalAmount,
             ];
 
             return $this->registerTransaction($transactionData, $journalEntriesData);

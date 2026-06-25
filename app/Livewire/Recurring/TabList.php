@@ -99,10 +99,10 @@ class TabList extends Component
 
         foreach ($transactions as $tx) {
             if ($tx->is_planned) {
-                $debit = $tx->journalEntries->where('type', 'debit')->sortByDesc('amount')->first();
-                $credit = $tx->journalEntries->where('type', 'credit')->sortByDesc('amount')->first();
+                $debit = $tx->journalEntries->where('type', 'debit')->sortByDesc('net_amount')->first();
+                $credit = $tx->journalEntries->where('type', 'credit')->sortByDesc('net_amount')->first();
 
-                $this->inputs[$tx->id]['amount'] ??= $debit?->amount;
+                $this->inputs[$tx->id]['amount'] ??= $debit?->net_amount;
                 $this->inputs[$tx->id]['credit_sub_account_id'] ??= $credit?->sub_account_id;
                 $this->inputs[$tx->id]['date'] ??= $tx->date->format('Y-m-d');
             }

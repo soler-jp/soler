@@ -28,11 +28,31 @@ class JournalEntryTest extends TestCase
             'transaction_id' => $transaction->id,
             'sub_account_id' => $subAccount->id,
             'type' => 'debit',
-            'amount' => 1000,
+            'net_amount' => 1000,
         ];
 
         $this->expectNotToPerformAssertions();
         JournalEntryValidator::validate($data, true);
+    }
+
+    #[Test]
+    public function net_amountでもバリデーションが通る()
+    {
+        $transaction = Transaction::factory()->create();
+        $account = Account::factory()->create();
+
+        $subAccount = $account->subAccounts->first();
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'sub_account_id' => $subAccount->id,
+            'type' => 'debit',
+            'net_amount' => 1000,
+        ];
+
+        $validated = JournalEntryValidator::validate($data, true);
+
+        $this->assertSame(1000, $validated['net_amount']);
     }
 
     #[Test]
@@ -44,7 +64,7 @@ class JournalEntryTest extends TestCase
             'transaction_id' => null,
             'account_id' => 1,
             'type' => 'debit',
-            'amount' => 1000,
+            'net_amount' => 1000,
         ];
 
         $this->expectException(ValidationException::class);
@@ -60,7 +80,7 @@ class JournalEntryTest extends TestCase
             'transaction_id' => 1,
             'account_id' => null,
             'type' => 'debit',
-            'amount' => 1000,
+            'net_amount' => 1000,
         ];
 
         $this->expectException(ValidationException::class);
@@ -79,7 +99,7 @@ class JournalEntryTest extends TestCase
             'transaction_id' => $transaction->id,
             'sub_account_id' => $subAccount->id,
             'type' => null,
-            'amount' => 1000,
+            'net_amount' => 1000,
         ];
 
         $this->expectException(ValidationException::class);
@@ -98,7 +118,7 @@ class JournalEntryTest extends TestCase
             'transaction_id' => $transaction->id,
             'sub_account_id' => $subAccount->id,
             'type' => 'debit',
-            'amount' => null,
+            'net_amount' => null,
         ];
 
         $this->expectException(ValidationException::class);
@@ -117,7 +137,7 @@ class JournalEntryTest extends TestCase
             'transaction_id' => $transaction->id,
             'sub_account_id' => $subAccount->id,
             'type' => 'invalid',
-            'amount' => 1000,
+            'net_amount' => 1000,
         ];
 
         $this->expectException(ValidationException::class);
@@ -136,7 +156,7 @@ class JournalEntryTest extends TestCase
             'transaction_id' => $transaction->id,
             'sub_account_id' => $subAccount->id,
             'type' => 'debit',
-            'amount' => 0,
+            'net_amount' => 0,
         ];
 
         $this->expectException(ValidationException::class);
@@ -155,7 +175,7 @@ class JournalEntryTest extends TestCase
             'transaction_id' => $transaction->id,
             'sub_account_id' => $subAccount->id,
             'type' => 'debit',
-            'amount' => 1000,
+            'net_amount' => 1000,
             'tax_amount' => -100,
         ];
 
@@ -175,7 +195,7 @@ class JournalEntryTest extends TestCase
             'transaction_id' => $transaction->id,
             'sub_account_id' => $subAccount->id,
             'type' => 'debit',
-            'amount' => 1000,
+            'net_amount' => 1000,
             'tax_type' => 'wrong',
         ];
 
@@ -195,7 +215,7 @@ class JournalEntryTest extends TestCase
             'transaction_id' => $transaction->id,
             'sub_account_id' => $subAccount->id,
             'type' => 'debit',
-            'amount' => 1000,
+            'net_amount' => 1000,
             'is_effective' => 'yes',
         ];
 
@@ -215,7 +235,7 @@ class JournalEntryTest extends TestCase
             'transaction_id' => $transaction->id,
             'sub_account_id' => $subAccount->id,
             'type' => 'debit',
-            'amount' => 1000,
+            'net_amount' => 1000,
         ];
 
         $this->expectNotToPerformAssertions();
@@ -234,7 +254,7 @@ class JournalEntryTest extends TestCase
             'transaction_id' => $transaction->id,
             'sub_account_id' => $subAccount->id,
             'type' => 'debit',
-            'amount' => 1000,
+            'net_amount' => 1000,
         ];
 
         $this->expectNotToPerformAssertions();
@@ -253,7 +273,7 @@ class JournalEntryTest extends TestCase
             'transaction_id' => $transaction->id,
             'sub_account_id' => $subAccount->id,
             'type' => 'debit',
-            'amount' => 1000,
+            'net_amount' => 1000,
         ];
 
         $this->expectNotToPerformAssertions();
@@ -293,14 +313,14 @@ class JournalEntryTest extends TestCase
                 [
                     'sub_account_id' => $subA->id,
                     'type' => 'debit',
-                    'amount' => 10000,
+                    'net_amount' => 10000,
                     'tax_amount' => 0,
                     'tax_type' => 'non_taxable',
                 ],
                 [
                     'sub_account_id' => $equitySubAccount->id,
                     'type' => 'credit',
-                    'amount' => 10000,
+                    'net_amount' => 10000,
                     'tax_amount' => 0,
                     'tax_type' => 'non_taxable',
                 ],
@@ -317,14 +337,14 @@ class JournalEntryTest extends TestCase
                 [
                     'sub_account_id' => $subB->id,
                     'type' => 'debit',
-                    'amount' => 20000,
+                    'net_amount' => 20000,
                     'tax_amount' => 0,
                     'tax_type' => 'non_taxable',
                 ],
                 [
                     'sub_account_id' => $equitySubAccount->id,
                     'type' => 'credit',
-                    'amount' => 20000,
+                    'net_amount' => 20000,
                     'tax_amount' => 0,
                     'tax_type' => 'non_taxable',
                 ],
@@ -341,14 +361,14 @@ class JournalEntryTest extends TestCase
                 [
                     'sub_account_id' => $subC->id,
                     'type' => 'debit',
-                    'amount' => 30000,
+                    'net_amount' => 30000,
                     'tax_amount' => 0,
                     'tax_type' => 'non_taxable',
                 ],
                 [
                     'sub_account_id' => $equitySubAccount->id,
                     'type' => 'credit',
-                    'amount' => 30000,
+                    'net_amount' => 30000,
                     'tax_amount' => 0,
                     'tax_type' => 'non_taxable',
                 ],
@@ -359,17 +379,17 @@ class JournalEntryTest extends TestCase
 
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $subA->id,
-            'amount' => 10000,
+            'net_amount' => 10000,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $subB->id,
-            'amount' => 20000,
+            'net_amount' => 20000,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $subC->id,
-            'amount' => 30000,
+            'net_amount' => 30000,
         ]);
     }
 }

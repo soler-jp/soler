@@ -88,7 +88,7 @@ class DepreciationServiceTest extends TestCase
                 fn($e) =>
                 $e->type === 'debit' &&
                     $e->sub_account_id === $assetSubAccount->id &&
-                    $e->amount === 165000
+                    $e->net_amount === 165000
             )
         );
 
@@ -97,7 +97,7 @@ class DepreciationServiceTest extends TestCase
                 fn($e) =>
                 $e->type === 'credit' &&
                     $e->sub_account_id === $paymentSubAccount->id &&
-                    $e->amount === 165000
+                    $e->net_amount === 165000
             )
         );
     }
@@ -167,7 +167,7 @@ class DepreciationServiceTest extends TestCase
     //                 fn($e) =>
     //                 $e->type === 'debit' &&
     //                     $e->account_id === $assetAccount->id &&
-    //                     $e->amount === 150000
+    //                     $e->net_amount === 150000
     //             )
     //         );
 
@@ -176,7 +176,7 @@ class DepreciationServiceTest extends TestCase
     //                 fn($e) =>
     //                 $e->type === 'debit' &&
     //                     $e->account->name === '仮払消費税' &&
-    //                     $e->amount === 15000
+    //                     $e->net_amount === 15000
     //             )
     //         );
 
@@ -185,7 +185,7 @@ class DepreciationServiceTest extends TestCase
     //                 fn($e) =>
     //                 $e->type === 'credit' &&
     //                     $e->account_id === $paymentAccount->id &&
-    //                     $e->amount === 165000
+    //                     $e->net_amount === 165000
     //             )
     //         );
     //     }

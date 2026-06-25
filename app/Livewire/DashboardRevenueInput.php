@@ -37,17 +37,17 @@ class DashboardRevenueInput extends Component
                 [
                     'sub_account_id' => $this->revenueSubAccountId,
                     'type' => 'credit',
-                    'amount' => (int) $this->gross_amount,
+                    'net_amount' => (int) $this->gross_amount,
                 ],
                 [
                     'sub_account_id' => $this->receiptSubAccountId,
                     'type' => 'debit',
-                    'amount' => (int) ($this->gross_amount - $this->holding_amount),
+                    'net_amount' => (int) ($this->gross_amount - $this->holding_amount),
                 ],
                 [
                     'sub_account_id' => $this->withheldTaxSubAccountId,
                     'type' => 'debit',
-                    'amount' => (int) $this->holding_amount,
+                    'net_amount' => (int) $this->holding_amount,
                 ],
             ];
         } else {
@@ -55,12 +55,12 @@ class DashboardRevenueInput extends Component
                 [
                     'sub_account_id' => $this->receiptSubAccountId,
                     'type' => 'debit',
-                    'amount' => (int) $this->gross_amount,
+                    'net_amount' => (int) $this->gross_amount,
                 ],
                 [
                     'sub_account_id' => $this->revenueSubAccountId,
                     'type' => 'credit',
-                    'amount' => (int) $this->gross_amount,
+                    'net_amount' => (int) $this->gross_amount,
                 ],
             ];
         }

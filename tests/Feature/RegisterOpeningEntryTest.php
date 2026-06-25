@@ -57,8 +57,8 @@ class RegisterOpeningEntryTest extends TestCase
         $this->assertEquals(2, $debits->count());
         $this->assertEquals(1, $credits->count());
 
-        $this->assertEquals(300000, $debits->sum('amount'));
-        $this->assertEquals(300000, $credits->sum('amount'));
+        $this->assertEquals(300000, $debits->sum('net_amount'));
+        $this->assertEquals(300000, $credits->sum('net_amount'));
 
         $this->assertEquals('equity', $credits->first()->subAccount->account->type);
         $this->assertEquals('元入金', $credits->first()->subAccount->account->name);

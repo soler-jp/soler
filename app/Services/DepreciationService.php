@@ -66,12 +66,12 @@ class DepreciationService
                 [
                     'sub_account_id' => $assetSubAccount->id,
                     'type' => 'debit',
-                    'amount' => $acquisitionCost,
+                    'net_amount' => $acquisitionCost,
                 ],
                 [
                     'sub_account_id' => $paymentSubAccount->id,
                     'type' => 'credit',
-                    'amount' => $acquisitionCost,
+                    'net_amount' => $acquisitionCost,
                 ],
             ]);
 

@@ -24,7 +24,7 @@ class GeneralLedgerService
         $ledger = [];
 
         foreach ($entries as $entry) {
-            $amount = $entry->amount;
+            $amount = $entry->net_amount;
 
             if ($entry->type === 'debit') {
                 $balance += $amount;
@@ -66,7 +66,7 @@ class GeneralLedgerService
         $ledger = [];
 
         foreach ($entries as $entry) {
-            $amount = $entry->amount;
+            $amount = $entry->net_amount;
 
             if ($entry->type === 'debit') {
                 $balance += $amount;

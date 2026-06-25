@@ -74,13 +74,13 @@ class DashboardExpenseInputTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $debit->id,
             'type' => 'debit',
-            'amount' => 1500,
+            'net_amount' => 1500,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $credit->id,
             'type' => 'credit',
-            'amount' => 1500,
+            'net_amount' => 1500,
         ]);
     }
 
@@ -130,7 +130,7 @@ class DashboardExpenseInputTest extends TestCase
         $this->assertDatabaseMissing('journal_entries', [
             'sub_account_id' => $foreignDebit->id,
             'type' => 'debit',
-            'amount' => 1500,
+            'net_amount' => 1500,
         ]);
     }
 

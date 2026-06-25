@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\Transaction;
@@ -18,10 +19,16 @@ class JournalEntry extends Model
         'account_id',
         'sub_account_id',
         'type',
-        'amount',
+        'net_amount',
         'tax_amount',
         'tax_type',
         'is_effective',
+    ];
+
+    protected $casts = [
+        'net_amount' => 'integer',
+        'tax_amount' => 'integer',
+        'is_effective' => 'boolean',
     ];
 
     // 定数: 借方・貸方
@@ -57,6 +64,20 @@ class JournalEntry extends Model
     public function account(): Attribute
     {
         return Attribute::get(fn() => $this->subAccount?->account);
+    }
+
+    public function netAmount(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => (int) ($this->attributes['net_amount'] ?? 0),
+        );
+    }
+
+    public function grossAmount(): Attribute
+    {
+        return Attribute::get(
+            fn() => $this->net_amount + (int) ($this->attributes['tax_amount'] ?? 0)
+        );
     }
 
     public function subAccount(): BelongsTo

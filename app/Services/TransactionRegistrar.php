@@ -15,7 +15,7 @@ class TransactionRegistrar
      * 取引と仕訳の登録を行う
      *
      * @param  array  $transactionData  取引情報（例: fiscal_year_id, date, description）
-     * @param  array  $journalEntriesData  仕訳情報（複数）（例: account_id, type, amount, ...）
+     * @param  array  $journalEntriesData  仕訳情報（複数）（例: account_id, type, net_amount, ...）
      * @return Transaction
      *
      * @throws \Illuminate\Validation\ValidationException
@@ -75,7 +75,7 @@ class TransactionRegistrar
 
     function totalWithTax(array $entries): int
     {
-        return collect($entries)->sum(fn($e) => (int) ($e['amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
+        return collect($entries)->sum(fn($e) => (int) ($e['net_amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
     }
 
     protected function ensureEntriesBelongToBusinessUnit(FiscalYear $fiscalYear, array $validatedEntries): void
@@ -127,7 +127,7 @@ class TransactionRegistrar
             return [
                 'sub_account_id' => $entry->sub_account_id,
                 'type' => $entry->type,
-                'amount' => 0,
+                'net_amount' => 0,
                 'tax_type' => null,
                 'tax_amount' => 0,
             ];

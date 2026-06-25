@@ -49,12 +49,12 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $subAccount->id,
                 'type' => 'debit',
-                'amount' => 1000,
+                'net_amount' => 1000,
             ],
             [
                 'sub_account_id' => $subAccount->id,
                 'type' => 'credit',
-                'amount' => 1000,
+                'net_amount' => 1000,
             ],
         ];
 
@@ -68,6 +68,35 @@ class TransactionRegistrarTest extends TestCase
 
         $this->assertDatabaseCount('journal_entries', 2);
         $this->assertEquals($transaction->id, $transaction->journalEntries()->first()->transaction_id);
+    }
+
+    #[Test]
+    public function net_amountを使って取引が登録できる()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        $transaction = (new TransactionRegistrar())->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => 'net_amountで登録',
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+
+        $this->assertSame(1000, $transaction->journalEntries()->where('type', 'debit')->first()->net_amount);
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $transaction->id,
+            'net_amount' => 1000,
+        ]);
     }
 
 
@@ -87,12 +116,12 @@ class TransactionRegistrarTest extends TestCase
             [
                 'account_id' => 1,
                 'type' => 'debit',
-                'amount' => 1000,
+                'net_amount' => 1000,
             ],
             [
                 'account_id' => 1,
                 'type' => 'credit',
-                'amount' => 1000,
+                'net_amount' => 1000,
             ],
         ];
         $registrar->register(null, $transactionData, $journalEntriesData);
@@ -117,12 +146,12 @@ class TransactionRegistrarTest extends TestCase
             [
                 'account_id' => $account->id,
                 'type' => 'debit',
-                'amount' => 1000,
+                'net_amount' => 1000,
             ],
             [
                 'account_id' => 99999, // 存在しないID
                 'type' => 'credit',
-                'amount' => 1000,
+                'net_amount' => 1000,
             ],
         ];
 
@@ -146,12 +175,12 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $subAccount->id,
                 'type' => 'debit',
-                'amount' => 1000,
+                'net_amount' => 1000,
             ],
             [
                 'sub_account_id' => $subAccount->id,
                 'type' => 'credit',
-                'amount' => 800, // バランスが崩れている
+                'net_amount' => 800, // バランスが崩れている
             ],
         ];
 
@@ -174,8 +203,8 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['account_id' => null, 'type' => 'debit', 'amount' => 1000],
-            ['account_id' => 1, 'type' => 'credit', 'amount' => 1000],
+            ['account_id' => null, 'type' => 'debit', 'net_amount' => 1000],
+            ['account_id' => 1, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -195,7 +224,7 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'net_amount' => 1000],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -215,8 +244,8 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'amount' => 1000],
-            ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'amount' => 900],
+            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'net_amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 900],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -236,8 +265,8 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'amount' => 500],
-            ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'amount' => 500],
+            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'net_amount' => 500],
+            ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 500],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -257,8 +286,8 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['account_id' => $account->id, 'type' => 'debit', 'amount' => 0],
-            ['account_id' => $account->id, 'type' => 'credit', 'amount' => 0],
+            ['account_id' => $account->id, 'type' => 'debit', 'net_amount' => 0],
+            ['account_id' => $account->id, 'type' => 'credit', 'net_amount' => 0],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -278,8 +307,8 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['sub_account_id' => $subAccount->id, 'type' => 'invalid', 'amount' => 1000],
-            ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'invalid', 'net_amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -316,8 +345,8 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'amount' => 1000],
-            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'net_amount' => 1000],
+            ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'net_amount' => 1000],
         ];
 
         (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
@@ -342,14 +371,14 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
-                'amount' => 5000,
+                'net_amount' => 5000,
                 'tax_amount' => 500,
                 'tax_type' => 'taxable_purchases_10',
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
-                'amount' => 5500,
+                'net_amount' => 5500,
                 'tax_amount' => 0,
                 'tax_type' => 'non_taxable',
             ],
@@ -380,14 +409,14 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
-                'amount' => 5000,
+                'net_amount' => 5000,
                 'tax_amount' => 500,
                 'tax_type' => 'taxable_purchases_10',
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
-                'amount' => 5400,
+                'net_amount' => 5400,
                 'tax_amount' => 0,
                 'tax_type' => 'non_taxable',
             ],
@@ -416,14 +445,14 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
-                'amount' => 5000,
+                'net_amount' => 5000,
                 'tax_amount' => -100,
                 'tax_type' => 'taxable_purchases_10',
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
-                'amount' => 4900,
+                'net_amount' => 4900,
                 'tax_amount' => 0,
                 'tax_type' => 'non_taxable',
             ],
@@ -456,14 +485,14 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
-                'amount' => 3000,
+                'net_amount' => 3000,
                 'tax_amount' => null,
                 'tax_type' => 'non_taxable',
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
-                'amount' => 3000,
+                'net_amount' => 3000,
                 'tax_amount' => null,
                 'tax_type' => 'non_taxable',
             ],
@@ -494,14 +523,14 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
-                'amount' => 3000,
+                'net_amount' => 3000,
                 'tax_amount' => 0,
                 'tax_type' => 'non_taxable',
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
-                'amount' => 3000,
+                'net_amount' => 3000,
                 'tax_amount' => 0,
                 'tax_type' => 'non_taxable',
             ],
@@ -532,14 +561,14 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
-                'amount' => 4500,
+                'net_amount' => 4500,
                 'tax_amount' => 500,
                 'tax_type' => 'taxable_purchases_10',
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
-                'amount' => 5000,
+                'net_amount' => 5000,
             ],
         ];
 
@@ -570,12 +599,12 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $subAccount->id,
                 'type' => 'debit',
-                'amount' => 1000,
+                'net_amount' => 1000,
             ],
             [
                 'sub_account_id' => $subAccount->id,
                 'type' => 'credit',
-                'amount' => 1000,
+                'net_amount' => 1000,
             ],
         ]);
 
@@ -602,14 +631,14 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $expense->id,
                 'type' => 'debit',
-                'amount' => 1000,
+                'net_amount' => 1000,
                 'tax_type' => 'taxable_purchases_10',
                 'tax_amount' => 100,
             ],
             [
                 'sub_account_id' => $asset->id,
                 'type' => 'credit',
-                'amount' => 1100,
+                'net_amount' => 1100,
             ],
         ]);
 
@@ -644,14 +673,14 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $expense->id,
                 'type' => 'debit',
-                'amount' => 1000,
+                'net_amount' => 1000,
                 'tax_type' => 'taxable_purchases_10',
                 'tax_amount' => 100,
             ],
             [
                 'sub_account_id' => $asset->id,
                 'type' => 'credit',
-                'amount' => 1100,
+                'net_amount' => 1100,
             ],
         ]);
 
@@ -663,10 +692,10 @@ class TransactionRegistrarTest extends TestCase
         $debit = $transaction->journalEntries->firstWhere('type', 'debit');
         $credit = $transaction->journalEntries->firstWhere('type', 'credit');
 
-        $debit->amount = 2000;
+        $debit->net_amount = 2000;
         $debit->tax_amount = 200;
 
-        $credit->amount = 2200;
+        $credit->net_amount = 2200;
         $credit->sub_account_id = $liability->id;
 
         $confirmed = $registrar->confirmPlanned($transaction);
@@ -680,8 +709,8 @@ class TransactionRegistrarTest extends TestCase
             $this->assertContains($entry->id, $originalIds);
         }
 
-        $this->assertSame(2000, $confirmed->journalEntries->firstWhere('type', 'debit')->amount);
-        $this->assertSame(2200, $confirmed->journalEntries->firstWhere('type', 'credit')->amount);
+        $this->assertSame(2000, $confirmed->journalEntries->firstWhere('type', 'debit')->net_amount);
+        $this->assertSame(2200, $confirmed->journalEntries->firstWhere('type', 'credit')->net_amount);
         $this->assertSame($liability->id, $confirmed->journalEntries->firstWhere('type', 'credit')->sub_account_id);
     }
 
@@ -705,21 +734,21 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $expense->id,
                 'type' => 'debit',
-                'amount' => 1000,
+                'net_amount' => 1000,
                 'tax_type' => 'taxable_purchases_10',
                 'tax_amount' => 100,
             ],
             [
                 'sub_account_id' => $asset->id,
                 'type' => 'credit',
-                'amount' => 1100,
+                'net_amount' => 1100,
             ],
         ]);
 
         $originalIds = $transaction->journalEntries->pluck('id')->toArray();
 
         foreach ($transaction->journalEntries as $entry) {
-            $entry->amount = 0;
+            $entry->net_amount = 0;
         }
 
         $transaction->description = '取消予定取引（取消）';
@@ -729,7 +758,7 @@ class TransactionRegistrarTest extends TestCase
         $this->assertFalse($cancelled->is_planned);
         $this->assertSame('取消予定取引（取消）', $cancelled->description);
         $this->assertCount(2, $cancelled->journalEntries);
-        $this->assertTrue($cancelled->journalEntries->every(fn($e) => $e->amount === 0));
+        $this->assertTrue($cancelled->journalEntries->every(fn($e) => $e->net_amount === 0));
 
         foreach ($cancelled->journalEntries as $entry) {
             $this->assertContains($entry->id, $originalIds);
@@ -758,12 +787,12 @@ class TransactionRegistrarTest extends TestCase
             [
                 'sub_account_id' => $expense->id,
                 'type' => 'debit',
-                'amount' => 1000,
+                'net_amount' => 1000,
             ],
             [
                 'sub_account_id' => $asset->id,
                 'type' => 'credit',
-                'amount' => 1000,
+                'net_amount' => 1000,
             ],
         ]);
 

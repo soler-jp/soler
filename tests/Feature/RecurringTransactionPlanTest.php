@@ -679,14 +679,14 @@ class RecurringTransactionPlanTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'transaction_id' => $transaction->id,
             'type' => 'debit',
-            'amount' => 1400,
+            'net_amount' => 1400,
             'sub_account_id' => $debitSubAccount->id,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
             'transaction_id' => $transaction->id,
             'type' => 'credit',
-            'amount' => 1400,
+            'net_amount' => 1400,
             'sub_account_id' => $newCreditSubAccount->id,
         ]);
     }
@@ -724,21 +724,21 @@ class RecurringTransactionPlanTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'transaction_id' => $transaction->id,
             'type' => 'credit',
-            'amount' => 1100,
+            'net_amount' => 1100,
             'sub_account_id' => $newCreditSubAccount->id,
         ]);
 
         $this->assertDatabaseMissing('journal_entries', [
             'transaction_id' => $transaction->id,
             'type' => 'credit',
-            'amount' => 1100,
+            'net_amount' => 1100,
             'sub_account_id' => $originalCreditSubAccount->id,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
             'transaction_id' => $transaction->id,
             'type' => 'debit',
-            'amount' => 1100,
+            'net_amount' => 1100,
             'sub_account_id' => $debitSubAccount->id,
         ]);
     }
@@ -836,7 +836,7 @@ class RecurringTransactionPlanTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'transaction_id' => $transaction->id,
             'type' => 'credit',
-            'amount' => 1100,
+            'net_amount' => 1100,
             'sub_account_id' => $creditSubAccount->id,
         ]);
     }

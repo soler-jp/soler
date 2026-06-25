@@ -37,8 +37,8 @@ class FiscalYearSummaryTest extends TestCase
             'date' => '2025-04-01',
             'description' => '売上取引',
         ], [
-            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'amount' => 10000],
-            ['sub_account_id' => $asset->id,   'type' => 'debit',  'amount' => 10000],
+            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 10000],
+            ['sub_account_id' => $asset->id,   'type' => 'debit',  'net_amount' => 10000],
         ]);
 
         // 経費 5,000円
@@ -46,8 +46,8 @@ class FiscalYearSummaryTest extends TestCase
             'date' => '2025-04-02',
             'description' => '経費取引',
         ], [
-            ['sub_account_id' => $expense->id,   'type' => 'debit',  'amount' => 5000],
-            ['sub_account_id' => $liability->id, 'type' => 'credit', 'amount' => 5000],
+            ['sub_account_id' => $expense->id,   'type' => 'debit',  'net_amount' => 5000],
+            ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 5000],
         ]);
 
         $summary = $fiscalYear->calculateSummary()['actual'];
@@ -79,14 +79,14 @@ class FiscalYearSummaryTest extends TestCase
             [
                 'sub_account_id' => $revenue->id,
                 'type' => 'credit',
-                'amount' => 10000,
+                'net_amount' => 10000,
                 'tax_amount' => 1000,
                 'tax_type' => 'taxable_sales_10',
             ],
             [
                 'sub_account_id' => $asset->id,
                 'type' => 'debit',
-                'amount' => 11000,
+                'net_amount' => 11000,
             ],
         ]);
 
@@ -98,14 +98,14 @@ class FiscalYearSummaryTest extends TestCase
             [
                 'sub_account_id' => $expense->id,
                 'type' => 'debit',
-                'amount' => 6000,
+                'net_amount' => 6000,
                 'tax_amount' => 600,
                 'tax_type' => 'taxable_purchases_10',
             ],
             [
                 'sub_account_id' => $liability->id,
                 'type' => 'credit',
-                'amount' => 6600,
+                'net_amount' => 6600,
             ],
         ]);
 
@@ -135,8 +135,8 @@ class FiscalYearSummaryTest extends TestCase
             'date' => '2025-04-01',
             'description' => '売上（2025）',
         ], [
-            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'amount' => 10000],
-            ['sub_account_id' => $asset->id,   'type' => 'debit',  'amount' => 10000],
+            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 10000],
+            ['sub_account_id' => $asset->id,   'type' => 'debit',  'net_amount' => 10000],
         ]);
 
         // 2026年度の売上
@@ -144,8 +144,8 @@ class FiscalYearSummaryTest extends TestCase
             'date' => '2026-04-01',
             'description' => '売上（2026）',
         ], [
-            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'amount' => 20000],
-            ['sub_account_id' => $asset->id,   'type' => 'debit',  'amount' => 20000],
+            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 20000],
+            ['sub_account_id' => $asset->id,   'type' => 'debit',  'net_amount' => 20000],
         ]);
 
         $summary = $fy2025->calculateSummary()['actual'];
@@ -171,8 +171,8 @@ class FiscalYearSummaryTest extends TestCase
             'date' => '2025-05-01',
             'description' => '売上のみの取引',
         ], [
-            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'amount' => 15000],
-            ['sub_account_id' => $asset->id,   'type' => 'debit',  'amount' => 15000],
+            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 15000],
+            ['sub_account_id' => $asset->id,   'type' => 'debit',  'net_amount' => 15000],
         ]);
 
         $summary = $fiscalYear->calculateSummary()['actual'];
@@ -198,8 +198,8 @@ class FiscalYearSummaryTest extends TestCase
             'date' => '2025-06-01',
             'description' => '経費のみの取引',
         ], [
-            ['sub_account_id' => $expense->id,   'type' => 'debit',  'amount' => 8000],
-            ['sub_account_id' => $liability->id, 'type' => 'credit', 'amount' => 8000],
+            ['sub_account_id' => $expense->id,   'type' => 'debit',  'net_amount' => 8000],
+            ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 8000],
         ]);
 
         $summary = $fiscalYear->calculateSummary()['actual'];
@@ -242,8 +242,8 @@ class FiscalYearSummaryTest extends TestCase
             'date' => '2025-04-01',
             'description' => '実績売上',
         ], [
-            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'amount' => 10000],
-            ['sub_account_id' => $asset->id,   'type' => 'debit',  'amount' => 10000],
+            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 10000],
+            ['sub_account_id' => $asset->id,   'type' => 'debit',  'net_amount' => 10000],
         ]);
 
         // 実績経費 5,000円
@@ -251,8 +251,8 @@ class FiscalYearSummaryTest extends TestCase
             'date' => '2025-04-02',
             'description' => '実績経費',
         ], [
-            ['sub_account_id' => $expense->id,   'type' => 'debit',  'amount' => 5000],
-            ['sub_account_id' => $liability->id, 'type' => 'credit', 'amount' => 5000],
+            ['sub_account_id' => $expense->id,   'type' => 'debit',  'net_amount' => 5000],
+            ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 5000],
         ]);
 
         // 予定売上 20,000円
@@ -261,8 +261,8 @@ class FiscalYearSummaryTest extends TestCase
             'description' => '予定売上',
             'is_planned' => true,
         ], [
-            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'amount' => 20000],
-            ['sub_account_id' => $asset->id,   'type' => 'debit',  'amount' => 20000],
+            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 20000],
+            ['sub_account_id' => $asset->id,   'type' => 'debit',  'net_amount' => 20000],
         ]);
 
         // 予定経費 3,000円
@@ -271,8 +271,8 @@ class FiscalYearSummaryTest extends TestCase
             'description' => '予定経費',
             'is_planned' => true,
         ], [
-            ['sub_account_id' => $expense->id,   'type' => 'debit',  'amount' => 3000],
-            ['sub_account_id' => $liability->id, 'type' => 'credit', 'amount' => 3000],
+            ['sub_account_id' => $expense->id,   'type' => 'debit',  'net_amount' => 3000],
+            ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 3000],
         ]);
 
         $summary = $fiscalYear->calculateSummary();

@@ -121,14 +121,14 @@ class FreelancerBookTest extends TestCase
                 [
                     'sub_account_id' => $this->subId($sample['debit'][0]),
                     'type' => 'debit',
-                    'amount' => $sample['debit'][1],
+                    'net_amount' => $sample['debit'][1],
                     'tax_amount' => $sample['debit'][2],
                     'tax_type' => $sample['debit'][3],
                 ],
                 [
                     'sub_account_id' => $this->subId($sample['credit'][0]),
                     'type' => 'credit',
-                    'amount' => $sample['credit'][1],
+                    'net_amount' => $sample['credit'][1],
                     'tax_amount' => $sample['credit'][2],
                     'tax_type' => $sample['credit'][3],
                 ],
@@ -164,14 +164,14 @@ class FreelancerBookTest extends TestCase
             [
                 'sub_account_id' => $this->subId('consumables'),
                 'type' => 'debit',
-                'amount' => 1000,
+                'net_amount' => 1000,
                 'tax_amount' => 0,
                 'tax_type' => 'non_taxable',
             ],
             [
                 'sub_account_id' => $this->subId('bank'),
                 'type' => 'credit',
-                'amount' => 2000,
+                'net_amount' => 2000,
                 'tax_amount' => 0,
                 'tax_type' => 'non_taxable',
             ],

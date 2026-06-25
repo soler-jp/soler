@@ -51,13 +51,13 @@ class DashboardRevenueInputTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $revenueSub->id,
             'type' => 'credit',
-            'amount' => 10000,
+            'net_amount' => 10000,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $cashSub->id,
             'type' => 'debit',
-            'amount' => 10000,
+            'net_amount' => 10000,
         ]);
     }
 
@@ -100,19 +100,19 @@ class DashboardRevenueInputTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $revenueSubAccount->id,
             'type' => 'credit',
-            'amount' => 10000,
+            'net_amount' => 10000,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $cashSubAccount->id,
             'type' => 'debit',
-            'amount' => 8979,
+            'net_amount' => 8979,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $withheldTaxSubAccount->id,
             'type' => 'debit',
-            'amount' => 1021,
+            'net_amount' => 1021,
         ]);
     }
 
@@ -162,7 +162,7 @@ class DashboardRevenueInputTest extends TestCase
         $this->assertDatabaseMissing('journal_entries', [
             'sub_account_id' => $foreignReceipt->id,
             'type' => 'debit',
-            'amount' => 10000,
+            'net_amount' => 10000,
         ]);
     }
 
@@ -340,13 +340,13 @@ class DashboardRevenueInputTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $cashSubAccount->id,
             'type' => 'debit',
-            'amount' => 12000,
+            'net_amount' => 12000,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $revenueSubAccount->id,
             'type' => 'credit',
-            'amount' => 12000,
+            'net_amount' => 12000,
         ]);
     }
 
@@ -383,13 +383,13 @@ class DashboardRevenueInputTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $bankSubAccount->id,
             'type' => 'debit',
-            'amount' => 15000,
+            'net_amount' => 15000,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $revenueSubAccount->id,
             'type' => 'credit',
-            'amount' => 15000,
+            'net_amount' => 15000,
         ]);
     }
 

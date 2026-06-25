@@ -45,8 +45,8 @@ class FiscalYearTransactionTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['sub_account_id' => $sub->id, 'type' => 'debit',  'amount' => 1000],
-            ['sub_account_id' => $sub->id, 'type' => 'credit', 'amount' => 1000],
+            ['sub_account_id' => $sub->id, 'type' => 'debit',  'net_amount' => 1000],
+            ['sub_account_id' => $sub->id, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
         $transaction = $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
@@ -73,8 +73,8 @@ class FiscalYearTransactionTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['sub_account_id' => $sub->id, 'type' => 'debit',  'amount' => 1000],
-            ['sub_account_id' => $sub->id, 'type' => 'credit', 'amount' => 900],
+            ['sub_account_id' => $sub->id, 'type' => 'debit',  'net_amount' => 1000],
+            ['sub_account_id' => $sub->id, 'type' => 'credit', 'net_amount' => 900],
         ];
 
         $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
@@ -117,8 +117,8 @@ class FiscalYearTransactionTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['sub_account_id' => $sub->id, 'type' => 'debit',  'amount' => 500],
-            ['sub_account_id' => $sub->id, 'type' => 'credit', 'amount' => 500],
+            ['sub_account_id' => $sub->id, 'type' => 'debit',  'net_amount' => 500],
+            ['sub_account_id' => $sub->id, 'type' => 'credit', 'net_amount' => 500],
         ];
 
         $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
@@ -144,8 +144,8 @@ class FiscalYearTransactionTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['sub_account_id' => null, 'type' => 'debit',  'amount' => 1000],
-            ['sub_account_id' => null, 'type' => 'credit', 'amount' => 1000],
+            ['sub_account_id' => null, 'type' => 'debit',  'net_amount' => 1000],
+            ['sub_account_id' => null, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
         $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
@@ -162,8 +162,8 @@ class FiscalYearTransactionTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['sub_account_id' => $sub->id, 'type' => 'debit',  'amount' => 1000],
-            ['sub_account_id' => $sub->id, 'type' => 'credit', 'amount' => 1000],
+            ['sub_account_id' => $sub->id, 'type' => 'debit',  'net_amount' => 1000],
+            ['sub_account_id' => $sub->id, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
         $transaction = $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
@@ -182,8 +182,8 @@ class FiscalYearTransactionTest extends TestCase
         ];
 
         $journalEntriesData = [
-            ['sub_account_id' => $sub->id, 'type' => 'debit',  'amount' => 500],
-            ['sub_account_id' => $sub->id, 'type' => 'credit', 'amount' => 500],
+            ['sub_account_id' => $sub->id, 'type' => 'debit',  'net_amount' => 500],
+            ['sub_account_id' => $sub->id, 'type' => 'credit', 'net_amount' => 500],
         ];
 
         $transaction = $fiscalYear->registerTransaction($transactionData, $journalEntriesData);

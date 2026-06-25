@@ -189,14 +189,14 @@ class RecurringTransactionPlan extends Model
                 [
                     'sub_account_id' => $this->debit_sub_account_id,
                     'type' => 'debit',
-                    'amount' => $this->amount,
+                    'net_amount' => $this->amount,
                     'tax_amount' => $this->tax_amount,
                     'tax_type' => $this->tax_type,
                 ],
                 [
                     'sub_account_id' => $this->credit_sub_account_id,
                     'type' => 'credit',
-                    'amount' => $this->amount + (int) $this->tax_amount,
+                    'net_amount' => $this->amount + (int) $this->tax_amount,
                 ],
             ],
         ];
@@ -228,10 +228,10 @@ class RecurringTransactionPlan extends Model
             return null;
         }
 
-        $debitEntry->amount = $attributes['amount'];
+        $debitEntry->net_amount = $attributes['amount'];
         $debitEntry->save();
 
-        $creditEntry->amount = $attributes['amount'];
+        $creditEntry->net_amount = $attributes['amount'];
         $creditEntry->sub_account_id = $creditSubAccountId;
         $creditEntry->save();
 

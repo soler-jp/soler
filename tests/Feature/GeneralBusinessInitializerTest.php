@@ -112,13 +112,13 @@ class GeneralBusinessInitializerTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $bankSubAccount->id,
             'type' => 'debit',
-            'amount' => 30000,
+            'net_amount' => 30000,
         ]);
 
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $equitySubAccount->id,
             'type' => 'credit',
-            'amount' => 30000,
+            'net_amount' => 30000,
         ]);
 
         //メインバンクのサブアカウントが作成されていることを確認
@@ -141,7 +141,7 @@ class GeneralBusinessInitializerTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $subAccount->id,
             'type' => 'debit',
-            'amount' => 30000,
+            'net_amount' => 30000,
         ]);
     }
 

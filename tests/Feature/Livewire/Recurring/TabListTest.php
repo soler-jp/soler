@@ -77,10 +77,10 @@ class TabListTest extends TestCase
         $orgCredit = $tx->journalEntries->where('type', 'credit')->first();
 
         $this->assertTrue($tx->is_planned);
-        $this->assertEquals(1100, $orgDebit->amount);
+        $this->assertEquals(1100, $orgDebit->net_amount);
         $this->assertEquals(0, $orgDebit->tax_amount);
         $this->assertEquals($orgDebit->sub_account_id, $debitSubAccount->id);
-        $this->assertEquals(1100, $orgCredit->amount);
+        $this->assertEquals(1100, $orgCredit->net_amount);
         $this->assertEquals(0, $orgCredit->tax_amount);
         $this->assertEquals($orgCredit->sub_account_id, $creditSubAccount->id);
 
@@ -110,7 +110,7 @@ class TabListTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'transaction_id' => $tx->id,
             'type' => 'debit',
-            'amount' => 1400,
+            'net_amount' => 1400,
             'tax_amount' => 0,
             'sub_account_id' => $debitSubAccount->id,
         ]);
@@ -118,7 +118,7 @@ class TabListTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'transaction_id' => $tx->id,
             'type' => 'credit',
-            'amount' => 1400,
+            'net_amount' => 1400,
             'tax_amount' => 0,
             'sub_account_id' => $newCreditSubAccount->id,
         ]);
@@ -172,7 +172,7 @@ class TabListTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'transaction_id' => $otherTx->id,
             'type' => 'credit',
-            'amount' => 1100,
+            'net_amount' => 1100,
             'sub_account_id' => $otherCredit->id,
         ]);
     }
@@ -226,7 +226,7 @@ class TabListTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'transaction_id' => $tx->id,
             'type' => 'credit',
-            'amount' => 1100,
+            'net_amount' => 1100,
             'sub_account_id' => $creditSubAccount->id,
         ]);
     }

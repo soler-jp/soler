@@ -39,12 +39,12 @@ class GeneralLedgerServiceTest extends TestCase
                 [
                     'sub_account_id' => $debitSubAccount->id,
                     'type' => 'debit',
-                    'amount' => 100000,
+                    'net_amount' => 100000,
                 ],
                 [
                     'sub_account_id' => $creditSubAccount->id,
                     'type' => 'credit',
-                    'amount' => 100000,
+                    'net_amount' => 100000,
                 ],
             ]
         );
@@ -87,12 +87,12 @@ class GeneralLedgerServiceTest extends TestCase
                 [
                     'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
-                    'amount' => 100000,
+                    'net_amount' => 100000,
                 ],
                 [
                     'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'credit',
-                    'amount' => 100000,
+                    'net_amount' => 100000,
                 ],
             ]
         );
@@ -108,12 +108,12 @@ class GeneralLedgerServiceTest extends TestCase
                 [
                     'sub_account_id' => $cashSubAccount->id,
                     'type' => 'credit',
-                    'amount' => 30000,
+                    'net_amount' => 30000,
                 ],
                 [
                     'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'debit',
-                    'amount' => 30000,
+                    'net_amount' => 30000,
                 ],
             ]
         );
@@ -129,12 +129,12 @@ class GeneralLedgerServiceTest extends TestCase
                 [
                     'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
-                    'amount' => 50000,
+                    'net_amount' => 50000,
                 ],
                 [
                     'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'credit',
-                    'amount' => 50000,
+                    'net_amount' => 50000,
                 ],
             ]
         );
@@ -189,12 +189,12 @@ class GeneralLedgerServiceTest extends TestCase
                 [
                     'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
-                    'amount' => 50000,
+                    'net_amount' => 50000,
                 ],
                 [
                     'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'credit',
-                    'amount' => 50000,
+                    'net_amount' => 50000,
                 ],
             ]
         );
@@ -210,12 +210,12 @@ class GeneralLedgerServiceTest extends TestCase
                 [
                     'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
-                    'amount' => 80000,
+                    'net_amount' => 80000,
                 ],
                 [
                     'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'credit',
-                    'amount' => 80000,
+                    'net_amount' => 80000,
                 ],
             ]
         );
@@ -265,12 +265,12 @@ class GeneralLedgerServiceTest extends TestCase
                 [
                     'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
-                    'amount' => 10000,
+                    'net_amount' => 10000,
                 ],
                 [
                     'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'credit',
-                    'amount' => 10000,
+                    'net_amount' => 10000,
                 ],
             ]
         );
@@ -286,12 +286,12 @@ class GeneralLedgerServiceTest extends TestCase
                 [
                     'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
-                    'amount' => 50000,
+                    'net_amount' => 50000,
                 ],
                 [
                     'sub_account_id' => $ownerSubAccount->id,
                     'type' => 'credit',
-                    'amount' => 50000,
+                    'net_amount' => 50000,
                 ],
             ]
         );
@@ -356,12 +356,12 @@ class GeneralLedgerServiceTest extends TestCase
                 [
                     'sub_account_id' => $subAccountA->id,
                     'type' => 'debit',
-                    'amount' => 10000,
+                    'net_amount' => 10000,
                 ],
                 [
                     'sub_account_id' => $otherSubAccount->id,
                     'type' => 'credit',
-                    'amount' => 10000,
+                    'net_amount' => 10000,
                 ],
             ]
         );
@@ -377,12 +377,12 @@ class GeneralLedgerServiceTest extends TestCase
                 [
                     'sub_account_id' => $subAccountB->id,
                     'type' => 'debit',
-                    'amount' => 5000,
+                    'net_amount' => 5000,
                 ],
                 [
                     'sub_account_id' => $otherSubAccount->id,
                     'type' => 'credit',
-                    'amount' => 5000,
+                    'net_amount' => 5000,
                 ],
             ]
         );
@@ -426,12 +426,12 @@ class GeneralLedgerServiceTest extends TestCase
                 [
                     'sub_account_id' => $cashSubAccount->id,
                     'type' => 'debit',
-                    'amount' => 30000,
+                    'net_amount' => 30000,
                 ],
                 [
                     'sub_account_id' => $otherSubAccount->id,
                     'type' => 'credit',
-                    'amount' => 30000,
+                    'net_amount' => 30000,
                 ],
             ]
         );
@@ -447,12 +447,12 @@ class GeneralLedgerServiceTest extends TestCase
                 [
                     'sub_account_id' => $cashSubAccount->id,
                     'type' => 'credit',
-                    'amount' => 10000,
+                    'net_amount' => 10000,
                 ],
                 [
                     'sub_account_id' => $otherSubAccount->id,
                     'type' => 'debit',
-                    'amount' => 10000,
+                    'net_amount' => 10000,
                 ],
             ]
         );

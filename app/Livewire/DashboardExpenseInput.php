@@ -61,12 +61,12 @@ class DashboardExpenseInput extends Component
                 [
                     'sub_account_id' => $this->debit_sub_account_id,
                     'type' => 'debit',
-                    'amount' => $this->amount,
+                    'net_amount' => $this->amount,
                 ],
                 [
                     'sub_account_id' => $this->credit_sub_account_id,
                     'type' => 'credit',
-                    'amount' => $this->amount,
+                    'net_amount' => $this->amount,
                 ],
             ]);
 

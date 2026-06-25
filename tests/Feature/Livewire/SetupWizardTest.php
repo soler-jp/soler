@@ -318,7 +318,7 @@ class SetupWizardTest extends TestCase
         $cashSubAccount = $bu->getSubAccountByName('現金', 'レジ現金');
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $cashSubAccount->id,
-            'amount' => 5000, // レジ現金5000
+            'net_amount' => 5000, // レジ現金5000
         ]);
     }
 
@@ -389,7 +389,7 @@ class SetupWizardTest extends TestCase
         $inventorySubAccount = $bu->getSubAccountByName('棚卸資産', '棚卸資産');
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $inventorySubAccount->id,
-            'amount' => 100000, // 棚卸資産100000
+            'net_amount' => 100000, // 棚卸資産100000
         ]);
     }
 }
