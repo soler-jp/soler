@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\FiscalYearSummaryCalculator;
 use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -61,44 +62,7 @@ class FiscalYear extends Model
 
     public function calculateSummary(): array
     {
-        // 実績（is_planned = false）
-        $actualIncome = $this->journalEntries()
-            ->whereHas('transaction', fn ($q) => $q->where('is_planned', false))
-            ->whereHas('subAccount.account', fn ($q) => $q->where('type', 'revenue'))
-            ->where('type', 'credit')
-            ->sum(\DB::raw('net_amount + COALESCE(tax_amount, 0)'));
-
-        $actualExpense = $this->journalEntries()
-            ->whereHas('transaction', fn ($q) => $q->where('is_planned', false))
-            ->whereHas('subAccount.account', fn ($q) => $q->where('type', 'expense'))
-            ->where('type', 'debit')
-            ->sum(\DB::raw('net_amount + COALESCE(tax_amount, 0)'));
-
-        // 予定（is_planned = true）
-        $plannedIncome = $this->journalEntries()
-            ->whereHas('transaction', fn ($q) => $q->where('is_planned', true))
-            ->whereHas('subAccount.account', fn ($q) => $q->where('type', 'revenue'))
-            ->where('type', 'credit')
-            ->sum(\DB::raw('net_amount + COALESCE(tax_amount, 0)'));
-
-        $plannedExpense = $this->journalEntries()
-            ->whereHas('transaction', fn ($q) => $q->where('is_planned', true))
-            ->whereHas('subAccount.account', fn ($q) => $q->where('type', 'expense'))
-            ->where('type', 'debit')
-            ->sum(\DB::raw('net_amount + COALESCE(tax_amount, 0)'));
-
-        return [
-            'actual' => [
-                'total_income' => (int) $actualIncome,
-                'total_expense' => (int) $actualExpense,
-                'profit' => (int) ($actualIncome - $actualExpense),
-            ],
-            'planned' => [
-                'total_income' => (int) $plannedIncome,
-                'total_expense' => (int) $plannedExpense,
-                'profit' => (int) ($plannedIncome - $plannedExpense),
-            ],
-        ];
+        return app(FiscalYearSummaryCalculator::class)->calculate($this);
     }
 
     public function registerOpeningEntry(array $entries): ?Transaction
