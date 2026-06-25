@@ -17,3 +17,9 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+/.agents
+/.claude
+/.codex
+/.github
+boost.json
+.mcp.json
