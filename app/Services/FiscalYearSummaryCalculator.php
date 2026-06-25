@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\FiscalYear;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 
 class FiscalYearSummaryCalculator
 {
@@ -16,10 +15,12 @@ class FiscalYearSummaryCalculator
      */
     public function calculate(FiscalYear $fiscalYear): array
     {
-        $actualIncome = $this->sumBy($fiscalYear, false, 'revenue', 'credit');
-        $actualExpense = $this->sumBy($fiscalYear, false, 'expense', 'debit');
-        $plannedIncome = $this->sumBy($fiscalYear, true, 'revenue', 'credit');
-        $plannedExpense = $this->sumBy($fiscalYear, true, 'expense', 'debit');
+        $amountSummary = $this->calculateAmountSummary($fiscalYear);
+
+        $actualIncome = $amountSummary['actual']['sales']['gross_amount'];
+        $actualExpense = $amountSummary['actual']['expenses']['gross_amount'];
+        $plannedIncome = $amountSummary['planned']['sales']['gross_amount'];
+        $plannedExpense = $amountSummary['planned']['expenses']['gross_amount'];
 
         return [
             'actual' => [
@@ -35,16 +36,54 @@ class FiscalYearSummaryCalculator
         ];
     }
 
-    private function sumBy(
+    /**
+     * @return array{
+     *     actual: array{
+     *         sales: array{net_amount: int, tax_amount: int, gross_amount: int},
+     *         expenses: array{net_amount: int, tax_amount: int, gross_amount: int}
+     *     },
+     *     planned: array{
+     *         sales: array{net_amount: int, tax_amount: int, gross_amount: int},
+     *         expenses: array{net_amount: int, tax_amount: int, gross_amount: int}
+     *     }
+     * }
+     */
+    public function calculateAmountSummary(FiscalYear $fiscalYear): array
+    {
+        return [
+            'actual' => [
+                'sales' => $this->totalsBy($fiscalYear, false, 'revenue', 'credit'),
+                'expenses' => $this->totalsBy($fiscalYear, false, 'expense', 'debit'),
+            ],
+            'planned' => [
+                'sales' => $this->totalsBy($fiscalYear, true, 'revenue', 'credit'),
+                'expenses' => $this->totalsBy($fiscalYear, true, 'expense', 'debit'),
+            ],
+        ];
+    }
+
+    /**
+     * @return array{net_amount: int, tax_amount: int, gross_amount: int}
+     */
+    private function totalsBy(
         FiscalYear $fiscalYear,
         bool $isPlanned,
         string $accountType,
         string $entryType
-    ): int {
-        return (int) $fiscalYear->journalEntries()
+    ): array {
+        $totals = $fiscalYear->journalEntries()
             ->whereHas('transaction', fn (Builder $query) => $query->where('is_planned', $isPlanned))
             ->whereHas('subAccount.account', fn (Builder $query) => $query->where('type', $accountType))
             ->where('type', $entryType)
-            ->sum(DB::raw('net_amount + COALESCE(tax_amount, 0)'));
+            ->selectRaw('COALESCE(SUM(net_amount), 0) as summary_net_amount')
+            ->selectRaw('COALESCE(SUM(tax_amount), 0) as summary_tax_amount')
+            ->selectRaw('COALESCE(SUM(net_amount + COALESCE(tax_amount, 0)), 0) as summary_gross_amount')
+            ->first();
+
+        return [
+            'net_amount' => (int) ($totals?->summary_net_amount ?? 0),
+            'tax_amount' => (int) ($totals?->summary_tax_amount ?? 0),
+            'gross_amount' => (int) ($totals?->summary_gross_amount ?? 0),
+        ];
     }
 }

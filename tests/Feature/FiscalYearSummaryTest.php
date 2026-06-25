@@ -285,4 +285,190 @@ class FiscalYearSummaryTest extends TestCase
         $this->assertSame(3000, $summary['planned']['total_expense']);
         $this->assertSame(17000, $summary['planned']['profit']);
     }
+
+    #[Test]
+    public function 複数の実績売上実績経費予定売上予定経費を合算してnet_tax_grossを集計できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '金額集計テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
+        $expense = $this->subAccountByTypeOrName($unit, 'expense');
+        $asset = $this->subAccountByTypeOrName($unit, 'asset');
+        $liability = $this->subAccountByTypeOrName($unit, 'liability');
+
+        $registrar = new TransactionRegistrar;
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '実績売上1',
+        ], [
+            [
+                'sub_account_id' => $revenue->id,
+                'type' => 'credit',
+                'net_amount' => 10000,
+                'tax_amount' => 1000,
+                'tax_type' => 'taxable_sales_10',
+            ],
+            [
+                'sub_account_id' => $asset->id,
+                'type' => 'debit',
+                'net_amount' => 11000,
+            ],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-04-03',
+            'description' => '実績売上2',
+        ], [
+            [
+                'sub_account_id' => $revenue->id,
+                'type' => 'credit',
+                'net_amount' => 5000,
+                'tax_amount' => 500,
+                'tax_type' => 'taxable_sales_10',
+            ],
+            [
+                'sub_account_id' => $asset->id,
+                'type' => 'debit',
+                'net_amount' => 5500,
+            ],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-04-02',
+            'description' => '実績経費1',
+        ], [
+            [
+                'sub_account_id' => $expense->id,
+                'type' => 'debit',
+                'net_amount' => 6000,
+                'tax_amount' => 600,
+                'tax_type' => 'taxable_purchases_10',
+            ],
+            [
+                'sub_account_id' => $liability->id,
+                'type' => 'credit',
+                'net_amount' => 6600,
+            ],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-04-04',
+            'description' => '実績経費2',
+        ], [
+            [
+                'sub_account_id' => $expense->id,
+                'type' => 'debit',
+                'net_amount' => 2000,
+                'tax_amount' => 200,
+                'tax_type' => 'taxable_purchases_10',
+            ],
+            [
+                'sub_account_id' => $liability->id,
+                'type' => 'credit',
+                'net_amount' => 2200,
+            ],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-05-01',
+            'description' => '予定売上1',
+            'is_planned' => true,
+        ], [
+            [
+                'sub_account_id' => $revenue->id,
+                'type' => 'credit',
+                'net_amount' => 20000,
+                'tax_amount' => 2000,
+                'tax_type' => 'taxable_sales_10',
+            ],
+            [
+                'sub_account_id' => $asset->id,
+                'type' => 'debit',
+                'net_amount' => 22000,
+            ],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-05-03',
+            'description' => '予定売上2',
+            'is_planned' => true,
+        ], [
+            [
+                'sub_account_id' => $revenue->id,
+                'type' => 'credit',
+                'net_amount' => 4000,
+                'tax_amount' => 400,
+                'tax_type' => 'taxable_sales_10',
+            ],
+            [
+                'sub_account_id' => $asset->id,
+                'type' => 'debit',
+                'net_amount' => 4400,
+            ],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-05-02',
+            'description' => '予定経費1',
+            'is_planned' => true,
+        ], [
+            [
+                'sub_account_id' => $expense->id,
+                'type' => 'debit',
+                'net_amount' => 3000,
+                'tax_amount' => 300,
+                'tax_type' => 'taxable_purchases_10',
+            ],
+            [
+                'sub_account_id' => $liability->id,
+                'type' => 'credit',
+                'net_amount' => 3300,
+            ],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-05-04',
+            'description' => '予定経費2',
+            'is_planned' => true,
+        ], [
+            [
+                'sub_account_id' => $expense->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+                'tax_amount' => 100,
+                'tax_type' => 'taxable_purchases_10',
+            ],
+            [
+                'sub_account_id' => $liability->id,
+                'type' => 'credit',
+                'net_amount' => 1100,
+            ],
+        ]);
+
+        $summary = $fiscalYear->calculateAmountSummary();
+
+        $this->assertSame([
+            'net_amount' => 15000,
+            'tax_amount' => 1500,
+            'gross_amount' => 16500,
+        ], $summary['actual']['sales']);
+        $this->assertSame([
+            'net_amount' => 8000,
+            'tax_amount' => 800,
+            'gross_amount' => 8800,
+        ], $summary['actual']['expenses']);
+        $this->assertSame([
+            'net_amount' => 24000,
+            'tax_amount' => 2400,
+            'gross_amount' => 26400,
+        ], $summary['planned']['sales']);
+        $this->assertSame([
+            'net_amount' => 4000,
+            'tax_amount' => 400,
+            'gross_amount' => 4400,
+        ], $summary['planned']['expenses']);
+    }
 }

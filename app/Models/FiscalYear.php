@@ -65,6 +65,11 @@ class FiscalYear extends Model
         return app(FiscalYearSummaryCalculator::class)->calculate($this);
     }
 
+    public function calculateAmountSummary(): array
+    {
+        return app(FiscalYearSummaryCalculator::class)->calculateAmountSummary($this);
+    }
+
     public function registerOpeningEntry(array $entries): ?Transaction
     {
         if ($entries === []) {
