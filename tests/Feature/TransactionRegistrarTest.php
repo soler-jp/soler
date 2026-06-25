@@ -1089,6 +1089,68 @@ class TransactionRegistrarTest extends TestCase
     }
 
     #[Test]
+    public function 課税仕入れ区分が貸方だとregisterで拒否される()
+    {
+        $fiscalYear = FiscalYear::factory()->create([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('仕入・経費の消費税区分は借方でのみ使用できます。');
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '課税仕入れ区分の方向エラー',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            ],
+        ]);
+    }
+
+    #[Test]
+    public function 課税売上区分が借方だとregisterで拒否される()
+    {
+        $fiscalYear = FiscalYear::factory()->create([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('売上の消費税区分は貸方でのみ使用できます。');
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '課税売上区分の方向エラー',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+    }
+
+    #[Test]
     public function 他事業体の補助科目はregisterで拒否される()
     {
         $user = User::factory()->create();

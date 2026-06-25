@@ -4,6 +4,7 @@ namespace App\Validators;
 
 use App\Models\JournalEntry;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class JournalEntryValidator
 {
@@ -22,8 +23,12 @@ class JournalEntryValidator
             $data['tax_amount'] = 0;
         }
 
-        return Validator::make($data, self::rules($requireTransactionId), [], self::attributes())
+        $validated = Validator::make($data, self::rules($requireTransactionId), [], self::attributes())
             ->validate();
+
+        self::ensureTaxTypeMatchesEntryType($validated);
+
+        return $validated;
     }
 
     /**
@@ -42,6 +47,47 @@ class JournalEntryValidator
         ], $requireTransactionId ? [
             'transaction_id' => ['required', 'exists:transactions,id'],
         ] : []);
+    }
+
+    protected static function ensureTaxTypeMatchesEntryType(array $validated): void
+    {
+        $taxType = $validated['tax_type'] ?? null;
+
+        if ($taxType === null) {
+            return;
+        }
+
+        $entryType = $validated['type'];
+
+        if (in_array($taxType, self::purchaseTaxTypes(), true) && $entryType !== JournalEntry::TYPE_DEBIT) {
+            throw ValidationException::withMessages([
+                'tax_type' => ['仕入・経費の消費税区分は借方でのみ使用できます。'],
+            ]);
+        }
+
+        if (in_array($taxType, self::salesTaxTypes(), true) && $entryType !== JournalEntry::TYPE_CREDIT) {
+            throw ValidationException::withMessages([
+                'tax_type' => ['売上の消費税区分は貸方でのみ使用できます。'],
+            ]);
+        }
+    }
+
+    protected static function purchaseTaxTypes(): array
+    {
+        return [
+            JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8,
+            JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10,
+        ];
+    }
+
+    protected static function salesTaxTypes(): array
+    {
+        return [
+            JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+            JournalEntry::TAX_TYPE_TAXABLE_SALES_8,
+            JournalEntry::TAX_TYPE_DEEMED_TAXABLE_SALES_10,
+        ];
     }
 
     /**

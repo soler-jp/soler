@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
@@ -220,6 +221,48 @@ class JournalEntryTest extends TestCase
         ];
 
         $this->expectException(ValidationException::class);
+        JournalEntryValidator::validate($data, true);
+    }
+
+    #[Test]
+    public function purchase系tax_typeが貸方だとバリデーションエラー()
+    {
+        $transaction = Transaction::factory()->create();
+        $account = Account::factory()->create();
+        $subAccount = $account->subAccounts->first();
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'sub_account_id' => $subAccount->id,
+            'type' => JournalEntry::TYPE_CREDIT,
+            'net_amount' => 1000,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+        ];
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('仕入・経費の消費税区分は借方でのみ使用できます。');
+
+        JournalEntryValidator::validate($data, true);
+    }
+
+    #[Test]
+    public function sales系tax_typeが借方だとバリデーションエラー()
+    {
+        $transaction = Transaction::factory()->create();
+        $account = Account::factory()->create();
+        $subAccount = $account->subAccounts->first();
+
+        $data = [
+            'transaction_id' => $transaction->id,
+            'sub_account_id' => $subAccount->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => 1000,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+        ];
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('売上の消費税区分は貸方でのみ使用できます。');
+
         JournalEntryValidator::validate($data, true);
     }
 
