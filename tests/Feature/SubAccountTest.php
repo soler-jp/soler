@@ -4,10 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\SubAccount;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Tests\TestCase;
-use PHPUnit\Framework\Attributes\Test;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class SubAccountTest extends TestCase
 {
@@ -23,7 +23,7 @@ class SubAccountTest extends TestCase
             'name' => '営業部',
         ]);
 
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(QueryException::class);
 
         SubAccount::create([
             'account_id' => $account->id,

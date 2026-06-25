@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\PortalController;
+use App\Http\Controllers\SetupController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome');
@@ -14,18 +17,17 @@ Route::view('profile', 'profile')
 
 Route::middleware(['auth'])->group(function () {
 
-    Route::get('/dashboard', \App\Http\Controllers\PortalController::class)->name('dashboard');
-    Route::get('/initialize', [\App\Http\Controllers\SetupController::class, 'initialize'])->name('initialize');
+    Route::get('/dashboard', PortalController::class)->name('dashboard');
+    Route::get('/initialize', [SetupController::class, 'initialize'])->name('initialize');
 
-    Route::get('/fixed-expenses', [\App\Http\Controllers\PortalController::class, 'fixedExpenses'])
+    Route::get('/fixed-expenses', [PortalController::class, 'fixedExpenses'])
         ->name('fixed-expenses');
 });
-
 
 Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->group(function () {
-        Route::get('/users',  [\App\Http\Controllers\Admin\UserController::class, 'index'])->name('admin.users');
+        Route::get('/users', [UserController::class, 'index'])->name('admin.users');
     });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

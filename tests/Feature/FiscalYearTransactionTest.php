@@ -2,14 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Models\FiscalYear;
 use App\Models\User;
+use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
-use DomainException;
 use InvalidArgumentException;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class FiscalYearTransactionTest extends TestCase
 {
@@ -190,7 +189,7 @@ class FiscalYearTransactionTest extends TestCase
 
         $this->assertCount(2, $transaction->journalEntries);
         $this->assertTrue(
-            $transaction->journalEntries->every(fn($entry) => $entry->transaction_id === $transaction->id)
+            $transaction->journalEntries->every(fn ($entry) => $entry->transaction_id === $transaction->id)
         );
     }
 }

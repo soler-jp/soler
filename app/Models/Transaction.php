@@ -2,17 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Models\FiscalYear;
-use App\Models\RecurringTransactionPlan;
 
 class Transaction extends Model
 {
-
     use HasFactory;
 
     protected $fillable = [
@@ -69,6 +66,7 @@ class Transaction extends Model
     {
         $year = $this->fiscalYear->year ?? '----';
         $number = str_pad($this->entry_number ?? 0, 4, '0', STR_PAD_LEFT);
+
         return "{$year}-{$number}";
     }
 
@@ -78,7 +76,7 @@ class Transaction extends Model
     protected static function booted(): void
     {
         static::creating(function (Transaction $transaction) {
-            if (!$transaction->fiscal_year_id) {
+            if (! $transaction->fiscal_year_id) {
                 throw new \Exception('fiscal_year_id は必須です');
             }
 
@@ -101,7 +99,7 @@ class Transaction extends Model
     {
         return $this->journalEntries
             ->where('type', 'credit')
-            ->map(fn($entry) => $entry->subAccount->account->name . ' / ' . $entry->subAccount->name)
+            ->map(fn ($entry) => $entry->subAccount->account->name.' / '.$entry->subAccount->name)
             ->unique()
             ->implode(', ');
     }

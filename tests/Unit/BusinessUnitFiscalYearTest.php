@@ -3,20 +3,20 @@
 namespace Tests\Unit;
 
 use App\Models\BusinessUnit;
-use App\Models\User;
 use App\Models\FiscalYear;
+use App\Models\User;
+use App\Validators\FiscalYearValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
-use App\Validators\FiscalYearValidator;
-use Illuminate\Validation\ValidationException;
 
 class BusinessUnitFiscalYearTest extends TestCase
 {
     use RefreshDatabase;
 
     #[Test]
-    public function createFiscalYearは年だけ指定して正しく作成される()
+    public function create_fiscal_yearは年だけ指定して正しく作成される()
     {
         $user = User::factory()->create();
         $businessUnit = BusinessUnit::factory()->create(['user_id' => $user->id]);
@@ -60,9 +60,8 @@ class BusinessUnitFiscalYearTest extends TestCase
         ]);
     }
 
-
     #[Test]
-    public function 初回作成したFiscalYearは自動でis_activeになる()
+    public function 初回作成した_fiscal_yearは自動でis_activeになる()
     {
         $user = User::factory()->create();
         $businessUnit = BusinessUnit::factory()->create(['user_id' => $user->id]);
@@ -81,9 +80,8 @@ class BusinessUnitFiscalYearTest extends TestCase
         ]);
     }
 
-
     #[Test]
-    public function FiscalYear作成時に2つ目以降はis_activeがfalseで作成される()
+    public function fiscal_year作成時に2つ目以降はis_activeがfalseで作成される()
     {
         $user = User::factory()->create();
         $businessUnit = BusinessUnit::factory()->create(['user_id' => $user->id]);

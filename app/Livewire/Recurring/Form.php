@@ -2,10 +2,9 @@
 
 namespace App\Livewire\Recurring;
 
-use Livewire\Component;
-use Illuminate\Support\Collection;
 use App\Models\Account;
-use App\Models\RecurringTransactionPlan;
+use Illuminate\Support\Collection;
+use Livewire\Component;
 
 class Form extends Component
 {
@@ -24,8 +23,8 @@ class Form extends Component
     ];
 
     public Collection $expenseAccounts; // type = 'expense'
-    public Collection $creditAccounts; // name in ['現金', '普通預金', '事業主借']
 
+    public Collection $creditAccounts; // name in ['現金', '普通預金', '事業主借']
 
     public function mount()
     {
@@ -63,7 +62,6 @@ class Form extends Component
             'form.tax_amount' => ['nullable', 'integer', 'min:0'],
             'form.tax_type' => ['nullable', 'string', 'max:50'],
         ]);
-
 
         try {
             \DB::transaction(function () use ($unit, $validated) {

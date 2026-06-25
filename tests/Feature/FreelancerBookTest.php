@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\BusinessUnit;
+use App\Models\FiscalYear;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -12,9 +15,11 @@ class FreelancerBookTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected \App\Models\BusinessUnit $unit;
-    protected \App\Models\FiscalYear $fiscalYear;
-    protected \Illuminate\Support\Collection $accounts;
+    protected BusinessUnit $unit;
+
+    protected FiscalYear $fiscalYear;
+
+    protected Collection $accounts;
 
     protected function setUp(): void
     {
@@ -58,7 +63,7 @@ class FreelancerBookTest extends TestCase
     #[Test]
     public function 青色申告用の取引サンプルを8件登録できる()
     {
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $samples = [
             [
@@ -152,7 +157,7 @@ class FreelancerBookTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('仕訳の金額がバランスしていません');
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transactionData = [
             'fiscal_year_id' => $this->fiscalYear->id,

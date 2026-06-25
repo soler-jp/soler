@@ -2,13 +2,14 @@
 
 namespace Tests\Feature\Livewire;
 
-use Tests\TestCase;
-use Livewire\Livewire;
+use App\Models\Account;
+use App\Models\SubAccount;
 use App\Models\User;
 use App\Setup\Initializers\GeneralBusinessInitializer;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
-use PHPUnit\Framework\Attributes\Test;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class DashboardRevenueInputTest extends TestCase
 {
@@ -19,7 +20,7 @@ class DashboardRevenueInputTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $initializer = new GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -66,7 +67,7 @@ class DashboardRevenueInputTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -88,7 +89,7 @@ class DashboardRevenueInputTest extends TestCase
             ->set('date', '2025-04-01')
             ->set('gross_amount', '10000')
             ->set('withholding', true)
-            ->set('holding_amount', '1021') // 源泉徴収額          
+            ->set('holding_amount', '1021') // 源泉徴収額
             ->set('description', '源泉あり売上テスト')
             ->set('revenueSubAccountId', $revenueSubAccount->id)
             ->set('receiptSubAccountId', $cashSubAccount->id)
@@ -122,7 +123,7 @@ class DashboardRevenueInputTest extends TestCase
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => '自分の事業体',
             'type' => 'general',
@@ -171,7 +172,7 @@ class DashboardRevenueInputTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $unit = (new \App\Setup\Initializers\GeneralBusinessInitializer())->initialize($user, [
+        $unit = (new GeneralBusinessInitializer)->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
             'year' => 2025,
@@ -191,7 +192,6 @@ class DashboardRevenueInputTest extends TestCase
             ->assertSet('revenueSubAccountId', $revenueSubAccount->id)
             ->assertSet('withheldTaxSubAccountId', $withheldSubAccount->id);
     }
-
 
     #[Test]
     public function 入力が不正な場合はバリデーションエラーになる()
@@ -222,7 +222,7 @@ class DashboardRevenueInputTest extends TestCase
     }
 
     #[Test]
-    public function 入金先としてsubAccountが表示される()
+    public function 入金先としてsub_accountが表示される()
     {
         $user = User::factory()->create();
 
@@ -251,16 +251,16 @@ class DashboardRevenueInputTest extends TestCase
         $groups = $component->instance()->receiptGroups;
 
         // 現金（SubAccountなし → Accountで表示）
-        $this->assertContainsOnlyInstancesOf(\App\Models\SubAccount::class, $groups['cash']);
-        $this->assertTrue(collect($groups['cash'])->contains(fn($c) => $c->id === $cashSubAccount->id));
+        $this->assertContainsOnlyInstancesOf(SubAccount::class, $groups['cash']);
+        $this->assertTrue(collect($groups['cash'])->contains(fn ($c) => $c->id === $cashSubAccount->id));
 
         // その他の預金（SubAccountが2つ → SubAccountで表示）
-        $this->assertContainsOnlyInstancesOf(\App\Models\SubAccount::class, $groups['bank']);
-        $this->assertTrue(collect($groups['bank'])->contains(fn($c) => $c->id === $bankSubAccount_1->id));
-        $this->assertTrue(collect($groups['bank'])->contains(fn($c) => $c->id === $bankSubAccount_2->id));
+        $this->assertContainsOnlyInstancesOf(SubAccount::class, $groups['bank']);
+        $this->assertTrue(collect($groups['bank'])->contains(fn ($c) => $c->id === $bankSubAccount_1->id));
+        $this->assertTrue(collect($groups['bank'])->contains(fn ($c) => $c->id === $bankSubAccount_2->id));
 
         // 銀行本体は含まれない
-        $this->assertFalse(collect($groups['bank'])->contains(fn($c) => $c instanceof \App\Models\Account && $c->id === $bankAccount->id));
+        $this->assertFalse(collect($groups['bank'])->contains(fn ($c) => $c instanceof Account && $c->id === $bankAccount->id));
     }
 
     #[Test]
@@ -280,8 +280,6 @@ class DashboardRevenueInputTest extends TestCase
             ->set('withholding', true)
             ->assertSee('源泉徴収額');
     }
-
-
 
     #[Test]
     public function 必須入力が不足していると全てのバリデーションエラーが表示される()
@@ -308,7 +306,6 @@ class DashboardRevenueInputTest extends TestCase
                 'revenueSubAccountId' => ['required'],
             ]);
     }
-
 
     #[Test]
     public function 現金勘定に入金された売上が登録できる()
@@ -355,7 +352,7 @@ class DashboardRevenueInputTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -398,7 +395,7 @@ class DashboardRevenueInputTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',

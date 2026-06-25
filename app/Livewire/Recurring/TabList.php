@@ -2,15 +2,16 @@
 
 namespace App\Livewire\Recurring;
 
-use App\Models\RecurringTransactionPlan;
 use Illuminate\Support\Facades\Auth;
-use Livewire\Component;
 use Illuminate\Validation\ValidationException;
+use Livewire\Component;
 
 class TabList extends Component
 {
     public ?int $selectedPlanId = null;
+
     public array $inputs = [];
+
     public $creditAccounts;
 
     public function mount()
@@ -50,7 +51,7 @@ class TabList extends Component
             })
             ->first();
 
-        if (!$plan) {
+        if (! $plan) {
             return;
         }
 
@@ -66,7 +67,7 @@ class TabList extends Component
             return;
         }
 
-        if (!$transaction) {
+        if (! $transaction) {
             return;
         }
 
@@ -91,10 +92,10 @@ class TabList extends Component
 
         $transactions = $selectedPlan
             ? $selectedPlan->transactions()
-            ->with('journalEntries')
-            ->whereBetween('date', [$fiscalYear->start_date, $fiscalYear->end_date])
-            ->orderBy('date')
-            ->get()
+                ->with('journalEntries')
+                ->whereBetween('date', [$fiscalYear->start_date, $fiscalYear->end_date])
+                ->orderBy('date')
+                ->get()
             : collect();
 
         foreach ($transactions as $tx) {

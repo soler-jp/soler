@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Validators\TransactionValidator;
-use PHPUnit\Framework\Attributes\Test;
 use App\Models\FiscalYear;
+use App\Validators\TransactionValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class TransactionValidatorTest extends TestCase
 {

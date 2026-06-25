@@ -2,17 +2,17 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class UserTest extends TestCase
 {
     use RefreshDatabase;
 
     #[Test]
-    public function selectedBusinessUnitを取得できる()
+    public function selected_business_unitを取得できる()
     {
         $user = User::factory()->create();
         $unit1 = $user->createBusinessUnitWithDefaults(['name' => '事業体A']);
@@ -27,7 +27,7 @@ class UserTest extends TestCase
     }
 
     #[Test]
-    public function createBusinessUnitWithDefaultsでCurrentBusinessUnitが設定される()
+    public function create_business_unit_with_defaultsで_current_business_unitが設定される()
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '新規事業体']);
@@ -37,7 +37,7 @@ class UserTest extends TestCase
     }
 
     #[Test]
-    public function currentBusinessUnitが未設定の場合はnullを返す()
+    public function current_business_unitが未設定の場合はnullを返す()
     {
         $user = User::factory()->create([
             'current_business_unit_id' => null,
@@ -47,7 +47,7 @@ class UserTest extends TestCase
     }
 
     #[Test]
-    public function currentBusinessUnitが削除されたらnullになる()
+    public function current_business_unitが削除されたらnullになる()
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '削除予定']);
@@ -60,9 +60,8 @@ class UserTest extends TestCase
         $this->assertNull($user->selectedBusinessUnit);
     }
 
-
     #[Test]
-    public function setSelectedBusinessUnitで選択できる()
+    public function set_selected_business_unitで選択できる()
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '設定対象']);

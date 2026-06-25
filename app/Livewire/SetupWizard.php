@@ -2,22 +2,31 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
 use App\Setup\Initializers\GeneralBusinessInitializer;
+use Livewire\Component;
 
 class SetupWizard extends Component
 {
     public int $step = 1;
 
     public string $name = '一般事業所';
+
     public string $business_type = 'general';
+
     public bool $is_taxable = false;
+
     public bool $is_tax_exclusive = false;
-    public int|null $year = null;
+
+    public ?int $year = null;
+
     public array $cash_accounts = [];
+
     public array $bank_accounts = [];
+
     public array $other_assets = [];
+
     public string $submitError = '';
+
     public array $revenue_sub_accounts = [];
 
     protected function rulesPerStep(): array
@@ -60,7 +69,6 @@ class SetupWizard extends Component
         $this->step++;
     }
 
-
     public function submit()
     {
         $allRules = collect($this->rulesPerStep())->collapse()->all();
@@ -70,7 +78,6 @@ class SetupWizard extends Component
             $this->submitError = '現時点では免税事業者・税込経理のみ対応しています。';
             throw new \InvalidArgumentException($this->submitError);
         }
-
 
         $opening_entries = [];
 
@@ -84,7 +91,6 @@ class SetupWizard extends Component
                 ];
             }
         }
-
 
         foreach ($this->bank_accounts as $bankAccount) {
             $opening_entries[] = [
@@ -106,7 +112,7 @@ class SetupWizard extends Component
 
         $revenue_sub_accounts = [];
         foreach ($this->revenue_sub_accounts as $subAccount) {
-            if (!$subAccount['is_locked'] && $subAccount['name']) {
+            if (! $subAccount['is_locked'] && $subAccount['name']) {
                 $revenue_sub_accounts[] = [
                     'name' => $subAccount['name'],
                 ];
@@ -124,7 +130,7 @@ class SetupWizard extends Component
         ];
 
         try {
-            $initializer = new GeneralBusinessInitializer();
+            $initializer = new GeneralBusinessInitializer;
             $initializer->initialize(auth()->user(), $inputs);
 
             return $this->redirect(route('dashboard'));
@@ -194,10 +200,9 @@ class SetupWizard extends Component
         $this->revenue_sub_accounts = array_values($this->revenue_sub_accounts);
     }
 
-
     public function mount()
     {
-        $this->year = (int)  date('Y');
+        $this->year = (int) date('Y');
 
         $bu = auth()->user()->selectedBusinessUnit;
 

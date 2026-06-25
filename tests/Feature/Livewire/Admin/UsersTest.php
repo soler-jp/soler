@@ -2,18 +2,15 @@
 
 namespace Tests\Feature\Livewire\Admin;
 
-use App\Livewire\Admin\Users;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
-use Livewire\Livewire;
-use Tests\TestCase;
 use App\Models\User;
-use PHPUnit\Framework\Attributes\Test;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class UsersTest extends TestCase
 {
-
     use RefreshDatabase;
 
     #[Test]
@@ -33,7 +30,6 @@ class UsersTest extends TestCase
             ->assertSee('ユーザーA')
             ->assertSee('ユーザーB');
     }
-
 
     #[Test]
     public function 管理者はユーザーを登録できる()

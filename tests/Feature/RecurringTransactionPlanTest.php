@@ -2,12 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\RecurringTransactionPlan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
-use App\Models\RecurringTransactionPlan;
-use Illuminate\Validation\ValidationException;
 
 class RecurringTransactionPlanTest extends TestCase
 {
@@ -47,7 +47,6 @@ class RecurringTransactionPlanTest extends TestCase
         $this->assertDatabaseHas('recurring_transaction_plans', $data);
     }
 
-
     #[Test]
     public function 必須項目がなければ保存に失敗する()
     {
@@ -61,7 +60,6 @@ class RecurringTransactionPlanTest extends TestCase
         $unit->createRecurringTransactionPlan([]);
     }
 
-
     #[Test]
     public function is_incomeとis_activeはbooleanとしてキャストされる()
     {
@@ -71,7 +69,7 @@ class RecurringTransactionPlanTest extends TestCase
         ]);
 
         $subAccount = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
         $plan = $unit->createRecurringTransactionPlan([
@@ -89,7 +87,7 @@ class RecurringTransactionPlanTest extends TestCase
     }
 
     #[Test]
-    public function businessUnitとのリレーションが正しく動作する()
+    public function business_unitとのリレーションが正しく動作する()
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults([
@@ -97,7 +95,7 @@ class RecurringTransactionPlanTest extends TestCase
         ]);
 
         $subAccount = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
         $plan = $unit->createRecurringTransactionPlan([
@@ -121,14 +119,14 @@ class RecurringTransactionPlanTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
 
         $debit = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))
+            ->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))
             ->firstOrFail();
 
         $credit = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
-        $validated = \App\Models\RecurringTransactionPlan::validate([
+        $validated = RecurringTransactionPlan::validate([
             'name' => '水道代',
             'interval' => 'monthly',
             'day_of_month' => 10,
@@ -160,7 +158,7 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
         $subAccount = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
         RecurringTransactionPlan::validate([
@@ -183,7 +181,7 @@ class RecurringTransactionPlanTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
 
         $subAccount = $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
         $unit->createRecurringTransactionPlan([
@@ -220,11 +218,11 @@ class RecurringTransactionPlanTest extends TestCase
         $unit2 = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業2']);
 
         $sub1 = $unit1->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
         $sub2 = $unit2->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
         $plan1 = $unit1->createRecurringTransactionPlan([
@@ -253,7 +251,6 @@ class RecurringTransactionPlanTest extends TestCase
         $this->assertNotNull($plan2);
     }
 
-
     #[Test]
     public function tax付きのmonthlyプランで1年分の予定取引が生成される()
     {
@@ -261,8 +258,8 @@ class RecurringTransactionPlanTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業'])->refresh();
         $fiscalYear = $unit->createFiscalYear(2025)->refresh();
 
-        $debitSub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
-        $creditSub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))->first();
+        $debitSub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
+        $creditSub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'business_unit_id' => $unit->id,
@@ -280,14 +277,14 @@ class RecurringTransactionPlanTest extends TestCase
         $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
 
         $this->assertCount(12, $transactions);
-        $this->assertTrue($transactions->every(fn($t) => $t->is_planned));
+        $this->assertTrue($transactions->every(fn ($t) => $t->is_planned));
 
         foreach ($transactions as $transaction) {
             $entries = $transaction->journalEntries;
 
             $this->assertEquals(2, $entries->count());
-            $this->assertTrue($entries->contains(fn($e) => $e->tax_amount === 1000));
-            $this->assertTrue($entries->contains(fn($e) => $e->tax_type === 'taxable_purchases_10'));
+            $this->assertTrue($entries->contains(fn ($e) => $e->tax_amount === 1000));
+            $this->assertTrue($entries->contains(fn ($e) => $e->tax_type === 'taxable_purchases_10'));
         }
     }
 
@@ -298,7 +295,7 @@ class RecurringTransactionPlanTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => '末日テスト事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
+        $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => '末日補正プラン',
@@ -329,7 +326,7 @@ class RecurringTransactionPlanTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => '隔月プラン事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
+        $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => '隔月プラン',
@@ -346,7 +343,7 @@ class RecurringTransactionPlanTest extends TestCase
 
         $this->assertCount(6, $transactions);
 
-        $dates = $transactions->pluck('date')->sort()->values()->map(fn($d) => $d->toDateString());
+        $dates = $transactions->pluck('date')->sort()->values()->map(fn ($d) => $d->toDateString());
 
         $this->assertEquals([
             '2025-01-15',
@@ -365,7 +362,7 @@ class RecurringTransactionPlanTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => '年一プラン事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
+        $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => '年1プラン',
@@ -383,13 +380,12 @@ class RecurringTransactionPlanTest extends TestCase
 
         $this->assertCount(1, $transactions);
 
-        $dates = $transactions->pluck('date')->sort()->values()->map(fn($d) => $d->toDateString());
+        $dates = $transactions->pluck('date')->sort()->values()->map(fn ($d) => $d->toDateString());
 
         $this->assertEquals([
             '2025-06-15',
         ], $dates->toArray());
     }
-
 
     #[Test]
     public function is_activeがfalseのプランでは予定取引が作成されない()
@@ -397,7 +393,7 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '非アクティブ事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
-        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
+        $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => '非アクティブプラン',
@@ -422,7 +418,7 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'リンクテスト事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
-        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
+        $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => 'リンク付きプラン',
@@ -451,7 +447,7 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '重複防止テスト事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
-        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
+        $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
             'name' => '重複チェックプラン',
@@ -488,7 +484,7 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '同日許可テスト']);
         $fiscalYear = $unit->createFiscalYear(2025);
-        $sub = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '水道光熱費'))->first();
+        $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan1 = $unit->createRecurringTransactionPlan([
             'name' => 'プランA',
@@ -521,8 +517,8 @@ class RecurringTransactionPlanTest extends TestCase
         $this->assertCount(12, $transactions2);
 
         // 各取引に適切な plan_id が設定されていること
-        $this->assertTrue($transactions1->every(fn($t) => $t->recurring_transaction_plan_id === $plan1->id));
-        $this->assertTrue($transactions2->every(fn($t) => $t->recurring_transaction_plan_id === $plan2->id));
+        $this->assertTrue($transactions1->every(fn ($t) => $t->recurring_transaction_plan_id === $plan1->id));
+        $this->assertTrue($transactions2->every(fn ($t) => $t->recurring_transaction_plan_id === $plan2->id));
 
         // 合計24件生成されていること
         $this->assertEquals(
@@ -558,7 +554,7 @@ class RecurringTransactionPlanTest extends TestCase
 
         // 奇数月にのみ取引が生成されることを確認
         $this->assertCount(6, $transactions);
-        $dates = $transactions->pluck('date')->sort()->values()->map(fn($d) => $d->toDateString());
+        $dates = $transactions->pluck('date')->sort()->values()->map(fn ($d) => $d->toDateString());
 
         $this->assertEquals([
             '2025-01-15',
@@ -594,7 +590,7 @@ class RecurringTransactionPlanTest extends TestCase
 
         // 偶数月にのみ取引が生成されることを確認
         $this->assertCount(6, $transactions);
-        $dates = $transactions->pluck('date')->sort()->values()->map(fn($d) => $d->toDateString());
+        $dates = $transactions->pluck('date')->sort()->values()->map(fn ($d) => $d->toDateString());
 
         $this->assertEquals([
             '2025-02-15',
@@ -630,7 +626,7 @@ class RecurringTransactionPlanTest extends TestCase
 
         // 奇数月にのみ取引が生成されることを確認
         $this->assertCount(6, $transactions);
-        $dates = $transactions->pluck('date')->sort()->values()->map(fn($d) => $d->toDateString());
+        $dates = $transactions->pluck('date')->sort()->values()->map(fn ($d) => $d->toDateString());
 
         $this->assertEquals([
             '2025-01-15',

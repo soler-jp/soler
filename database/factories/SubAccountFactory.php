@@ -2,10 +2,12 @@
 
 namespace Database\Factories;
 
+use App\Models\Account;
+use App\Models\SubAccount;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\SubAccount>
+ * @extends Factory<SubAccount>
  */
 class SubAccountFactory extends Factory
 {
@@ -17,9 +19,9 @@ class SubAccountFactory extends Factory
     public function definition(): array
     {
         return [
-            'account_id' => \App\Models\Account::factory(),
+            'account_id' => Account::factory(),
             'name' => $this->faker->word,
         ];
     }
 }
-// 
+//

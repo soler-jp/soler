@@ -4,12 +4,10 @@ namespace Tests\Feature\Livewire\Recurring;
 
 use App\Livewire\Recurring\TabList;
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
-use App\Models\Transaction;
+use Tests\TestCase;
 
 class TabListTest extends TestCase
 {
@@ -83,7 +81,6 @@ class TabListTest extends TestCase
         $this->assertEquals(1100, $orgCredit->net_amount);
         $this->assertEquals(0, $orgCredit->tax_amount);
         $this->assertEquals($orgCredit->sub_account_id, $creditSubAccount->id);
-
 
         $newCreditSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 

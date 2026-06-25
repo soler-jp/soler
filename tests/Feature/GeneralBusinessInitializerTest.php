@@ -1,18 +1,18 @@
 <?php
 
+use App\Models\SubAccount;
 use App\Models\User;
 use App\Setup\Initializers\GeneralBusinessInitializer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Models\SubAccount;
 
 class GeneralBusinessInitializerTest extends TestCase
 {
     use RefreshDatabase;
 
     #[Test]
-    public function BusinessUnitが作成される()
+    public function business_unitが作成される()
     {
         $user = User::factory()->create();
 
@@ -28,7 +28,7 @@ class GeneralBusinessInitializerTest extends TestCase
             'recurring_templates' => [],
         ];
 
-        $initializer = new GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, $inputs);
 
         $this->assertDatabaseHas('business_units', [
@@ -55,7 +55,7 @@ class GeneralBusinessInitializerTest extends TestCase
             'recurring_templates' => [],
         ];
 
-        $initializer = new GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, $inputs);
 
         $this->assertDatabaseHas('fiscal_years', [
@@ -85,10 +85,10 @@ class GeneralBusinessInitializerTest extends TestCase
                     'sub_account_name' => 'メインバンク',
                     'amount' => 30000,
                 ],
-            ]
+            ],
         ];
 
-        $initializer = new GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, $inputs);
 
         $fiscalYear = $unit->currentFiscalYear;
@@ -108,7 +108,6 @@ class GeneralBusinessInitializerTest extends TestCase
             })
             ->first();
 
-
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $bankSubAccount->id,
             'type' => 'debit',
@@ -121,7 +120,7 @@ class GeneralBusinessInitializerTest extends TestCase
             'net_amount' => 30000,
         ]);
 
-        //メインバンクのサブアカウントが作成されていることを確認
+        // メインバンクのサブアカウントが作成されていることを確認
         $this->assertDatabaseHas('sub_accounts', [
             'account_id' => $bankAccount->id,
             'name' => 'メインバンク',
@@ -145,7 +144,6 @@ class GeneralBusinessInitializerTest extends TestCase
         ]);
     }
 
-
     #[Test]
     public function 現段階では免税業者で税込経理の事業体以外は作成できない_免税業者_税別経理()
     {
@@ -163,9 +161,9 @@ class GeneralBusinessInitializerTest extends TestCase
             'recurring_templates' => [],
         ];
 
-        $initializer = new GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $initializer->initialize($user, $inputs);
     }
 
@@ -186,9 +184,9 @@ class GeneralBusinessInitializerTest extends TestCase
             'recurring_templates' => [],
         ];
 
-        $initializer = new GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $initializer->initialize($user, $inputs);
     }
 
@@ -209,17 +207,17 @@ class GeneralBusinessInitializerTest extends TestCase
             'recurring_templates' => [],
         ];
 
-        $initializer = new GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $initializer->initialize($user, $inputs);
     }
 
     #[Test]
-    public function 源泉徴収のSubAccountが生成される()
+    public function 源泉徴収の_sub_accountが生成される()
     {
         $user = User::factory()->create();
-        $initializer = new GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -241,10 +239,10 @@ class GeneralBusinessInitializerTest extends TestCase
     }
 
     #[Test]
-    public function 売上高SubAccountが生成される()
+    public function 売上高_sub_accountが生成される()
     {
         $user = User::factory()->create();
-        $initializer = new GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',

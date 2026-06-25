@@ -2,10 +2,13 @@
 
 namespace Database\Factories;
 
+use App\Models\FiscalYear;
+use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Transaction>
+ * @extends Factory<Transaction>
  */
 class TransactionFactory extends Factory
 {
@@ -17,9 +20,9 @@ class TransactionFactory extends Factory
     public function definition(): array
     {
         return [
-            'fiscal_year_id' => \App\Models\FiscalYear::factory(),
+            'fiscal_year_id' => FiscalYear::factory(),
             'date' => $this->faker->dateTimeBetween('-1 year', 'now')->format('Y-m-d'),
-            'created_by' => \App\Models\User::factory(),
+            'created_by' => User::factory(),
         ];
     }
 }

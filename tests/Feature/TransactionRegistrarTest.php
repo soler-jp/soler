@@ -4,12 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\FiscalYear;
+use App\Models\User;
 use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
-use Illuminate\Validation\ValidationException;
-use App\Models\User;
 
 class TransactionRegistrarTest extends TestCase
 {
@@ -56,7 +56,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ];
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
         $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
 
         $this->assertDatabaseHas('transactions', [
@@ -74,7 +74,7 @@ class TransactionRegistrarTest extends TestCase
         $fiscalYear = FiscalYear::factory()->create();
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
-        $transaction = (new TransactionRegistrar())->register($fiscalYear, [
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
             'date' => now()->toDateString(),
             'description' => 'net_amountで登録',
         ], [
@@ -97,15 +97,14 @@ class TransactionRegistrarTest extends TestCase
         ]);
     }
 
-
     #[Test]
-    public function fiscalYearがnullだと登録できない()
+    public function fiscal_yearがnullだと登録できない()
     {
         $this->expectException(ValidationException::class);
 
         $fiscalYear = FiscalYear::factory()->create();
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -131,9 +130,9 @@ class TransactionRegistrarTest extends TestCase
     public function 不正な仕訳データの場合は登録できない()
     {
         $fiscalYear = FiscalYear::factory()->create();
-        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->expectException(ValidationException::class);
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -166,7 +165,7 @@ class TransactionRegistrarTest extends TestCase
 
         $this->expectException(ValidationException::class);
 
-        (new TransactionRegistrar())->register($fiscalYear, [
+        (new TransactionRegistrar)->register($fiscalYear, [
             'date' => now()->toDateString(),
             'description' => 'account_id混入テスト',
         ], [
@@ -190,7 +189,7 @@ class TransactionRegistrarTest extends TestCase
         $fiscalYear = FiscalYear::factory()->create();
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -234,7 +233,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
-        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
     }
 
     #[Test]
@@ -254,7 +253,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'net_amount' => 1000],
         ];
 
-        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
     }
 
     #[Test]
@@ -275,7 +274,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 900],
         ];
 
-        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
     }
 
     #[Test]
@@ -296,7 +295,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 500],
         ];
 
-        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
     }
 
     #[Test]
@@ -317,7 +316,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 0],
         ];
 
-        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
     }
 
     #[Test]
@@ -338,11 +337,11 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
-        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
     }
 
     #[Test]
-    public function journalEntriesが空配列だと登録できない()
+    public function journal_entriesが空配列だと登録できない()
     {
         $this->expectException(\InvalidArgumentException::class);
 
@@ -355,11 +354,11 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntriesData = [];
 
-        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
     }
 
     #[Test]
-    public function journalEntriesがすべてdebitだと登録できない()
+    public function journal_entriesがすべてdebitだと登録できない()
     {
         $this->expectException(\DomainException::class);
 
@@ -376,10 +375,8 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'net_amount' => 1000],
         ];
 
-        (new TransactionRegistrar())->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
     }
-
-
 
     #[Test]
     public function tax_amount込みでもバランスが正しければ登録できる()
@@ -387,7 +384,7 @@ class TransactionRegistrarTest extends TestCase
         $fiscalYear = FiscalYear::factory()->create();
         [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -425,7 +422,7 @@ class TransactionRegistrarTest extends TestCase
         $fiscalYear = FiscalYear::factory()->create();
         [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -461,7 +458,7 @@ class TransactionRegistrarTest extends TestCase
         $fiscalYear = FiscalYear::factory()->create();
         [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -501,7 +498,7 @@ class TransactionRegistrarTest extends TestCase
         $fiscalYear = FiscalYear::factory()->create();
         [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -539,7 +536,7 @@ class TransactionRegistrarTest extends TestCase
         $fiscalYear = FiscalYear::factory()->create();
         [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -577,7 +574,7 @@ class TransactionRegistrarTest extends TestCase
         $fiscalYear = FiscalYear::factory()->create();
         [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transactionData = [
             'date' => now()->toDateString(),
@@ -616,13 +613,13 @@ class TransactionRegistrarTest extends TestCase
         $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $ownExpense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
-        $foreignAsset = $otherUnit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
+        $ownExpense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
+        $foreignAsset = $otherUnit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('選択中の事業体に属する補助科目を指定してください。');
 
-        (new TransactionRegistrar())->register($fiscalYear, [
+        (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-01',
             'description' => '他事業体の補助科目テスト',
         ], [
@@ -649,7 +646,7 @@ class TransactionRegistrarTest extends TestCase
         $account = $unit->accounts()->first();
         $subAccount = $account->subAccounts->first();
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transaction = $registrar->register($fiscalYear, [
             'date' => now()->toDateString(),
@@ -678,10 +675,10 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
-        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transaction = $registrar->register($fiscalYear, [
             'date' => '2025-04-01',
@@ -719,11 +716,11 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
-        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
-        $liability = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '未払金'))->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
+        $liability = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '未払金'))->first();
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transaction = $registrar->register($fiscalYear, [
             'date' => '2025-04-01',
@@ -781,10 +778,10 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
-        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transaction = $registrar->register($fiscalYear, [
             'date' => '2025-05-01',
@@ -818,7 +815,7 @@ class TransactionRegistrarTest extends TestCase
         $this->assertFalse($cancelled->is_planned);
         $this->assertSame('取消予定取引（取消）', $cancelled->description);
         $this->assertCount(2, $cancelled->journalEntries);
-        $this->assertTrue($cancelled->journalEntries->every(fn($e) => $e->net_amount === 0));
+        $this->assertTrue($cancelled->journalEntries->every(fn ($e) => $e->net_amount === 0));
 
         foreach ($cancelled->journalEntries as $entry) {
             $this->assertContains($entry->id, $originalIds);
@@ -834,10 +831,10 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
-        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $transaction = $registrar->register($fiscalYear, [
             'date' => '2025-05-01',

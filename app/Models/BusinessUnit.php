@@ -2,15 +2,13 @@
 
 namespace App\Models;
 
+use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
-use App\Models\RecurringTransactionPlan;
-use App\Models\FiscalYear;
-use Illuminate\Support\Collection;
-use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
 
@@ -19,7 +17,9 @@ class BusinessUnit extends Model
     use HasFactory;
 
     public const TYPE_GENERAL = 'general';
+
     public const TYPE_AGRICULTURE = 'agriculture';
+
     public const TYPE_REAL_ESTATE = 'real_estate';
 
     public const TYPES = [
@@ -67,8 +67,8 @@ class BusinessUnit extends Model
     public function subAccounts(): HasManyThrough
     {
         return $this->hasManyThrough(
-            \App\Models\SubAccount::class,
-            \App\Models\Account::class,
+            SubAccount::class,
+            Account::class,
             'business_unit_id', // Foreign key on Account
             'account_id',       // Foreign key on SubAccount
             'id',               // Local key on BusinessUnit
@@ -138,7 +138,6 @@ class BusinessUnit extends Model
         ['name' => '雑費', 'type' => Account::TYPE_EXPENSE],
     ];
 
-
     public static array $defaultSubAccounts = [
         '事業主貸' => ['事業主貸', '源泉徴収'],
         '現金' => ['レジ現金', 'その他現金'],
@@ -147,9 +146,6 @@ class BusinessUnit extends Model
 
     /**
      * BusinessUnitを作成し、標準勘定科目も同時に登録する
-     *
-     * @param array $attributes
-     * @return self
      */
     public static function createWithDefaultAccounts(array $attributes): self
     {
@@ -166,12 +162,8 @@ class BusinessUnit extends Model
         });
     }
 
-
     /**
      * BusinessUnitに紐づくアカウントを作成するヘルパーメソッド
-     *
-     * @param array $attributes
-     * @return Account
      */
     public function createAccount(array $attributes): Account
     {
@@ -196,21 +188,18 @@ class BusinessUnit extends Model
 
     /**
      * FiscalYearを作成するヘルパーメソッド
-     * 
-     *  @param int $year
-     * @return FiscalYear
      */
     public function createFiscalYear(int $year): FiscalYear
     {
 
         $hasActive = $this->fiscalYears()->where('is_active', true)->exists();
 
-        $fiscalYear =  $this->fiscalYears()->create([
+        $fiscalYear = $this->fiscalYears()->create([
             'year' => $year,
             'start_date' => "$year-01-01",
             'end_date' => "$year-12-31",
             'is_closed' => false,
-            'is_active' => !$hasActive,  // まだなければtrueにする
+            'is_active' => ! $hasActive,  // まだなければtrueにする
         ]);
 
         $this->setCurrentFiscalYearIfNotSet($fiscalYear);
@@ -222,7 +211,6 @@ class BusinessUnit extends Model
     {
         return $this->accounts()->where('name', $name)->first();
     }
-
 
     public function getSubAccountByName(string $accountName, string $subAccountName): ?SubAccount
     {
@@ -281,9 +269,9 @@ class BusinessUnit extends Model
 
             if (
                 $plan->transactions()
-                ->whereDate('date', $date)
-                ->where('is_planned', true)
-                ->exists()
+                    ->whereDate('date', $date)
+                    ->where('is_planned', true)
+                    ->exists()
             ) {
                 continue;
             }
@@ -309,7 +297,7 @@ class BusinessUnit extends Model
     public function subAccountExistsRule(): Exists
     {
         return Rule::exists('sub_accounts', 'id')
-            ->where(fn($query) => $query->whereIn('account_id', $this->accounts()->select('id')));
+            ->where(fn ($query) => $query->whereIn('account_id', $this->accounts()->select('id')));
     }
 
     public function currentFiscalYear(): BelongsTo

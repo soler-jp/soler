@@ -1,12 +1,12 @@
 <?php
 
+use App\Models\JournalEntry;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use App\Models\JournalEntry;
 
-return new class extends Migration {
-
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('journal_entries', function (Blueprint $table) {

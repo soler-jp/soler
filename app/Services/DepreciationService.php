@@ -2,17 +2,15 @@
 
 namespace App\Services;
 
-use App\Models\BusinessUnit;
-use App\Models\Account;
-use App\Models\SubAccount;
+use App\Models\DepreciationEntry;
 use App\Models\FiscalYear;
 use App\Models\FixedAsset;
+use App\Models\SubAccount;
 use App\Models\Transaction;
 use Illuminate\Support\Facades\DB;
 
 class DepreciationService
 {
-
     public function registerFixedAsset(
         FiscalYear $fiscalYear,
         SubAccount $assetSubAccount,
@@ -84,7 +82,7 @@ class DepreciationService
         // 実装は後で
     }
 
-    public function registerJournalEntryFor(\App\Models\DepreciationEntry $entry): void
+    public function registerJournalEntryFor(DepreciationEntry $entry): void
     {
         // 実装は後で
     }

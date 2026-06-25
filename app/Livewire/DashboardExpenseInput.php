@@ -2,22 +2,26 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
-use Illuminate\Support\Collection;
 use App\Models\Account;
 use App\Services\TransactionRegistrar;
+use Illuminate\Support\Collection;
+use Livewire\Component;
 
 class DashboardExpenseInput extends Component
 {
     public string $date;
+
     public string $description = '';
-    public int|null $amount = null;
-    public int|null $debit_sub_account_id = null;
-    public int|null $credit_sub_account_id = null;
+
+    public ?int $amount = null;
+
+    public ?int $debit_sub_account_id = null;
+
+    public ?int $credit_sub_account_id = null;
 
     public Collection $expenseAccounts; // type = 'expense'
-    public Collection $creditAccounts; // name in ['現金', '普通預金', '事業主借']
 
+    public Collection $creditAccounts; // name in ['現金', '普通預金', '事業主借']
 
     public function mount()
     {
@@ -37,7 +41,6 @@ class DashboardExpenseInput extends Component
             ->orderByRaw("CASE name WHEN '現金' THEN 0 WHEN '普通預金' THEN 1 WHEN '事業主借' THEN 2 ELSE 3 END")
             ->get();
     }
-
 
     public function submit()
     {
@@ -74,10 +77,9 @@ class DashboardExpenseInput extends Component
             $this->reset(['description', 'amount', 'debit_sub_account_id', 'credit_sub_account_id']);
             session()->flash('message', '経費を登録しました');
         } catch (\Exception $e) {
-            session()->flash('error', '経費の登録に失敗しました: ' . $e->getMessage());
+            session()->flash('error', '経費の登録に失敗しました: '.$e->getMessage());
         }
     }
-
 
     public function render()
     {

@@ -2,20 +2,27 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
 use App\Services\TransactionRegistrar;
-use Illuminate\Support\Collection;
+use Livewire\Component;
 
 class DashboardRevenueInput extends Component
 {
     public string $date = '';
-    public int|null $gross_amount = null;
-    public int|null $holding_amount = null;
+
+    public ?int $gross_amount = null;
+
+    public ?int $holding_amount = null;
+
     public string $description = '';
-    public int|null $revenueSubAccountId = null;
-    public int|null $receiptSubAccountId = null;
-    public int|null $withheldTaxSubAccountId = null;
+
+    public ?int $revenueSubAccountId = null;
+
+    public ?int $receiptSubAccountId = null;
+
+    public ?int $withheldTaxSubAccountId = null;
+
     public bool $withholding = false;
+
     public array $receiptGroups;
 
     public function save()
@@ -87,7 +94,7 @@ class DashboardRevenueInput extends Component
                 'holding_amount',
             ]);
         } catch (\Exception $e) {
-            session()->flash('error', '取引の登録に失敗しました: ' . $e->getMessage());
+            session()->flash('error', '取引の登録に失敗しました: '.$e->getMessage());
         }
     }
 

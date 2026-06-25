@@ -2,27 +2,25 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use PHPUnit\Framework\Attributes\Test;
 use App\Models\FiscalYear;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Validators\TransactionValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
-use App\Models\Transaction;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class TransactionTest extends TestCase
 {
-
     use RefreshDatabase;
 
-
-    //////////
+    // ////////
     // Factory のテスト
-    //////////
+    // ////////
 
     #[Test]
-    public function factoryでTransactionをmakeできる()
+    public function factoryで_transactionをmakeできる()
     {
         $transaction = Transaction::factory()->make();
 
@@ -32,7 +30,7 @@ class TransactionTest extends TestCase
     }
 
     #[Test]
-    public function factoryでTransactionをcreateできる()
+    public function factoryで_transactionをcreateできる()
     {
         $transaction = Transaction::factory()->create();
 
@@ -41,7 +39,7 @@ class TransactionTest extends TestCase
         ]);
     }
 
-    ///////////////////////////
+    // /////////////////////////
 
     #[Test]
     public function 正しいデータでバリデーションが通る()
@@ -90,7 +88,6 @@ class TransactionTest extends TestCase
         $this->assertArrayHasKey('created_by', $validated);
         $this->assertNull($validated['created_by']);
     }
-
 
     #[Test]
     public function entry_numberは年度ごとに連番で採番される()

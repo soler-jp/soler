@@ -35,6 +35,7 @@ return new class extends Migration
             $table->dropColumn('account_id');
         });
     }
+
     public function down(): void
     {
         Schema::table('journal_entries', function (Blueprint $table) {

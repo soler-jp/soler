@@ -10,8 +10,9 @@ class TransactionValidator
     /**
      * バリデーションと正規化を行う
      *
-     * @param array $data 入力データ
+     * @param  array  $data  入力データ
      * @return array 検証済みデータ
+     *
      * @throws ValidationException バリデーションエラー時
      */
     public static function validate(array $data): array

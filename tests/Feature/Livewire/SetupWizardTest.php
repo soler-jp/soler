@@ -3,13 +3,12 @@
 namespace Tests\Feature\Livewire;
 
 use App\Livewire\SetupWizard;
+use App\Models\Account;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Models\BusinessUnit;
-use App\Models\Account;
 
 class SetupWizardTest extends TestCase
 {
@@ -37,7 +36,7 @@ class SetupWizardTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\SetupWizard::class)
+        Livewire::test(SetupWizard::class)
             ->set('name', '')
             ->set('year', '')
             ->call('submit')
@@ -50,7 +49,7 @@ class SetupWizardTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\SetupWizard::class)
+        Livewire::test(SetupWizard::class)
             ->set('name', 'テスト事業体')
             ->set('business_type', 'general')
             ->set('year', 2025)
@@ -79,7 +78,7 @@ class SetupWizardTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\SetupWizard::class)
+        Livewire::test(SetupWizard::class)
             ->set('name', '課税業者のテスト')
             ->set('business_type', 'general')
             ->set('year', 2025)
@@ -96,7 +95,7 @@ class SetupWizardTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\SetupWizard::class)
+        Livewire::test(SetupWizard::class)
             ->set('name', '税抜経理のテスト')
             ->set('business_type', 'general')
             ->set('year', 2025)
@@ -106,25 +105,24 @@ class SetupWizardTest extends TestCase
     }
 
     #[Test]
-    public function Step1で未入力ならバリデーションエラーになる()
+    public function step1で未入力ならバリデーションエラーになる()
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\SetupWizard::class)
+        Livewire::test(SetupWizard::class)
             ->set('name', '')
             ->call('next')
             ->assertHasErrors(['name']);
     }
 
-
     #[Test]
-    public function Step1でnameとtypeを入力して次に進める()
+    public function step1でnameとtypeを入力して次に進める()
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\SetupWizard::class)
+        Livewire::test(SetupWizard::class)
             ->set('name', 'テスト事業体')
             ->set('business_type', 'general')
             ->call('next')
@@ -132,12 +130,12 @@ class SetupWizardTest extends TestCase
     }
 
     #[Test]
-    public function Step2で入力すれば初期化処理が呼ばれる()
+    public function step2で入力すれば初期化処理が呼ばれる()
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\SetupWizard::class)
+        Livewire::test(SetupWizard::class)
             ->set('name', 'ウィザード事業体')
             ->set('business_type', 'general')
             ->call('next') // Step1完了
@@ -150,7 +148,7 @@ class SetupWizardTest extends TestCase
     }
 
     #[Test]
-    public function Step4で銀行口座を1件追加できる()
+    public function step4で銀行口座を1件追加できる()
     {
         $user = User::factory()->create();
         $this->actingAs($user);
@@ -160,7 +158,7 @@ class SetupWizardTest extends TestCase
             'amount' => 50000,
         ];
 
-        $component = Livewire::test(\App\Livewire\SetupWizard::class)
+        $component = Livewire::test(SetupWizard::class)
             ->set('name', '銀行あり事業体')
             ->set('business_type', 'general')
             ->call('next') // Step1 → Step2
@@ -173,8 +171,9 @@ class SetupWizardTest extends TestCase
 
         $this->assertEquals([$input], $component->get('bank_accounts'));
     }
+
     #[Test]
-    public function Step5で資産を1件追加できる()
+    public function step5で資産を1件追加できる()
     {
         $user = User::factory()->create();
         $this->actingAs($user);
@@ -185,7 +184,7 @@ class SetupWizardTest extends TestCase
             'amount' => 500000,
         ];
 
-        $component = Livewire::test(\App\Livewire\SetupWizard::class)
+        $component = Livewire::test(SetupWizard::class)
             // Step1
             ->set('name', '資産あり事業体')
             ->set('business_type', 'general')
@@ -203,14 +202,13 @@ class SetupWizardTest extends TestCase
         $this->assertEquals([$input], $component->get('other_assets'));
     }
 
-
     #[Test]
-    public function Step6で全情報を入力して初期化に成功する()
+    public function step6で全情報を入力して初期化に成功する()
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\SetupWizard::class)
+        Livewire::test(SetupWizard::class)
             // Step 1
             ->set('name', 'テスト事業体')
             ->set('business_type', 'general')
@@ -266,13 +264,13 @@ class SetupWizardTest extends TestCase
     }
 
     #[Test]
-    public function cashAccount画面で、デフォルトの「レジ現金」が表示される()
+    public function cash_account画面で、デフォルトの「レジ現金」が表示される()
     {
         $user = User::factory()->create();
         $bu = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\SetupWizard::class)
+        Livewire::test(SetupWizard::class)
             ->set('name', 'テスト事業体')
             ->set('business_type', 'general')
             ->call('next') // Step1 → Step2
@@ -284,12 +282,12 @@ class SetupWizardTest extends TestCase
     }
 
     #[Test]
-    public function cashAccountに入力した内容がOpeningEntryとして渡される()
+    public function cash_accountに入力した内容が_opening_entryとして渡される()
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\SetupWizard::class)
+        Livewire::test(SetupWizard::class)
             ->set('name', 'テスト事業所')
             ->set('business_type', 'general')
             ->call('next') // step1 → 2
@@ -328,7 +326,7 @@ class SetupWizardTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\SetupWizard::class)
+        Livewire::test(SetupWizard::class)
             ->set('name', '売上高補助科目テスト')
             ->set('business_type', 'general')
             ->call('next') // Step1 → Step2
@@ -359,7 +357,7 @@ class SetupWizardTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        Livewire::test(\App\Livewire\SetupWizard::class)
+        Livewire::test(SetupWizard::class)
             ->set('name', '棚卸資産空白テスト')
             ->set('business_type', 'general')
             ->call('next') // Step1 → Step2

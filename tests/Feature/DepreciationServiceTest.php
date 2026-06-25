@@ -2,13 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Services\DepreciationService;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class DepreciationServiceTest extends TestCase
 {
@@ -40,7 +39,6 @@ class DepreciationServiceTest extends TestCase
                 $query->where('name', 'その他の預金');
             })
             ->first();
-
 
         $fixedAssetData = [
             'name' => 'ノートPC',
@@ -85,8 +83,7 @@ class DepreciationServiceTest extends TestCase
 
         $this->assertTrue(
             $transaction->journalEntries->contains(
-                fn($e) =>
-                $e->type === 'debit' &&
+                fn ($e) => $e->type === 'debit' &&
                     $e->sub_account_id === $assetSubAccount->id &&
                     $e->net_amount === 165000
             )
@@ -94,16 +91,14 @@ class DepreciationServiceTest extends TestCase
 
         $this->assertTrue(
             $transaction->journalEntries->contains(
-                fn($e) =>
-                $e->type === 'credit' &&
+                fn ($e) => $e->type === 'credit' &&
                     $e->sub_account_id === $paymentSubAccount->id &&
                     $e->net_amount === 165000
             )
         );
     }
 
-
-    # 後回し
+    // 後回し
     //     #[Test]
     //     public function 固定資産を登録すると取得仕訳も同時に登録される_課税事業者_税別仕訳()
     //     {
@@ -189,5 +184,5 @@ class DepreciationServiceTest extends TestCase
     //             )
     //         );
     //     }
-    // 
+    //
 }

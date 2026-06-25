@@ -42,7 +42,6 @@ class GeneralBusinessInitializer
             }
         }
 
-
         return $unit->refresh();
     }
 }

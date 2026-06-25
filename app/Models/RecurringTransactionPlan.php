@@ -2,20 +2,19 @@
 
 namespace App\Models;
 
+use Database\Factories\RecurringTransactionPlanFactory;
+use Illuminate\Contracts\Validation\Validator as ValidatorContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Contracts\Validation\Validator as ValidatorContract;
-use Illuminate\Support\Collection;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\BusinessUnit;
-use App\Models\Transaction;
-use Illuminate\Support\Carbon;
 
 class RecurringTransactionPlan extends Model
 {
-    /** @use HasFactory<\Database\Factories\RecurringTransactionPlanFactory> */
+    /** @use HasFactory<RecurringTransactionPlanFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -30,7 +29,7 @@ class RecurringTransactionPlan extends Model
         'credit_sub_account_id',
         'amount',
         'tax_amount',
-        'tax_type', // 
+        'tax_type', //
         'is_active',
     ];
 
@@ -78,8 +77,8 @@ class RecurringTransactionPlan extends Model
         );
 
         $validator->after(function ($validator) use ($attributes) {
-            if (!empty($attributes['name']) && !empty($attributes['business_unit_id'])) {
-                $exists = \App\Models\RecurringTransactionPlan::where('business_unit_id', $attributes['business_unit_id'])
+            if (! empty($attributes['name']) && ! empty($attributes['business_unit_id'])) {
+                $exists = RecurringTransactionPlan::where('business_unit_id', $attributes['business_unit_id'])
                     ->where('name', $attributes['name'])
                     ->exists();
 
@@ -93,14 +92,14 @@ class RecurringTransactionPlan extends Model
         });
 
         $validator->after(function ($validator) use ($attributes, $businessUnit) {
-            if (!$businessUnit) {
+            if (! $businessUnit) {
                 return;
             }
 
             foreach (['debit_sub_account_id', 'credit_sub_account_id'] as $field) {
                 $subAccountId = $attributes[$field] ?? null;
 
-                if ($subAccountId && !$businessUnit->hasSubAccount((int) $subAccountId)) {
+                if ($subAccountId && ! $businessUnit->hasSubAccount((int) $subAccountId)) {
                     $validator->errors()->add($field, '選択中の事業体に属する補助科目を指定してください。');
                 }
             }
@@ -108,7 +107,6 @@ class RecurringTransactionPlan extends Model
 
         return $validator;
     }
-
 
     public static function validate(array $attributes): array
     {
@@ -209,13 +207,13 @@ class RecurringTransactionPlan extends Model
             ->whereKey($transactionId)
             ->first();
 
-        if (!$transaction || !$transaction->is_planned) {
+        if (! $transaction || ! $transaction->is_planned) {
             return null;
         }
 
         $creditSubAccountId = (int) $attributes['credit_sub_account_id'];
 
-        if (!$this->businessUnit->hasSubAccount($creditSubAccountId)) {
+        if (! $this->businessUnit->hasSubAccount($creditSubAccountId)) {
             throw ValidationException::withMessages([
                 'credit_sub_account_id' => ['選択中の事業体に属する補助科目を指定してください。'],
             ]);
@@ -224,7 +222,7 @@ class RecurringTransactionPlan extends Model
         $debitEntry = $transaction->journalEntries->firstWhere('type', 'debit');
         $creditEntry = $transaction->journalEntries->firstWhere('type', 'credit');
 
-        if (!$debitEntry || !$creditEntry) {
+        if (! $debitEntry || ! $creditEntry) {
             return null;
         }
 
@@ -237,7 +235,7 @@ class RecurringTransactionPlan extends Model
 
         $transaction->is_planned = false;
 
-        if (!empty($attributes['date'])) {
+        if (! empty($attributes['date'])) {
             $transaction->date = Carbon::parse($attributes['date']);
         }
 

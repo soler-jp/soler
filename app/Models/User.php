@@ -4,10 +4,9 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use App\Models\BusinessUnit;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class User extends Authenticatable
 {
@@ -48,8 +47,6 @@ class User extends Authenticatable
         ];
     }
 
-
-
     public function businessUnits()
     {
         return $this->hasMany(BusinessUnit::class);
@@ -74,7 +71,6 @@ class User extends Authenticatable
     {
         return $this->belongsTo(BusinessUnit::class, 'current_business_unit_id');
     }
-
 
     public function setSelectedBusinessUnit(BusinessUnit $unit): void
     {

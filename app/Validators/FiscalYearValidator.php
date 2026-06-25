@@ -3,8 +3,8 @@
 namespace App\Validators;
 
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class FiscalYearValidator
 {
@@ -13,8 +13,6 @@ class FiscalYearValidator
      * 合格すればクリーンな配列を返す。
      * 失敗すればValidationExceptionを投げる。
      *
-     * @param array $data
-     * @return array
      * @throws ValidationException
      */
     public static function validate(array $data): array

@@ -4,13 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Account;
 use App\Models\Transaction;
-use Tests\TestCase;
-use PHPUnit\Framework\Attributes\Test;
+use App\Models\User;
+use App\Services\TransactionRegistrar;
 use App\Validators\JournalEntryValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
-use App\Models\User;
-use App\Services\TransactionRegistrar;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class JournalEntryTest extends TestCase
 {
@@ -299,7 +299,6 @@ class JournalEntryTest extends TestCase
         $this->expectNotToPerformAssertions();
         JournalEntryValidator::validate($data, true);
     }
-
 
     #[Test]
     public function 同一勘定科目に複数の補助科目を使って取引を登録できる()

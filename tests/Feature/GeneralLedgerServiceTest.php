@@ -3,11 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use App\Services\TransactionRegistrar;
 use App\Services\GeneralLedgerService;
+use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class GeneralLedgerServiceTest extends TestCase
 {
@@ -27,7 +27,7 @@ class GeneralLedgerServiceTest extends TestCase
         $debitSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $creditSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $registrar->register(
             fiscalYear: $fiscalYear,
@@ -49,7 +49,7 @@ class GeneralLedgerServiceTest extends TestCase
             ]
         );
 
-        $ledger = (new GeneralLedgerService())->generate($debitSubAccount->account, $fiscalYear);
+        $ledger = (new GeneralLedgerService)->generate($debitSubAccount->account, $fiscalYear);
 
         $this->assertCount(1, $ledger);
         $this->assertSame('2025-01-10', $ledger[0]['date']);
@@ -58,7 +58,6 @@ class GeneralLedgerServiceTest extends TestCase
         $this->assertNull($ledger[0]['credit']);
         $this->assertSame(100000, $ledger[0]['balance']);
     }
-
 
     #[Test]
     public function 借方と貸方の複数仕訳が時系列順に表示される()
@@ -74,7 +73,7 @@ class GeneralLedgerServiceTest extends TestCase
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         // 1件目：入金（借方）
         $registrar->register(
@@ -139,7 +138,7 @@ class GeneralLedgerServiceTest extends TestCase
             ]
         );
 
-        $ledger = (new GeneralLedgerService())->generate($cashSubAccount->account, $fiscalYear);
+        $ledger = (new GeneralLedgerService)->generate($cashSubAccount->account, $fiscalYear);
 
         $this->assertCount(3, $ledger);
 
@@ -159,10 +158,8 @@ class GeneralLedgerServiceTest extends TestCase
         $this->assertSame(120000, $ledger[2]['balance']);
     }
 
-
-
     #[Test]
-    public function 異なる勘定科目の仕訳はLedgerに含まれない()
+    public function 異なる勘定科目の仕訳は_ledgerに含まれない()
     {
         $user = User::factory()->create();
 
@@ -175,7 +172,7 @@ class GeneralLedgerServiceTest extends TestCase
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         // 2件とも cash/owner を使った複式仕訳
         // 1件目
@@ -221,7 +218,7 @@ class GeneralLedgerServiceTest extends TestCase
         );
 
         // 事業主借のLedgerだけを生成
-        $ledger = (new GeneralLedgerService())->generate($ownerSubAccount->account, $fiscalYear);
+        $ledger = (new GeneralLedgerService)->generate($ownerSubAccount->account, $fiscalYear);
 
         $this->assertCount(2, $ledger);
 
@@ -236,9 +233,8 @@ class GeneralLedgerServiceTest extends TestCase
         $this->assertSame(-130000, $ledger[1]['balance']);
     }
 
-
     #[Test]
-    public function 指定年度外の仕訳はLedgerに含まれない()
+    public function 指定年度外の仕訳は_ledgerに含まれない()
     {
         $user = User::factory()->create();
 
@@ -252,7 +248,7 @@ class GeneralLedgerServiceTest extends TestCase
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         // 2024年度の取引（含まれないべき）
         $registrar->register(
@@ -296,7 +292,7 @@ class GeneralLedgerServiceTest extends TestCase
             ]
         );
 
-        $ledger = (new GeneralLedgerService())->generate($cashSubAccount->account, $fiscal2025);
+        $ledger = (new GeneralLedgerService)->generate($cashSubAccount->account, $fiscal2025);
 
         $this->assertCount(1, $ledger);
         $this->assertSame('2025-01-01', $ledger[0]['date']);
@@ -306,9 +302,8 @@ class GeneralLedgerServiceTest extends TestCase
         $this->assertSame(50000, $ledger[0]['balance']);
     }
 
-
     #[Test]
-    public function 仕訳が存在しない場合は空のLedgerを返す()
+    public function 仕訳が存在しない場合は空の_ledgerを返す()
     {
         $user = User::factory()->create();
 
@@ -320,15 +315,14 @@ class GeneralLedgerServiceTest extends TestCase
 
         $subAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
 
-        $ledger = (new GeneralLedgerService())->generate($subAccount->account, $fiscalYear);
+        $ledger = (new GeneralLedgerService)->generate($subAccount->account, $fiscalYear);
 
         $this->assertIsArray($ledger);
         $this->assertCount(0, $ledger);
     }
 
-
     #[Test]
-    public function 補助科目に紐づく仕訳のみがLedgerに表示される()
+    public function 補助科目に紐づく仕訳のみが_ledgerに表示される()
     {
         $user = User::factory()->create();
 
@@ -343,7 +337,7 @@ class GeneralLedgerServiceTest extends TestCase
 
         $otherSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         // レジ（対象）
         $registrar->register(
@@ -387,7 +381,7 @@ class GeneralLedgerServiceTest extends TestCase
             ]
         );
 
-        $ledger = (new GeneralLedgerService())->generateForSubAccount($subAccountA, $fiscalYear);
+        $ledger = (new GeneralLedgerService)->generateForSubAccount($subAccountA, $fiscalYear);
 
         $this->assertCount(1, $ledger);
         $this->assertSame('2025-01-01', $ledger[0]['date']);
@@ -413,7 +407,7 @@ class GeneralLedgerServiceTest extends TestCase
 
         $otherSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         // 1. 現金が借方
         $registrar->register(
@@ -457,7 +451,7 @@ class GeneralLedgerServiceTest extends TestCase
             ]
         );
 
-        $cashbook = (new GeneralLedgerService())->generateCashbook($fiscalYear);
+        $cashbook = (new GeneralLedgerService)->generateCashbook($fiscalYear);
 
         $this->assertCount(2, $cashbook);
 

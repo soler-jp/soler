@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\Livewire;
 
-use App\Livewire\DashboardExpenseInput;
+use App\Models\User;
+use App\Setup\Initializers\GeneralBusinessInitializer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use Tests\TestCase;
-use App\Models\User;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class DashboardExpenseInputTest extends TestCase
 {
@@ -17,7 +17,7 @@ class DashboardExpenseInputTest extends TestCase
     public function 経費入力フォームがダッシュボードに表示される()
     {
         $user = User::factory()->create();
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -43,7 +43,7 @@ class DashboardExpenseInputTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -90,7 +90,7 @@ class DashboardExpenseInputTest extends TestCase
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => '自分の事業体',
             'type' => 'general',
@@ -139,7 +139,7 @@ class DashboardExpenseInputTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -173,7 +173,7 @@ class DashboardExpenseInputTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -202,13 +202,12 @@ class DashboardExpenseInputTest extends TestCase
             ->assertHasErrors(['description' => 'required']);
     }
 
-
     #[Test]
     public function 金額が未入力だとバリデーションエラーになる()
     {
         $user = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -242,7 +241,7 @@ class DashboardExpenseInputTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -275,7 +274,7 @@ class DashboardExpenseInputTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -303,12 +302,11 @@ class DashboardExpenseInputTest extends TestCase
             ->assertHasErrors(['credit_sub_account_id' => 'required']);
     }
 
-
     #[Test]
     public function 金額が負の値だとバリデーションエラーになる()
     {
         $user = User::factory()->create();
-        $unit = (new \App\Setup\Initializers\GeneralBusinessInitializer())->initialize($user, [
+        $unit = (new GeneralBusinessInitializer)->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
             'year' => 2025,
@@ -336,12 +334,11 @@ class DashboardExpenseInputTest extends TestCase
             ->assertHasErrors(['amount' => 'min']);
     }
 
-
     #[Test]
     public function 存在しない勘定科目を指定するとバリデーションエラーになる()
     {
         $user = User::factory()->create();
-        $unit = (new \App\Setup\Initializers\GeneralBusinessInitializer())->initialize($user, [
+        $unit = (new GeneralBusinessInitializer)->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
             'year' => 2025,
@@ -369,12 +366,11 @@ class DashboardExpenseInputTest extends TestCase
             ]);
     }
 
-
     #[Test]
     public function 登録後にフォームが初期化される()
     {
         $user = User::factory()->create();
-        $unit = (new \App\Setup\Initializers\GeneralBusinessInitializer())->initialize($user, [
+        $unit = (new GeneralBusinessInitializer)->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
             'year' => 2025,
@@ -405,12 +401,11 @@ class DashboardExpenseInputTest extends TestCase
             ->assertSet('credit_sub_account_id', null);
     }
 
-
     #[Test]
     public function 登録後に確認メッセージが表示される()
     {
         $user = User::factory()->create();
-        $unit = (new \App\Setup\Initializers\GeneralBusinessInitializer())->initialize($user, [
+        $unit = (new GeneralBusinessInitializer)->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
             'year' => 2025,

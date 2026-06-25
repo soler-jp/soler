@@ -2,11 +2,12 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
 use App\Models\Account;
+use App\Models\BusinessUnit;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Account>
+ * @extends Factory<Account>
  */
 class AccountFactory extends Factory
 {
@@ -18,7 +19,7 @@ class AccountFactory extends Factory
     public function definition(): array
     {
         return [
-            'business_unit_id' => \App\Models\BusinessUnit::factory(),
+            'business_unit_id' => BusinessUnit::factory(),
             'name' => $this->faker->word,
             'type' => $this->faker->randomElement(['asset', 'liability', 'equity', 'revenue', 'expense']),
         ];

@@ -3,16 +3,18 @@
 namespace App\Livewire\Admin;
 
 use App\Models\User;
-use Livewire\Component;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Livewire\Component;
 
 class Users extends Component
 {
-
     public string $name = '';
+
     public string $email = '';
+
     public string $password = '';
+
     public string $submitError = '';
 
     public function createUser(): void
@@ -43,7 +45,6 @@ class Users extends Component
         // 自分自身や管理者を削除する制限はこの段階では入れない
         $user->delete();
     }
-
 
     public function render()
     {

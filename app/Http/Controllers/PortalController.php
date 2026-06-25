@@ -1,6 +1,7 @@
 <?php
 
 // app/Http/Controllers/PortalController.php
+
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -15,7 +16,6 @@ class PortalController extends Controller
             return redirect()->route('initialize');
         }
 
-
         $unit = auth()->user()->selectedBusinessUnit;
         $fiscalYear = $unit->currentFiscalYear;
 
@@ -23,7 +23,6 @@ class PortalController extends Controller
             'summary' => $fiscalYear->calculateSummary(),
         ]);
     }
-
 
     public function fixedExpenses(Request $request)
     {

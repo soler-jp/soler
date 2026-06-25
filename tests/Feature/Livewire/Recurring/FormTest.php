@@ -3,16 +3,15 @@
 namespace Tests\Feature\Livewire\Recurring;
 
 use App\Livewire\Recurring\Form;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
-use Livewire\Livewire;
-use Tests\TestCase;
 use App\Models\User;
+use App\Setup\Initializers\GeneralBusinessInitializer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class FormTest extends TestCase
 {
-
     use RefreshDatabase;
 
     #[Test]
@@ -20,7 +19,7 @@ class FormTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -72,7 +71,7 @@ class FormTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => 'テスト事業体',
             'type' => 'general',
@@ -118,7 +117,7 @@ class FormTest extends TestCase
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
 
-        $initializer = new \App\Setup\Initializers\GeneralBusinessInitializer();
+        $initializer = new GeneralBusinessInitializer;
         $unit = $initializer->initialize($user, [
             'name' => '自分の事業体',
             'type' => 'general',

@@ -2,15 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Services\TransactionRegistrar;
-use App\Models\Transaction;
-use App\Models\BusinessUnit;
-use App\Models\JournalEntry;
-use App\Models\SubAccount;
-use Illuminate\Support\Facades\DB;
-
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class FiscalYear extends Model
 {
@@ -32,9 +26,9 @@ class FiscalYear extends Model
         'is_taxable' => 'boolean',
         'is_tax_exclusive' => 'boolean',
         'is_active' => 'boolean',
-        'is_closed'  => 'boolean',
+        'is_closed' => 'boolean',
         'start_date' => 'date',
-        'end_date'   => 'date',
+        'end_date' => 'date',
     ];
 
     public function businessUnit()
@@ -69,27 +63,27 @@ class FiscalYear extends Model
     {
         // 実績（is_planned = false）
         $actualIncome = $this->journalEntries()
-            ->whereHas('transaction', fn($q) => $q->where('is_planned', false))
-            ->whereHas('subAccount.account', fn($q) => $q->where('type', 'revenue'))
+            ->whereHas('transaction', fn ($q) => $q->where('is_planned', false))
+            ->whereHas('subAccount.account', fn ($q) => $q->where('type', 'revenue'))
             ->where('type', 'credit')
             ->sum(\DB::raw('net_amount + COALESCE(tax_amount, 0)'));
 
         $actualExpense = $this->journalEntries()
-            ->whereHas('transaction', fn($q) => $q->where('is_planned', false))
-            ->whereHas('subAccount.account', fn($q) => $q->where('type', 'expense'))
+            ->whereHas('transaction', fn ($q) => $q->where('is_planned', false))
+            ->whereHas('subAccount.account', fn ($q) => $q->where('type', 'expense'))
             ->where('type', 'debit')
             ->sum(\DB::raw('net_amount + COALESCE(tax_amount, 0)'));
 
         // 予定（is_planned = true）
         $plannedIncome = $this->journalEntries()
-            ->whereHas('transaction', fn($q) => $q->where('is_planned', true))
-            ->whereHas('subAccount.account', fn($q) => $q->where('type', 'revenue'))
+            ->whereHas('transaction', fn ($q) => $q->where('is_planned', true))
+            ->whereHas('subAccount.account', fn ($q) => $q->where('type', 'revenue'))
             ->where('type', 'credit')
             ->sum(\DB::raw('net_amount + COALESCE(tax_amount, 0)'));
 
         $plannedExpense = $this->journalEntries()
-            ->whereHas('transaction', fn($q) => $q->where('is_planned', true))
-            ->whereHas('subAccount.account', fn($q) => $q->where('type', 'expense'))
+            ->whereHas('transaction', fn ($q) => $q->where('is_planned', true))
+            ->whereHas('subAccount.account', fn ($q) => $q->where('type', 'expense'))
             ->where('type', 'debit')
             ->sum(\DB::raw('net_amount + COALESCE(tax_amount, 0)'));
 
@@ -107,14 +101,11 @@ class FiscalYear extends Model
         ];
     }
 
-
-
     public function registerOpeningEntry(array $entries): ?Transaction
     {
         if ($entries === []) {
             return null;
         }
-
 
         return \DB::transaction(function () use ($entries) {
 
@@ -140,30 +131,27 @@ class FiscalYear extends Model
 
             foreach ($entries as $entry) {
 
-
                 if (empty($entry['sub_account_name'])) {
                     throw new \InvalidArgumentException('sub_account_name は必須です。');
                 }
 
-                if (!isset($entry['amount']) || !is_numeric($entry['amount']) || $entry['amount'] <= 0) {
+                if (! isset($entry['amount']) || ! is_numeric($entry['amount']) || $entry['amount'] <= 0) {
                     throw new \InvalidArgumentException("金額が不正です: {$entry['amount']}");
                 }
-
 
                 $account = $this->businessUnit->accounts()
                     ->where('name', $entry['account_name'])
                     ->firstOrFail();
 
-
                 $subAccount = $account->subAccounts()->firstOrCreate([
                     'name' => $entry['sub_account_name'],
                 ]);
 
-                if (!$subAccount) {
+                if (! $subAccount) {
                     throw new \InvalidArgumentException("補助科目「{$entry['sub_account_name']}」が存在しませんが、 account_nameも指定されていません。");
                 }
 
-                if (!in_array($account->name, $allowedDebitAccounts)) {
+                if (! in_array($account->name, $allowedDebitAccounts)) {
                     throw new \InvalidArgumentException(
                         '借方の勘定科目は「現金」「定期預金」「その他の預金」「車両運搬具」「棚卸資産」のみ使用できます。'
                     );

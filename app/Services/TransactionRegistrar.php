@@ -2,11 +2,11 @@
 
 namespace App\Services;
 
-use App\Models\Transaction;
-use App\Validators\TransactionValidator;
-use App\Validators\JournalEntryValidator;
-use Illuminate\Support\Facades\DB;
 use App\Models\FiscalYear;
+use App\Models\Transaction;
+use App\Validators\JournalEntryValidator;
+use App\Validators\TransactionValidator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class TransactionRegistrar
@@ -16,9 +16,8 @@ class TransactionRegistrar
      *
      * @param  array  $transactionData  取引情報（例: fiscal_year_id, date, description）
      * @param  array  $journalEntriesData  仕訳情報（複数）（例: sub_account_id, type, net_amount, ...）
-     * @return Transaction
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * @throws ValidationException
      */
     public function register(?FiscalYear $fiscalYear, array $transactionData, array $journalEntriesData): Transaction
     {
@@ -41,14 +40,13 @@ class TransactionRegistrar
 
         $this->ensureEntriesBelongToBusinessUnit($fiscalYear, $validatedEntries);
 
-
         if (empty($journalEntriesData)) {
             throw new \InvalidArgumentException('仕訳データが空です。');
         }
 
         // ドメインロジック: 仕訳の金額がバランスしているか確認
-        $totalDebit = $this->totalWithTax(array_filter($journalEntriesData, fn($e) => $e['type'] === 'debit'));
-        $totalCredit = $this->totalWithTax(array_filter($journalEntriesData, fn($e) => $e['type'] === 'credit'));
+        $totalDebit = $this->totalWithTax(array_filter($journalEntriesData, fn ($e) => $e['type'] === 'debit'));
+        $totalCredit = $this->totalWithTax(array_filter($journalEntriesData, fn ($e) => $e['type'] === 'credit'));
 
         if ($totalDebit !== $totalCredit) {
             $diff = $totalDebit - $totalCredit;
@@ -72,10 +70,9 @@ class TransactionRegistrar
         });
     }
 
-
-    function totalWithTax(array $entries): int
+    public function totalWithTax(array $entries): int
     {
-        return collect($entries)->sum(fn($e) => (int) ($e['net_amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
+        return collect($entries)->sum(fn ($e) => (int) ($e['net_amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
     }
 
     protected function ensureEntriesBelongToBusinessUnit(FiscalYear $fiscalYear, array $validatedEntries): void
@@ -83,14 +80,13 @@ class TransactionRegistrar
         $businessUnit = $fiscalYear->businessUnit;
 
         foreach ($validatedEntries as $index => $entry) {
-            if (!$businessUnit->hasSubAccount((int) $entry['sub_account_id'])) {
+            if (! $businessUnit->hasSubAccount((int) $entry['sub_account_id'])) {
                 throw ValidationException::withMessages([
                     "journal_entries.$index.sub_account_id" => ['選択中の事業体に属する補助科目を指定してください。'],
                 ]);
             }
         }
     }
-
 
     public function confirmPlanned(Transaction $transaction): Transaction
     {
@@ -109,7 +105,6 @@ class TransactionRegistrar
             return $transaction->fresh();
         });
     }
-
 
     public function cancelPlanned(Transaction $transaction): Transaction
     {
@@ -134,7 +129,7 @@ class TransactionRegistrar
         })->all();
 
         return $this->confirmPlanned($transaction, [
-            'description' => $transaction->description . '（取消）',
+            'description' => $transaction->description.'（取消）',
             'date' => $transaction->date->toDateString(),
             'journal_entries' => $zeroedEntries,
         ]);

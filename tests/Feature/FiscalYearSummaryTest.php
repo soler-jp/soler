@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
-use App\Models\User;
 
 class FiscalYearSummaryTest extends TestCase
 {
@@ -15,7 +15,7 @@ class FiscalYearSummaryTest extends TestCase
     private function subAccountByTypeOrName($unit, string $typeOrName)
     {
         return $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('type', $typeOrName)->orWhere('name', $typeOrName))
+            ->whereHas('account', fn ($q) => $q->where('type', $typeOrName)->orWhere('name', $typeOrName))
             ->first();
     }
 
@@ -31,7 +31,7 @@ class FiscalYearSummaryTest extends TestCase
         $asset = $this->subAccountByTypeOrName($unit, 'asset');
         $liability = $this->subAccountByTypeOrName($unit, 'liability');
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $registrar->register($fiscalYear, [
             'date' => '2025-04-01',
@@ -69,7 +69,7 @@ class FiscalYearSummaryTest extends TestCase
         $asset = $this->subAccountByTypeOrName($unit, 'asset');
         $liability = $this->subAccountByTypeOrName($unit, 'liability');
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         // 売上 10,000 + 消費税 1,000
         $registrar->register($fiscalYear, [
@@ -128,7 +128,7 @@ class FiscalYearSummaryTest extends TestCase
         $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
         $asset = $this->subAccountByTypeOrName($unit, 'asset');
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         // 2025年度の売上
         $registrar->register($fy2025, [
@@ -165,7 +165,7 @@ class FiscalYearSummaryTest extends TestCase
         $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
         $asset = $this->subAccountByTypeOrName($unit, 'asset');
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $registrar->register($fiscalYear, [
             'date' => '2025-05-01',
@@ -192,7 +192,7 @@ class FiscalYearSummaryTest extends TestCase
         $expense = $this->subAccountByTypeOrName($unit, 'expense');
         $liability = $this->subAccountByTypeOrName($unit, 'liability');
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         $registrar->register($fiscalYear, [
             'date' => '2025-06-01',
@@ -235,7 +235,7 @@ class FiscalYearSummaryTest extends TestCase
         $asset = $this->subAccountByTypeOrName($unit, 'その他の預金');
         $liability = $this->subAccountByTypeOrName($unit, '預り金');
 
-        $registrar = new TransactionRegistrar();
+        $registrar = new TransactionRegistrar;
 
         // 実績売上 10,000円
         $registrar->register($fiscalYear, [

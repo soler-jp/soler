@@ -2,12 +2,11 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
-use Tests\TestCase;
-use PHPUnit\Framework\Attributes\Test;
-use App\Models\User;
 use App\Models\SubAccount;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class RegisterOpeningEntryTest extends TestCase
 {
@@ -64,9 +63,8 @@ class RegisterOpeningEntryTest extends TestCase
         $this->assertEquals('元入金', $credits->first()->subAccount->account->name);
     }
 
-
     #[Test]
-    public function SubAccountを指定して期首仕訳を登録できる()
+    public function sub_accountを指定して期首仕訳を登録できる()
     {
         $user = User::factory()->create();
 
@@ -100,13 +98,11 @@ class RegisterOpeningEntryTest extends TestCase
             ],
         ]);
 
-
         $this->assertEquals(3, $transaction->journalEntries->count());
 
         $unit->refresh();
         $subAccounts = $unit->subAccounts->all();
         $this->assertCount(53, $subAccounts, 'SubAccountが2つ追加されていることを確認');
-
 
         $this->assertDatabaseHas('sub_accounts', [
             'name' => '事務所レジ',
@@ -117,7 +113,7 @@ class RegisterOpeningEntryTest extends TestCase
         ]);
 
         $subAccountNames = $transaction->journalEntries
-            ->filter(fn($e) => $e->subAccount)
+            ->filter(fn ($e) => $e->subAccount)
             ->pluck('subAccount.name')
             ->all();
 
@@ -125,9 +121,8 @@ class RegisterOpeningEntryTest extends TestCase
         $this->assertContains('地方信用金庫', $subAccountNames);
     }
 
-
     #[Test]
-    public function 既存のSubAccountがある場合は再利用される()
+    public function 既存の_sub_accountがある場合は再利用される()
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
@@ -144,7 +139,6 @@ class RegisterOpeningEntryTest extends TestCase
         $existing = $cashAccount->subAccounts()->create([
             'name' => '金庫',
         ]);
-
 
         $transaction = $fiscalYear->registerOpeningEntry([
             [

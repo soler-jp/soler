@@ -17,7 +17,7 @@ class GeneralLedgerService
                     ->where('date', '<=', $fiscalYear->end_date);
             })
             ->get()
-            ->sortBy(fn($entry) => $entry->transaction->date)
+            ->sortBy(fn ($entry) => $entry->transaction->date)
             ->values();
 
         $balance = 0;
@@ -59,7 +59,7 @@ class GeneralLedgerService
                     ->where('date', '<=', $fiscalYear->end_date);
             })
             ->get()
-            ->sortBy(fn($entry) => $entry->transaction->date)
+            ->sortBy(fn ($entry) => $entry->transaction->date)
             ->values();
 
         $balance = 0;
@@ -92,8 +92,7 @@ class GeneralLedgerService
         return $ledger;
     }
 
-
-    /// 現金出納帳 / 預金出納帳
+    // / 現金出納帳 / 預金出納帳
     public function generateCashbook(FiscalYear $fiscalYear): array
     {
         $account = $fiscalYear->businessUnit->getAccountByName('現金');
