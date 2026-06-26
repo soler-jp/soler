@@ -54,6 +54,11 @@ class Transaction extends Model
         return $this->hasMany(JournalEntry::class);
     }
 
+    public function depreciationEntries(): HasMany
+    {
+        return $this->hasMany(DepreciationEntry::class);
+    }
+
     public function recurringTransactionPlan(): BelongsTo
     {
         return $this->belongsTo(RecurringTransactionPlan::class);

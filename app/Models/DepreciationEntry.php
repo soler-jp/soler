@@ -16,7 +16,7 @@ class DepreciationEntry extends Model
         'total_amount',
         'business_usage_ratio',
         'deductible_amount',
-        'journal_entry_id',
+        'transaction_id',
     ];
 
     protected $casts = [
@@ -36,14 +36,14 @@ class DepreciationEntry extends Model
     }
 
     // 記帳された仕訳
-    public function journalEntry(): BelongsTo
+    public function transaction(): BelongsTo
     {
-        return $this->belongsTo(JournalEntry::class);
+        return $this->belongsTo(Transaction::class);
     }
 
     // 未記帳かどうかを判定（便利メソッド）
     public function isUnposted(): bool
     {
-        return is_null($this->journal_entry_id);
+        return is_null($this->transaction_id);
     }
 }

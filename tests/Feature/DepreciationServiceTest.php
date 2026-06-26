@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\DepreciationEntry;
+use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\DepreciationService;
@@ -88,7 +89,7 @@ class DepreciationServiceTest extends TestCase
             'total_amount' => 32081,
             'business_usage_ratio' => 1.00,
             'deductible_amount' => 32081,
-            'journal_entry_id' => null,
+            'transaction_id' => null,
         ]);
 
         $entry = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->first();
@@ -472,6 +473,115 @@ class DepreciationServiceTest extends TestCase
             'fiscal_year_id' => $fiscalYear2025->id,
             'months' => 12,
         ]);
+    }
+
+    #[Test]
+    public function register_transaction_forは未記帳entryから減価償却仕訳を作成する()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2025 = $unit->createFiscalYear(2025);
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', '機械装置'))
+            ->firstOrFail();
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+        $expenseSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', '減価償却費'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
+            $fiscalYear2025,
+            $assetSubAccount,
+            $paymentSubAccount,
+            [
+                'name' => '工作機械',
+                'asset_category' => 'machinery',
+                'acquisition_date' => '2025-01-01',
+                'taxable_amount' => 120_000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 60,
+            ],
+            ['date' => '2025-01-01', 'description' => '工作機械購入'],
+        );
+
+        $entry = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->firstOrFail();
+
+        app(DepreciationService::class)->registerTransactionFor($entry);
+
+        $entry->refresh();
+
+        $this->assertNotNull($entry->transaction_id);
+        $this->assertFalse($entry->isUnposted());
+
+        $transaction = Transaction::findOrFail($entry->transaction_id);
+
+        $this->assertSame($fiscalYear2025->id, $transaction->fiscal_year_id);
+        $this->assertSame('2025-12-31', $transaction->date->toDateString());
+        $this->assertSame('2025年 減価償却: 工作機械', $transaction->description);
+        $this->assertTrue($transaction->is_adjusting_entry);
+        $this->assertCount(2, $transaction->journalEntries);
+
+        $this->assertTrue(
+            $transaction->journalEntries->contains(
+                fn (JournalEntry $journalEntry) => $journalEntry->type === JournalEntry::TYPE_DEBIT
+                    && $journalEntry->sub_account_id === $expenseSubAccount->id
+                    && $journalEntry->net_amount === $entry->deductible_amount
+                    && $journalEntry->tax_type === JournalEntry::TAX_TYPE_NON_TAXABLE
+            )
+        );
+
+        $this->assertTrue(
+            $transaction->journalEntries->contains(
+                fn (JournalEntry $journalEntry) => $journalEntry->type === JournalEntry::TYPE_CREDIT
+                    && $journalEntry->sub_account_id === $assetSubAccount->id
+                    && $journalEntry->net_amount === $entry->deductible_amount
+                    && $journalEntry->tax_type === JournalEntry::TAX_TYPE_NON_TAXABLE
+            )
+        );
+    }
+
+    #[Test]
+    public function register_transaction_forは記帳済みentryを再記帳できない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2025 = $unit->createFiscalYear(2025);
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', '機械装置'))
+            ->firstOrFail();
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
+            $fiscalYear2025,
+            $assetSubAccount,
+            $paymentSubAccount,
+            [
+                'name' => '検査装置',
+                'asset_category' => 'machinery',
+                'acquisition_date' => '2025-01-01',
+                'taxable_amount' => 120_000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 60,
+            ],
+            ['date' => '2025-01-01', 'description' => '検査装置購入'],
+        );
+
+        $entry = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->firstOrFail();
+        $service = app(DepreciationService::class);
+
+        $service->registerTransactionFor($entry);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $service->registerTransactionFor($entry->fresh());
     }
 
     // 後回し

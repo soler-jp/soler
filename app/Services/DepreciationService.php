@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\DepreciationEntry;
 use App\Models\FiscalYear;
 use App\Models\FixedAsset;
+use App\Models\JournalEntry;
 use App\Models\SubAccount;
 use App\Models\Transaction;
 use Carbon\Carbon;
@@ -12,6 +13,10 @@ use Illuminate\Support\Facades\DB;
 
 class DepreciationService
 {
+    public function __construct(
+        private readonly TransactionRegistrar $transactionRegistrar
+    ) {}
+
     private const NEW_STANDARD_CAR_PRESET = [
         'asset_category' => '新車-普通車',
         'useful_life' => 72,
@@ -169,7 +174,7 @@ class DepreciationService
                     'total_amount' => $totalAmount,
                     'business_usage_ratio' => $businessUsageRatio,
                     'deductible_amount' => $deductibleAmount,
-                    'journal_entry_id' => null,
+                    'transaction_id' => null,
                 ]
             );
         }
@@ -208,13 +213,67 @@ class DepreciationService
         // 実装は後で
     }
 
-    public function registerJournalEntryFor(DepreciationEntry $entry): void
+    public function registerTransactionFor(DepreciationEntry $entry): void
     {
-        // 実装は後で
+        $entry->loadMissing('fiscalYear.businessUnit', 'fixedAsset.account');
+
+        if (! $entry->isUnposted()) {
+            throw new \InvalidArgumentException('この減価償却明細は既に記帳済みです。');
+        }
+
+        $expenseSubAccount = $this->resolveDepreciationExpenseSubAccount($entry->fiscalYear);
+        $assetSubAccount = $this->resolveFixedAssetSubAccount($entry->fiscalYear, $entry->fixedAsset);
+
+        $transaction = $this->transactionRegistrar->register(
+            $entry->fiscalYear,
+            [
+                'date' => $entry->fiscalYear->end_date->toDateString(),
+                'description' => sprintf('%d年 減価償却: %s', $entry->fiscalYear->year, $entry->fixedAsset->name),
+                'is_adjusting_entry' => true,
+            ],
+            [
+                [
+                    'sub_account_id' => $expenseSubAccount->id,
+                    'type' => JournalEntry::TYPE_DEBIT,
+                    'net_amount' => $entry->deductible_amount,
+                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_amount' => 0,
+                ],
+                [
+                    'sub_account_id' => $assetSubAccount->id,
+                    'type' => JournalEntry::TYPE_CREDIT,
+                    'net_amount' => $entry->deductible_amount,
+                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_amount' => 0,
+                ],
+            ],
+        );
+
+        $entry->forceFill([
+            'transaction_id' => $transaction->id,
+        ])->save();
     }
 
-    public function registerAllUnregisteredEntriesFor(FiscalYear $fiscalYear): void
+    private function resolveDepreciationExpenseSubAccount(FiscalYear $fiscalYear): SubAccount
     {
-        // 実装は後で
+        $subAccount = $fiscalYear->businessUnit->getSubAccountByName('減価償却費', '減価償却費');
+
+        if ($subAccount === null) {
+            throw new \RuntimeException('減価償却費の補助科目が見つかりません。');
+        }
+
+        return $subAccount;
+    }
+
+    private function resolveFixedAssetSubAccount(FiscalYear $fiscalYear, FixedAsset $asset): SubAccount
+    {
+        $accountName = $asset->account->name;
+        $subAccount = $fiscalYear->businessUnit->getSubAccountByName($accountName, $accountName);
+
+        if ($subAccount === null) {
+            throw new \RuntimeException("{$accountName} の補助科目が見つかりません。");
+        }
+
+        return $subAccount;
     }
 }
