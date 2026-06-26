@@ -11,6 +11,52 @@ use Illuminate\Support\Facades\DB;
 
 class DepreciationService
 {
+    private const NEW_STANDARD_CAR_PRESET = [
+        'asset_category' => '新車-普通車',
+        'useful_life' => 72,
+        'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
+    ];
+
+    private const NEW_LIGHT_CAR_PRESET = [
+        'asset_category' => '新車-軽自動車',
+        'useful_life' => 48,
+        'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
+    ];
+
+    public function registerNewStandardCar(
+        FiscalYear $fiscalYear,
+        SubAccount $paymentSubAccount,
+        array $fixedAssetData,
+        array $transactionData
+    ): FixedAsset {
+        $assetSubAccount = $this->resolveVehicleAssetSubAccount($fiscalYear);
+
+        return $this->registerFixedAsset(
+            $fiscalYear,
+            $assetSubAccount,
+            $paymentSubAccount,
+            array_merge($fixedAssetData, self::NEW_STANDARD_CAR_PRESET),
+            $transactionData,
+        );
+    }
+
+    public function registerNewLightCar(
+        FiscalYear $fiscalYear,
+        SubAccount $paymentSubAccount,
+        array $fixedAssetData,
+        array $transactionData
+    ): FixedAsset {
+        $assetSubAccount = $this->resolveVehicleAssetSubAccount($fiscalYear);
+
+        return $this->registerFixedAsset(
+            $fiscalYear,
+            $assetSubAccount,
+            $paymentSubAccount,
+            array_merge($fixedAssetData, self::NEW_LIGHT_CAR_PRESET),
+            $transactionData,
+        );
+    }
+
     public function registerFixedAsset(
         FiscalYear $fiscalYear,
         SubAccount $assetSubAccount,
@@ -77,6 +123,17 @@ class DepreciationService
         });
     }
 
+
+    private function resolveVehicleAssetSubAccount(FiscalYear $fiscalYear): SubAccount
+    {
+        $subAccount = $fiscalYear->businessUnit->getSubAccountByName('車両運搬具', '車両運搬具');
+
+        if ($subAccount === null) {
+            throw new \RuntimeException('車両運搬具の補助科目が見つかりません。');
+        }
+
+        return $subAccount;
+    }
     public function prepareEntriesFor(FiscalYear $fiscalYear): void
     {
         // 実装は後で

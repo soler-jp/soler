@@ -82,66 +82,6 @@ class BusinessUnit extends Model
         return $this->hasMany(FixedAsset::class);
     }
 
-    /**
-     * 新車普通車の固定資産をプリセット作成
-     */
-    public function newStandardCarFixedAsset(array $attributes = []): FixedAsset
-    {
-        $account = Account::firstOrCreate(
-            [
-                'business_unit_id' => $this->id,
-                'name' => '車両運搬具',
-            ],
-            [
-                'type' => Account::TYPE_ASSET,
-            ]
-        );
-
-        return FixedAsset::create(array_merge([
-            'business_unit_id' => $this->id,
-            'account_id' => $account->id,
-            'asset_category' => '新車-普通車',
-            'name' => '新車-普通車',
-            'acquisition_date' => now()->toDateString(),
-            'taxable_amount' => 0,
-            'tax_amount' => 0,
-            'acquisition_cost' => 0,
-            'depreciation_base_amount' => 0,
-            'useful_life' => 72,
-            'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
-        ], $attributes));
-    }
-
-    /**
-     * 新車軽自動車の固定資産をプリセット作成
-     */
-    public function newLightCarFixedAsset(array $attributes = []): FixedAsset
-    {
-        $account = Account::firstOrCreate(
-            [
-                'business_unit_id' => $this->id,
-                'name' => '車両運搬具',
-            ],
-            [
-                'type' => Account::TYPE_ASSET,
-            ]
-        );
-
-        return FixedAsset::create(array_merge([
-            'business_unit_id' => $this->id,
-            'account_id' => $account->id,
-            'asset_category' => '新車-軽自動車',
-            'name' => '新車-軽自動車',
-            'acquisition_date' => now()->toDateString(),
-            'taxable_amount' => 0,
-            'tax_amount' => 0,
-            'acquisition_cost' => 0,
-            'depreciation_base_amount' => 0,
-            'useful_life' => 48,
-            'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
-        ], $attributes));
-    }
-
     // 初期勘定科目リスト
     public static array $defaultAccounts = [
         // 資産（asset）
