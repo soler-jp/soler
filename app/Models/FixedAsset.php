@@ -2,12 +2,17 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FixedAsset extends Model
 {
+    use HasFactory;
+
+    public const DEPRECIATION_METHOD_STRAIGHT_LINE = 'straight_line';
+
     protected $fillable = [
         'business_unit_id',
         'account_id',
@@ -30,8 +35,24 @@ class FixedAsset extends Model
     protected $casts = [
         'acquisition_date' => 'date',
         'disposed_at' => 'date',
+        'taxable_amount' => 'integer',
+        'tax_amount' => 'integer',
+        'acquisition_cost' => 'integer',
+        'depreciation_base_amount' => 'integer',
+        'useful_life' => 'integer',
+        'disposal_amount' => 'integer',
         'is_disposed' => 'boolean',
     ];
+
+    public function isNewStandardCar(): bool
+    {
+        return $this->asset_category === '新車-普通車';
+    }
+
+    public function isNewLightCar(): bool
+    {
+        return $this->asset_category === '新車-軽自動車';
+    }
 
     // 所属する事業体
     public function businessUnit(): BelongsTo
