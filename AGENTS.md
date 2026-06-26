@@ -115,6 +115,9 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - This project runs inside Laravel Sail's Docker containers. You MUST execute all commands through Sail.
 - Start services using `vendor/bin/sail up -d` and stop them with `vendor/bin/sail stop`.
 - Open the application in the browser by running `vendor/bin/sail open`.
+- In this environment, Sail is often already running when the user asks for work.
+- If `Docker or Podman is not running.` appears, treat it as a possible false negative caused by Codex being unable to access the local Docker socket.
+- In that case, do not stop at the startup check alone; proceed on the assumption that Sail may already be running and try the requested `vendor/bin/sail artisan test ...` or `vendor/bin/sail bin pint ...` command before asking the user to restart Sail.
 - Always prefix PHP, Artisan, Composer, and Node commands with `vendor/bin/sail`. Examples:
     - Run Artisan Commands: `vendor/bin/sail artisan migrate`
     - Install Composer packages: `vendor/bin/sail composer install`
