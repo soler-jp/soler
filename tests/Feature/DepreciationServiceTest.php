@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\DepreciationEntry;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\DepreciationService;
@@ -77,6 +78,22 @@ class DepreciationServiceTest extends TestCase
             'description' => 'ノートPCを購入',
             'fiscal_year_id' => $fiscalYear->id,
         ]);
+
+        $this->assertDatabaseHas('depreciation_entries', [
+            'fiscal_year_id' => $fiscalYear->id,
+            'fixed_asset_id' => $fixedAsset->id,
+            'months' => 7,
+            'ordinary_amount' => 32081,
+            'special_amount' => 0,
+            'total_amount' => 32081,
+            'business_usage_ratio' => 1.00,
+            'deductible_amount' => 32081,
+            'journal_entry_id' => null,
+        ]);
+
+        $entry = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->first();
+        $this->assertNotNull($entry);
+        $this->assertTrue($entry->isUnposted());
 
         $transaction = Transaction::where('description', 'ノートPCを購入')->first();
         $this->assertCount(2, $transaction->journalEntries);
@@ -171,6 +188,289 @@ class DepreciationServiceTest extends TestCase
             'asset_category' => '新車-軽自動車',
             'useful_life' => 48,
             'depreciation_method' => 'straight_line',
+        ]);
+    }
+
+    #[Test]
+    public function 取得年度と登録年度が同じ場合は_entry1件だけ作成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023);
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
+            ->firstOrFail();
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
+            $fiscalYear2023,
+            $assetSubAccount,
+            $paymentSubAccount,
+            [
+                'name' => 'ノートPC',
+                'asset_category' => 'furniture_fixtures',
+                'acquisition_date' => '2023-04-01',
+                'taxable_amount' => 120000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 36,
+            ],
+            ['date' => '2023-04-01', 'description' => 'ノートPC購入'],
+        );
+
+        $this->assertSame(1, DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->count());
+
+        $this->assertDatabaseHas('depreciation_entries', [
+            'fixed_asset_id' => $fixedAsset->id,
+            'fiscal_year_id' => $fiscalYear2023->id,
+            'months' => 9, // 4月〜12月
+        ]);
+    }
+
+    #[Test]
+    public function 過去年度に取得した固定資産を登録すると取得年度から登録年度まで全年度の_entryが作成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+
+        $fiscalYear2023 = $unit->createFiscalYear(2023);
+        $fiscalYear2024 = $unit->createFiscalYear(2024);
+        $fiscalYear2025 = $unit->createFiscalYear(2025);
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
+            ->firstOrFail();
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        // 耐用年数60ヶ月 → 月額 = floor(600_000 / 60) = 10_000円
+        // 2023年10月取得の資産を2025年度で登録
+        $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
+            $fiscalYear2025,
+            $assetSubAccount,
+            $paymentSubAccount,
+            [
+                'name' => 'サーバー機器',
+                'asset_category' => 'machinery',
+                'acquisition_date' => '2023-10-01',
+                'taxable_amount' => 600_000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 60,
+            ],
+            ['date' => '2025-01-01', 'description' => 'サーバー機器購入（過去年度）'],
+        );
+
+        $this->assertSame(3, DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->count());
+
+        // 2023年: 10月〜12月 = 3ヶ月
+        $this->assertDatabaseHas('depreciation_entries', [
+            'fixed_asset_id' => $fixedAsset->id,
+            'fiscal_year_id' => $fiscalYear2023->id,
+            'months' => 3,
+            'ordinary_amount' => 30_000,
+            'total_amount' => 30_000,
+            'deductible_amount' => 30_000,
+        ]);
+
+        // 2024年: 1月〜12月 = 12ヶ月
+        $this->assertDatabaseHas('depreciation_entries', [
+            'fixed_asset_id' => $fixedAsset->id,
+            'fiscal_year_id' => $fiscalYear2024->id,
+            'months' => 12,
+            'ordinary_amount' => 120_000,
+            'total_amount' => 120_000,
+            'deductible_amount' => 120_000,
+        ]);
+
+        // 2025年: 1月〜12月 = 12ヶ月
+        $this->assertDatabaseHas('depreciation_entries', [
+            'fixed_asset_id' => $fixedAsset->id,
+            'fiscal_year_id' => $fiscalYear2025->id,
+            'months' => 12,
+            'ordinary_amount' => 120_000,
+            'total_amount' => 120_000,
+            'deductible_amount' => 120_000,
+        ]);
+    }
+
+    #[Test]
+    public function d_bに存在しない中間年度は_entryをスキップする()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+
+        $fiscalYear2023 = $unit->createFiscalYear(2023);
+        // 2024年度はDBに作成しない
+        $fiscalYear2025 = $unit->createFiscalYear(2025);
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
+            ->firstOrFail();
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
+            $fiscalYear2025,
+            $assetSubAccount,
+            $paymentSubAccount,
+            [
+                'name' => 'コピー機',
+                'asset_category' => 'machinery',
+                'acquisition_date' => '2023-01-01',
+                'taxable_amount' => 360_000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 60,
+            ],
+            ['date' => '2025-01-01', 'description' => 'コピー機購入（過去年度）'],
+        );
+
+        // 2024年度が存在しないので2件だけ
+        $this->assertSame(2, DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->count());
+
+        $this->assertDatabaseHas('depreciation_entries', [
+            'fixed_asset_id' => $fixedAsset->id,
+            'fiscal_year_id' => $fiscalYear2023->id,
+        ]);
+        $this->assertDatabaseHas('depreciation_entries', [
+            'fixed_asset_id' => $fixedAsset->id,
+            'fiscal_year_id' => $fiscalYear2025->id,
+        ]);
+    }
+
+    #[Test]
+    public function 事業使用割合が設定された場合は必要経費算入額が按分される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2024 = $unit->createFiscalYear(2024);
+        $fiscalYear2025 = $unit->createFiscalYear(2025);
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
+            ->firstOrFail();
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        // 耐用年数48ヶ月 → 月額 = floor(1_200_000 / 48) = 25_000円
+        // 事業使用割合80%、2024年1月取得
+        $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
+            $fiscalYear2025,
+            $assetSubAccount,
+            $paymentSubAccount,
+            [
+                'name' => '自家用兼事業用PC',
+                'asset_category' => 'furniture_fixtures',
+                'acquisition_date' => '2024-01-01',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 48,
+                'business_usage_ratio' => 0.80,
+            ],
+            ['date' => '2025-01-01', 'description' => '自家用兼事業用PC購入'],
+        );
+
+        // 2024年: 12ヶ月 × 25_000 = 300_000 → 80% = 240_000
+        $this->assertDatabaseHas('depreciation_entries', [
+            'fixed_asset_id' => $fixedAsset->id,
+            'fiscal_year_id' => $fiscalYear2024->id,
+            'months' => 12,
+            'ordinary_amount' => 300_000,
+            'total_amount' => 300_000,
+            'business_usage_ratio' => '0.80',
+            'deductible_amount' => 240_000,
+        ]);
+
+        // 2025年: 12ヶ月 × 25_000 = 300_000 → 80% = 240_000
+        $this->assertDatabaseHas('depreciation_entries', [
+            'fixed_asset_id' => $fixedAsset->id,
+            'fiscal_year_id' => $fiscalYear2025->id,
+            'months' => 12,
+            'ordinary_amount' => 300_000,
+            'business_usage_ratio' => '0.80',
+            'deductible_amount' => 240_000,
+        ]);
+    }
+
+    #[Test]
+    public function 年度末月に取得した場合は1ヶ月分の_entryが作成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2025 = $unit->createFiscalYear(2025);
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
+            ->firstOrFail();
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
+            $fiscalYear2025,
+            $assetSubAccount,
+            $paymentSubAccount,
+            [
+                'name' => '年末購入機器',
+                'asset_category' => 'machinery',
+                'acquisition_date' => '2025-12-15',
+                'taxable_amount' => 120_000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 60,
+            ],
+            ['date' => '2025-12-15', 'description' => '年末購入機器'],
+        );
+
+        $this->assertDatabaseHas('depreciation_entries', [
+            'fixed_asset_id' => $fixedAsset->id,
+            'fiscal_year_id' => $fiscalYear2025->id,
+            'months' => 1,
+        ]);
+    }
+
+    #[Test]
+    public function 年度初日に取得した場合は12ヶ月分の_entryが作成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2025 = $unit->createFiscalYear(2025);
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
+            ->firstOrFail();
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
+            $fiscalYear2025,
+            $assetSubAccount,
+            $paymentSubAccount,
+            [
+                'name' => '年初購入機器',
+                'asset_category' => 'machinery',
+                'acquisition_date' => '2025-01-01',
+                'taxable_amount' => 120_000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 60,
+            ],
+            ['date' => '2025-01-01', 'description' => '年初購入機器'],
+        );
+
+        $this->assertDatabaseHas('depreciation_entries', [
+            'fixed_asset_id' => $fixedAsset->id,
+            'fiscal_year_id' => $fiscalYear2025->id,
+            'months' => 12,
         ]);
     }
 

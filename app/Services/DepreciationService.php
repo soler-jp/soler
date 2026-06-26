@@ -7,6 +7,7 @@ use App\Models\FiscalYear;
 use App\Models\FixedAsset;
 use App\Models\SubAccount;
 use App\Models\Transaction;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class DepreciationService
@@ -119,10 +120,60 @@ class DepreciationService
                 ],
             ]);
 
+            $this->createDepreciationEntriesUpTo($fiscalYear, $asset, $acquisitionDate, $fixedAssetData);
+
             return $asset;
         });
     }
 
+    /**
+     * 取得年度から $upToFiscalYear までの全年度分の DepreciationEntry を作成する。
+     * 過去の年度を遡って登録する場合に、途中年度が DB に存在しないことがあるため、
+     * 存在する年度分のみ作成する。
+     */
+    private function createDepreciationEntriesUpTo(
+        FiscalYear $upToFiscalYear,
+        FixedAsset $asset,
+        string $acquisitionDate,
+        array $fixedAssetData
+    ): void {
+        $acquisitionYear = (int) Carbon::parse($acquisitionDate)->format('Y');
+        $businessUsageRatio = (float) ($fixedAssetData['business_usage_ratio'] ?? 1.00);
+
+        $usefulLife = (int) $asset->useful_life;
+        $ordinaryMonthlyAmount = $usefulLife > 0
+            ? intdiv((int) $asset->depreciation_base_amount, $usefulLife)
+            : 0;
+
+        $fiscalYears = $upToFiscalYear->businessUnit->fiscalYears()
+            ->whereBetween('year', [$acquisitionYear, $upToFiscalYear->year])
+            ->orderBy('year')
+            ->get();
+
+        foreach ($fiscalYears as $fiscalYear) {
+            $months = $this->calculateDepreciationMonthsForFiscalYear($fiscalYear, $acquisitionDate);
+            $ordinaryAmount = $ordinaryMonthlyAmount * $months;
+            $specialAmount = 0;
+            $totalAmount = $ordinaryAmount + $specialAmount;
+            $deductibleAmount = (int) floor($totalAmount * $businessUsageRatio);
+
+            DepreciationEntry::updateOrCreate(
+                [
+                    'fiscal_year_id' => $fiscalYear->id,
+                    'fixed_asset_id' => $asset->id,
+                ],
+                [
+                    'months' => $months,
+                    'ordinary_amount' => $ordinaryAmount,
+                    'special_amount' => $specialAmount,
+                    'total_amount' => $totalAmount,
+                    'business_usage_ratio' => $businessUsageRatio,
+                    'deductible_amount' => $deductibleAmount,
+                    'journal_entry_id' => null,
+                ]
+            );
+        }
+    }
 
     private function resolveVehicleAssetSubAccount(FiscalYear $fiscalYear): SubAccount
     {
@@ -134,6 +185,24 @@ class DepreciationService
 
         return $subAccount;
     }
+
+    private function calculateDepreciationMonthsForFiscalYear(FiscalYear $fiscalYear, string $acquisitionDate): int
+    {
+        $fiscalStart = Carbon::parse($fiscalYear->start_date)->startOfMonth();
+        $fiscalEnd = Carbon::parse($fiscalYear->end_date)->endOfMonth();
+        $acquisitionMonth = Carbon::parse($acquisitionDate)->startOfMonth();
+
+        $depreciationStart = $acquisitionMonth->greaterThan($fiscalStart)
+            ? $acquisitionMonth
+            : $fiscalStart;
+
+        if ($depreciationStart->greaterThan($fiscalEnd)) {
+            return 0;
+        }
+
+        return $depreciationStart->diffInMonths($fiscalEnd) + 1;
+    }
+
     public function prepareEntriesFor(FiscalYear $fiscalYear): void
     {
         // 実装は後で
