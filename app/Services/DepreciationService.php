@@ -99,7 +99,6 @@ class DepreciationService
                 'acquisition_date' => $acquisitionDate,
                 'taxable_amount' => $taxableAmount,
                 'tax_amount' => $taxAmount,
-                'acquisition_cost' => $acquisitionCost,
                 'depreciation_base_amount' => $depreciationBaseAmount,
                 'useful_life' => $fixedAssetData['useful_life'],
                 'depreciation_method' => $fixedAssetData['depreciation_method'],
@@ -116,12 +115,12 @@ class DepreciationService
                 [
                     'sub_account_id' => $assetSubAccount->id,
                     'type' => 'debit',
-                    'net_amount' => $acquisitionCost,
+                    'net_amount' => $asset->acquisition_cost,
                 ],
                 [
                     'sub_account_id' => $paymentSubAccount->id,
                     'type' => 'credit',
-                    'net_amount' => $acquisitionCost,
+                    'net_amount' => $asset->acquisition_cost,
                 ],
             ]);
 

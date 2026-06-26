@@ -71,9 +71,10 @@ class DepreciationServiceTest extends TestCase
             'business_unit_id' => $unit->id,
             'taxable_amount' => 150000,
             'tax_amount' => 15000,
-            'acquisition_cost' => 165000,
             'depreciation_base_amount' => 165000,
         ]);
+
+        $this->assertSame(165000, $fixedAsset->acquisition_cost);
 
         $this->assertDatabaseHas('transactions', [
             'description' => 'ノートPCを購入',
@@ -636,7 +637,6 @@ class DepreciationServiceTest extends TestCase
     //             'business_unit_id' => $unit->id,
     //             'taxable_amount' => 150000,
     //             'tax_amount' => 15000,
-    //             'acquisition_cost' => 165000,
     //             'depreciation_base_amount' => 150000,
     //         ]);
 

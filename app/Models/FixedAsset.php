@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,7 +22,6 @@ class FixedAsset extends Model
         'acquisition_date',
         'taxable_amount',
         'tax_amount',
-        'acquisition_cost',
         'depreciation_base_amount',
         'useful_life',
         'depreciation_method',
@@ -37,7 +37,6 @@ class FixedAsset extends Model
         'disposed_at' => 'date',
         'taxable_amount' => 'integer',
         'tax_amount' => 'integer',
-        'acquisition_cost' => 'integer',
         'depreciation_base_amount' => 'integer',
         'useful_life' => 'integer',
         'disposal_amount' => 'integer',
@@ -52,6 +51,13 @@ class FixedAsset extends Model
     public function isNewLightCar(): bool
     {
         return $this->asset_category === '新車-軽自動車';
+    }
+
+    public function acquisitionCost(): Attribute
+    {
+        return Attribute::get(
+            fn () => $this->taxable_amount + $this->tax_amount,
+        );
     }
 
     // 所属する事業体

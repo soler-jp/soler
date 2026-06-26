@@ -19,6 +19,7 @@ class FixedAssetTest extends TestCase
         $this->assertSame('車両運搬具', $fixedAsset->account->name);
         $this->assertSame($fixedAsset->business_unit_id, $fixedAsset->account->business_unit_id);
         $this->assertSame('新車-普通車', $fixedAsset->asset_category);
+        $this->assertSame(2_200_000, $fixedAsset->acquisition_cost);
         $this->assertSame(72, $fixedAsset->useful_life);
         $this->assertFalse($fixedAsset->is_disposed);
     }
