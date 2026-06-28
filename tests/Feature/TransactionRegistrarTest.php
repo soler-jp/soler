@@ -760,6 +760,67 @@ class TransactionRegistrarTest extends TestCase
     }
 
     #[Test]
+    public function 決算済み会計年度には新規取引を登録できない()
+    {
+        $fiscalYear = FiscalYear::factory()->create([
+            'is_closed' => true,
+        ]);
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('決算済みの会計年度には新規取引を登録できません。');
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '決算済み年度テスト',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+    }
+
+    #[Test]
+    public function 課税事業者は見なし消費税区分を指定すると登録できない()
+    {
+        $fiscalYear = FiscalYear::factory()->create([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('課税事業者の会計年度では見なし消費税区分は使用できません。');
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '見なし税区分拒否',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+    }
+
+    #[Test]
     public function 課税事業者はnon_taxableのgross_amount入力を税額ゼロで保存できる()
     {
         $fiscalYear = FiscalYear::factory()->create([

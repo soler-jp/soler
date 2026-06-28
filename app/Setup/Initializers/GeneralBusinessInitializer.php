@@ -10,8 +10,8 @@ class GeneralBusinessInitializer
 {
     public function initialize(User $user, array $inputs): BusinessUnit
     {
-        if ($inputs['is_taxable'] || $inputs['is_tax_exclusive']) {
-            throw new InvalidArgumentException('現時点では免税事業者・税込経理のみ対応しています。');
+        if ($inputs['is_tax_exclusive']) {
+            throw new InvalidArgumentException('現時点では税抜経理は対応していません。');
         }
 
         $unit = $user->createBusinessUnitWithDefaults([

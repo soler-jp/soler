@@ -29,6 +29,12 @@ class TransactionRegistrar
             ]);
         }
 
+        if ($fiscalYear->is_closed) {
+            throw ValidationException::withMessages([
+                'fiscal_year_id' => ['決算済みの会計年度には新規取引を登録できません。'],
+            ]);
+        }
+
         // バリデーション（失敗すると ValidationException をスロー）
         $transactionData['fiscal_year_id'] = $fiscalYear->id;
         $transactionData = TransactionValidator::validate($transactionData);
@@ -39,6 +45,8 @@ class TransactionRegistrar
         foreach ($normalizedEntries as $entry) {
             $validatedEntries[] = JournalEntryValidator::validate($entry, false);
         }
+
+        $this->ensureTaxTypeAllowedForFiscalYear($fiscalYear, $validatedEntries);
 
         $this->ensureEntriesBelongToBusinessUnit($fiscalYear, $validatedEntries);
 
@@ -151,6 +159,26 @@ class TransactionRegistrar
             if (! $businessUnit->hasSubAccount((int) $entry['sub_account_id'])) {
                 throw ValidationException::withMessages([
                     "journal_entries.$index.sub_account_id" => ['選択中の事業体に属する補助科目を指定してください。'],
+                ]);
+            }
+        }
+    }
+
+    protected function ensureTaxTypeAllowedForFiscalYear(FiscalYear $fiscalYear, array $validatedEntries): void
+    {
+        if (! $fiscalYear->is_taxable) {
+            return;
+        }
+
+        foreach ($validatedEntries as $index => $entry) {
+            $taxType = $entry['tax_type'] ?? null;
+
+            if (in_array($taxType, [
+                JournalEntry::TAX_TYPE_DEEMED_TAXABLE_SALES_10,
+                JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10,
+            ], true)) {
+                throw ValidationException::withMessages([
+                    "journal_entries.$index.tax_type" => ['課税事業者の会計年度では見なし消費税区分は使用できません。'],
                 ]);
             }
         }

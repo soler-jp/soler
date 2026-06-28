@@ -168,7 +168,7 @@ class GeneralBusinessInitializerTest extends TestCase
     }
 
     #[Test]
-    public function 現段階では免税業者で税込経理の事業体以外は作成できない_課税業者_税込経理()
+    public function 課税業者で税込経理の事業体を作成できる()
     {
         $user = User::factory()->create();
 
@@ -185,9 +185,14 @@ class GeneralBusinessInitializerTest extends TestCase
         ];
 
         $initializer = new GeneralBusinessInitializer;
+        $unit = $initializer->initialize($user, $inputs);
 
-        $this->expectException(InvalidArgumentException::class);
-        $initializer->initialize($user, $inputs);
+        $this->assertDatabaseHas('fiscal_years', [
+            'business_unit_id' => $unit->id,
+            'year' => 2025,
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
     }
 
     #[Test]
