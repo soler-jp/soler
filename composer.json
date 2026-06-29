@@ -38,7 +38,8 @@
             "./vendor/bin/sail artisan test --compact"
         ],
         "test:mysql": [
-            "./vendor/bin/sail php vendor/bin/phpunit --configuration=phpunit.mysql.xml --group=mysql"
+            "DB_CONNECTION=mysql DB_HOST=mysql DB_PORT=3306 DB_DATABASE=testing DB_USERNAME=sail DB_PASSWORD=password php artisan migrate:fresh --database=mysql --force --no-interaction",
+            "php vendor/bin/phpunit --configuration=phpunit.mysql.xml --group=mysql"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
