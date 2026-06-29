@@ -6,6 +6,7 @@ use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -245,6 +246,11 @@ class BusinessUnit extends Model
     public function recurringTransactionPlans()
     {
         return $this->hasMany(RecurringTransactionPlan::class);
+    }
+
+    public function creditCards(): HasMany
+    {
+        return $this->hasMany(CreditCard::class);
     }
 
     public function createRecurringTransactionPlan(array $attributes): RecurringTransactionPlan
