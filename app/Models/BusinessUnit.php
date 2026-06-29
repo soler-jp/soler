@@ -147,8 +147,6 @@ class BusinessUnit extends Model
 
     public static array $defaultSubAccounts = [
         '事業主貸' => ['事業主貸', '源泉徴収'],
-        '現金' => ['レジ現金', 'その他現金'],
-        '売上高' => ['一般売上'],
     ];
 
     /**

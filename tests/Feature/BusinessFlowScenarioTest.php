@@ -126,9 +126,9 @@ class BusinessFlowScenarioTest extends TestCase
         /** @var FiscalYear $fiscalYear */
         $fiscalYear = $unit->fiscalYears()->where('year', 2025)->firstOrFail();
 
-        $revenueSubAccount = $unit->getSubAccountByName('売上高', '一般売上');
+        $revenueSubAccount = $unit->getSubAccountByName('売上高', '売上高');
         $expenseSubAccount = $unit->getSubAccountByName('消耗品費', '消耗品費');
-        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
         $liabilitySubAccount = $unit->getSubAccountByName('未払金', '未払金');
         $paymentSubAccount = $unit->getSubAccountByName('その他の預金', 'その他の預金');
 

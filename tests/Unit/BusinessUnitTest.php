@@ -341,7 +341,7 @@ class BusinessUnitTest extends TestCase
     }
 
     #[Test]
-    public function 現金の_sub_accountはレジ現金とその他現金()
+    public function 現金の_sub_accountは現金のみ()
     {
 
         $user = User::factory()->create();
@@ -356,8 +356,7 @@ class BusinessUnitTest extends TestCase
 
         $subAccounts = $cashAccount->subAccounts;
 
-        $this->assertCount(2, $subAccounts);
-        $this->assertEquals('レジ現金', $subAccounts->first()->name);
-        $this->assertEquals('その他現金', $subAccounts->last()->name);
+        $this->assertCount(1, $subAccounts);
+        $this->assertEquals('現金', $subAccounts->first()->name);
     }
 }

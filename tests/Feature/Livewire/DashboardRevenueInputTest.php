@@ -205,7 +205,7 @@ class DashboardRevenueInputTest extends TestCase
             'is_tax_exclusive' => false,
         ]);
 
-        $cashSubAccount = $user->selectedBusinessUnit->getSubAccountByName('現金', 'レジ現金');
+        $cashSubAccount = $user->selectedBusinessUnit->getSubAccountByName('現金', '現金');
 
         Livewire::actingAs($user)
             ->test('dashboard-revenue-input')
@@ -252,15 +252,15 @@ class DashboardRevenueInputTest extends TestCase
 
         // 現金（SubAccountなし → Accountで表示）
         $this->assertContainsOnlyInstancesOf(SubAccount::class, $groups['cash']);
-        $this->assertTrue(collect($groups['cash'])->contains(fn ($c) => $c->id === $cashSubAccount->id));
+        $this->assertTrue(collect($groups['cash'])->contains(fn($c) => $c->id === $cashSubAccount->id));
 
         // その他の預金（SubAccountが2つ → SubAccountで表示）
         $this->assertContainsOnlyInstancesOf(SubAccount::class, $groups['bank']);
-        $this->assertTrue(collect($groups['bank'])->contains(fn ($c) => $c->id === $bankSubAccount_1->id));
-        $this->assertTrue(collect($groups['bank'])->contains(fn ($c) => $c->id === $bankSubAccount_2->id));
+        $this->assertTrue(collect($groups['bank'])->contains(fn($c) => $c->id === $bankSubAccount_1->id));
+        $this->assertTrue(collect($groups['bank'])->contains(fn($c) => $c->id === $bankSubAccount_2->id));
 
         // 銀行本体は含まれない
-        $this->assertFalse(collect($groups['bank'])->contains(fn ($c) => $c instanceof Account && $c->id === $bankAccount->id));
+        $this->assertFalse(collect($groups['bank'])->contains(fn($c) => $c instanceof Account && $c->id === $bankAccount->id));
     }
 
     #[Test]
@@ -321,8 +321,8 @@ class DashboardRevenueInputTest extends TestCase
         $fy = $unit->createFiscalYear(2025);
         $unit->setCurrentFiscalYear($fy);
 
-        $revenueSubAccount = $unit->getSubAccountByName('売上高', '一般売上');
-        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+        $revenueSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
 
         Livewire::actingAs($user)
             ->test('dashboard-revenue-input')
@@ -361,7 +361,7 @@ class DashboardRevenueInputTest extends TestCase
             'is_tax_exclusive' => false,
         ]);
 
-        $revenueSubAccount = $unit->getSubAccountByName('売上高', '一般売上');
+        $revenueSubAccount = $unit->getSubAccountByName('売上高', '売上高');
         $bankAccount = $unit->getAccountByName('その他の預金');
         $bankSubAccount = $bankAccount->subAccounts()->create([
             'name' => 'テスト銀行',

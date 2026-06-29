@@ -73,7 +73,7 @@ class RegisterOpeningEntryTest extends TestCase
         ]);
 
         $orgSubAccounts = $unit->subAccounts->all();
-        $this->assertCount(51, $orgSubAccounts, '初期状態ではSubAccountがデフォルトの50');
+        $this->assertCount(50, $orgSubAccounts, '初期状態ではSubAccountがデフォルトの50');
 
         $this->assertDatabaseMissing('sub_accounts', [
             'name' => '事務所レジ',
@@ -102,7 +102,7 @@ class RegisterOpeningEntryTest extends TestCase
 
         $unit->refresh();
         $subAccounts = $unit->subAccounts->all();
-        $this->assertCount(53, $subAccounts, 'SubAccountが2つ追加されていることを確認');
+        $this->assertCount(52, $subAccounts, 'SubAccountが2つ追加されていることを確認');
 
         $this->assertDatabaseHas('sub_accounts', [
             'name' => '事務所レジ',
@@ -113,7 +113,7 @@ class RegisterOpeningEntryTest extends TestCase
         ]);
 
         $subAccountNames = $transaction->journalEntries
-            ->filter(fn ($e) => $e->subAccount)
+            ->filter(fn($e) => $e->subAccount)
             ->pluck('subAccount.name')
             ->all();
 

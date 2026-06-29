@@ -244,7 +244,79 @@ class GeneralBusinessInitializerTest extends TestCase
     }
 
     #[Test]
-    public function 売上高_sub_accountが生成される()
+    public function 初期設定で現金の期首残高がある場合は指定された現金_sub_accountのみを作る()
+    {
+        $user = User::factory()->create();
+        $initializer = new GeneralBusinessInitializer;
+        $unit = $initializer->initialize($user, [
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+            'opening_entries' => [
+                [
+                    'account_name' => '現金',
+                    'sub_account_name' => '手持ち現金',
+                    'amount' => 12000,
+                ],
+            ],
+        ]);
+
+        $cashAccount = $unit->accounts()->where('name', '現金')->firstOrFail();
+
+        $this->assertDatabaseHas('sub_accounts', [
+            'account_id' => $cashAccount->id,
+            'name' => '手持ち現金',
+        ]);
+
+        $this->assertDatabaseMissing('sub_accounts', [
+            'account_id' => $cashAccount->id,
+            'name' => 'レジ現金',
+        ]);
+
+        $this->assertDatabaseMissing('sub_accounts', [
+            'account_id' => $cashAccount->id,
+            'name' => 'その他現金',
+        ]);
+    }
+
+    #[Test]
+    public function 売上高_sub_accountは指定がなければ売上高になる()
+    {
+        $user = User::factory()->create();
+        $initializer = new GeneralBusinessInitializer;
+        $unit = $initializer->initialize($user, [
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+        ]);
+
+        $salesAccount = $unit->accounts()->where('name', '売上高')->firstOrFail();
+
+        $this->assertDatabaseHas('sub_accounts', [
+            'account_id' => $salesAccount->id,
+            'name' => '売上高',
+        ]);
+
+        $this->assertDatabaseMissing('sub_accounts', [
+            'account_id' => $salesAccount->id,
+            'name' => '一般売上',
+        ]);
+    }
+
+    #[Test]
+    public function 売上高_sub_accountが指定されている場合は指定されたもののみ生成される()
     {
         $user = User::factory()->create();
         $initializer = new GeneralBusinessInitializer;
@@ -274,6 +346,11 @@ class GeneralBusinessInitializerTest extends TestCase
         $this->assertDatabaseHas('sub_accounts', [
             'account_id' => $salesAccount->id,
             'name' => 'bbb商事',
+        ]);
+
+        $this->assertDatabaseMissing('sub_accounts', [
+            'account_id' => $salesAccount->id,
+            'name' => '一般売上',
         ]);
     }
 }

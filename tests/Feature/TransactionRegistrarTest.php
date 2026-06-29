@@ -865,12 +865,12 @@ class TransactionRegistrarTest extends TestCase
         ]);
 
         $unit = $fiscalYear->businessUnit;
-        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
-        $salesSubAccount = $unit->getSubAccountByName('売上高', '一般売上');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-01',
-            'description' => '免税事業者のレジ売上',
+            'description' => '免税事業者の現金売上',
         ], [
             [
                 'sub_account_id' => $cashSubAccount->id,
@@ -908,7 +908,7 @@ class TransactionRegistrarTest extends TestCase
 
         $unit = $fiscalYear->businessUnit;
         $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
-        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-02',
@@ -949,8 +949,8 @@ class TransactionRegistrarTest extends TestCase
         ]);
 
         $unit = $fiscalYear->businessUnit;
-        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
-        $salesSubAccount = $unit->getSubAccountByName('売上高', '一般売上');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-03',
@@ -988,7 +988,7 @@ class TransactionRegistrarTest extends TestCase
 
         $unit = $fiscalYear->businessUnit;
         $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
-        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-04',
@@ -1026,7 +1026,7 @@ class TransactionRegistrarTest extends TestCase
 
         $unit = $fiscalYear->businessUnit;
         $expenseSubAccount = $unit->getSubAccountByName('雑費', '雑費');
-        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-05',
@@ -1064,7 +1064,7 @@ class TransactionRegistrarTest extends TestCase
 
         $unit = $fiscalYear->businessUnit;
         $purchaseSubAccount = $unit->getSubAccountByName('仕入金額', '仕入金額');
-        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-06',
@@ -1122,7 +1122,7 @@ class TransactionRegistrarTest extends TestCase
 
         $unit = $fiscalYear->businessUnit;
         $expenseSubAccount = $unit->getSubAccountByName('地代家賃', '地代家賃');
-        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-07',
@@ -1220,8 +1220,8 @@ class TransactionRegistrarTest extends TestCase
         $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $ownExpense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
-        $foreignAsset = $otherUnit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
+        $ownExpense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
+        $foreignAsset = $otherUnit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('選択中の事業体に属する補助科目を指定してください。');
@@ -1282,8 +1282,8 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
-        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
 
         $registrar = new TransactionRegistrar;
 
@@ -1323,9 +1323,9 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
-        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
-        $liability = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '未払金'))->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
+        $liability = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '未払金'))->first();
 
         $registrar = new TransactionRegistrar;
 
@@ -1385,8 +1385,8 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
-        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
 
         $registrar = new TransactionRegistrar;
 
@@ -1422,7 +1422,7 @@ class TransactionRegistrarTest extends TestCase
         $this->assertFalse($cancelled->is_planned);
         $this->assertSame('取消予定取引（取消）', $cancelled->description);
         $this->assertCount(2, $cancelled->journalEntries);
-        $this->assertTrue($cancelled->journalEntries->every(fn ($e) => $e->net_amount === 0));
+        $this->assertTrue($cancelled->journalEntries->every(fn($e) => $e->net_amount === 0));
 
         foreach ($cancelled->journalEntries as $entry) {
             $this->assertContains($entry->id, $originalIds);
@@ -1438,8 +1438,8 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
-        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
 
         $registrar = new TransactionRegistrar;
 

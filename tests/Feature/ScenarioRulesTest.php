@@ -65,8 +65,8 @@ class ScenarioRulesTest extends TestCase
         $fiscalYear = $unit->createFiscalYear(2026);
         $fiscalYear->forceFill(['is_closed' => true])->save();
 
-        $debitAccount = $unit->getSubAccountByName('現金', 'レジ現金');
-        $creditAccount = $unit->getSubAccountByName('売上高', '一般売上');
+        $debitAccount = $unit->getSubAccountByName('現金', '現金');
+        $creditAccount = $unit->getSubAccountByName('売上高', '売上高');
 
         $this->assertNotNull($debitAccount);
         $this->assertNotNull($creditAccount);
@@ -117,7 +117,7 @@ class ScenarioRulesTest extends TestCase
         /** @var FiscalYear $fiscalYear */
         $fiscalYear = $unit->fiscalYears()->where('year', 2026)->firstOrFail();
         $expenseSubAccount = $unit->getSubAccountByName('消耗品費', '消耗品費');
-        $cashSubAccount = $unit->getSubAccountByName('現金', 'レジ現金');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
 
         $this->assertNotNull($expenseSubAccount);
         $this->assertNotNull($cashSubAccount);
