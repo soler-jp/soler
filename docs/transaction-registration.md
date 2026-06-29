@@ -34,6 +34,23 @@
 - `Transaction` と `JournalEntry` の永続化
 - DB トランザクション境界の管理
 
+## 取引状態変更との責務分離
+
+`TransactionRegistrar` は「新規登録の入口」であり、既存 `Transaction` の状態変更までは持たせない。
+
+- `register()` は `Transaction` と `JournalEntry` を新規作成するユースケースを扱う
+- `is_active` / `deactivated_at` / `deactivated_by` / `deactivation_reason` の更新は `Transaction` 自身の明示メソッドで扱う
+- `Transaction` の無効化は `Transaction::deactivate()` を正規ルートとする
+
+この方針を採る理由は次の通り。
+
+- 登録サービスに更新・削除責務まで混ぜないため
+- `Transaction` 単体の状態遷移をモデルの public API として読めるようにするため
+- 今後、無効化時の副作用が増えた場合に `TransactionDeactivator` のような専用サービスへ切り出しやすくするため
+
+したがって、`TransactionRegistrar` 経由でしか `is_active` を変更できない設計にはしない。
+一方で、アプリケーションコードから `is_active` を直接 mass assignment する実装は増やさず、無効化は明示メソッド経由に寄せる。
+
 ## 保存データの意味
 
 `JournalEntry` に保存する金額は、将来の比較集計に使えるよう、税情報を失わない形にそろえる。

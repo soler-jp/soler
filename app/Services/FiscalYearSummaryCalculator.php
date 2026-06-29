@@ -76,6 +76,7 @@ class FiscalYearSummaryCalculator
             ->whereHas('transaction', function (Builder $query) use ($fiscalYear, $isPlanned): void {
                 $query
                     ->whereBelongsTo($fiscalYear)
+                    ->where('is_active', true)
                     ->where('is_planned', $isPlanned);
             })
             ->whereHas('subAccount.account', fn (Builder $query) => $query->where('type', $accountType))

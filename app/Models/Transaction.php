@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,12 +23,23 @@ class Transaction extends Model
         'is_planned',
         'recurring_transaction_plan_id',
         'created_by',
+        'credit_card_import_batch_id',
+        'is_active',
+        'deactivated_at',
+        'deactivated_by',
+        'deactivation_reason',
     ];
 
     protected $casts = [
         'date' => 'date',
         'is_adjusting_entry' => 'boolean',
         'is_planned' => 'boolean',
+        'is_active' => 'boolean',
+        'deactivated_at' => 'datetime',
+    ];
+
+    protected $attributes = [
+        'is_active' => true,
     ];
 
     /**
@@ -46,6 +58,16 @@ class Transaction extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function deactivator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'deactivated_by');
+    }
+
+    public function creditCardImportBatch(): BelongsTo
+    {
+        return $this->belongsTo(CreditCardImportBatch::class, 'credit_card_import_batch_id');
+    }
+
     /**
      * この取引に属する仕訳明細
      */
@@ -59,9 +81,24 @@ class Transaction extends Model
         return $this->hasMany(DepreciationEntry::class);
     }
 
+    public function creditCardStatementLines(): HasMany
+    {
+        return $this->hasMany(CreditCardStatementLine::class);
+    }
+
     public function recurringTransactionPlan(): BelongsTo
     {
         return $this->belongsTo(RecurringTransactionPlan::class);
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
+
+    public function scopeInactive(Builder $query): Builder
+    {
+        return $query->where('is_active', false);
     }
 
     /**
@@ -98,6 +135,20 @@ class Transaction extends Model
     public function getTotalAmountAttribute(): int
     {
         return $this->journalEntries->where('type', 'credit')->sum('net_amount');
+    }
+
+    public function deactivate(?User $user = null, ?string $reason = null): void
+    {
+        if (! $this->is_active) {
+            return;
+        }
+
+        $this->forceFill([
+            'is_active' => false,
+            'deactivated_at' => now(),
+            'deactivated_by' => $user?->id,
+            'deactivation_reason' => $reason,
+        ])->save();
     }
 
     public function getCreditAccountsLabelAttribute(): string

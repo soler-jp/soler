@@ -23,6 +23,7 @@ class TransactionFactory extends Factory
             'fiscal_year_id' => FiscalYear::factory(),
             'date' => $this->faker->dateTimeBetween('-1 year', 'now')->format('Y-m-d'),
             'created_by' => User::factory(),
+            'is_active' => true,
         ];
     }
 }

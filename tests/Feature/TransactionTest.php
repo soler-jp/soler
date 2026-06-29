@@ -40,6 +40,32 @@ class TransactionTest extends TestCase
         ]);
     }
 
+    #[Test]
+    public function transactionはactiveフラグをbooleanとして扱える()
+    {
+        $transaction = Transaction::factory()->create([
+            'is_active' => false,
+        ]);
+
+        $this->assertFalse($transaction->is_active);
+    }
+
+    #[Test]
+    public function transactionをdeactivateできる()
+    {
+        $user = User::factory()->create();
+        $transaction = Transaction::factory()->create();
+
+        $transaction->deactivate($user, '誤登録のため無効化');
+
+        $transaction->refresh();
+
+        $this->assertFalse($transaction->is_active);
+        $this->assertNotNull($transaction->deactivated_at);
+        $this->assertSame($user->id, $transaction->deactivated_by);
+        $this->assertSame('誤登録のため無効化', $transaction->deactivation_reason);
+    }
+
     // /////////////////////////
 
     #[Test]

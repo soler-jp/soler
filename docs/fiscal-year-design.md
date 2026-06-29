@@ -146,6 +146,12 @@
   - `account.type = expense`
   - `journal_entries.type = debit`
 
+加えて、`Transaction.is_active = true` の取引だけを集計対象にする。
+
+- `is_active = false` の取引は履歴として保持する
+- 履歴保持された `JournalEntry` が残っていても、年度集計には含めない
+- 集計ロジックは `JournalEntry` ではなく親 `Transaction` の active 状態で判定する
+
 ## 現在の実装方針
 
 ### 1. 集計の入口は `FiscalYear`
@@ -231,6 +237,8 @@
 - 総額ベース集計で既存と同じ結果になる
 - `calculateAmountSummary()` が売上・経費の `net_amount` / `tax_amount` / `gross_amount` を返せる
 - 複数の実績売上・実績経費・予定売上・予定経費を合算できる
+- `inactive` にした実績取引が年度集計に含まれない
+- `inactive` にした予定取引が年度金額集計に含まれない
 
 ## 非目標
 

@@ -148,4 +148,45 @@ class CreditCardModelsTest extends TestCase
         $this->assertTrue($batch->lines->contains($line));
         $this->assertTrue($transaction->creditCardStatementLines->contains($line));
     }
+
+    #[Test]
+    public function バッチを無効化すると関連明細行と取引も無効化される(): void
+    {
+        $user = User::factory()->create();
+        $statement = CreditCardStatement::factory()->create();
+        $batch = CreditCardImportBatch::factory()->create([
+            'credit_card_statement_id' => $statement->id,
+        ]);
+        $transaction = Transaction::factory()->create([
+            'credit_card_import_batch_id' => $batch->id,
+        ]);
+        $line = CreditCardStatementLine::factory()->create([
+            'credit_card_statement_id' => $statement->id,
+            'credit_card_import_batch_id' => $batch->id,
+            'transaction_id' => $transaction->id,
+            'status' => CreditCardStatementLine::STATUS_REGISTERED,
+        ]);
+
+        $batch->deactivate($user, 'CSV修正版を再アップロード');
+
+        $this->assertFalse($batch->fresh()->is_active);
+        $this->assertFalse($line->fresh()->is_active);
+        $this->assertFalse($transaction->fresh()->is_active);
+        $this->assertSame($user->id, $batch->fresh()->deactivated_by);
+        $this->assertSame('CSV修正版を再アップロード', $transaction->fresh()->deactivation_reason);
+    }
+
+    #[Test]
+    public function 明細の進捗計算はactiveな明細行だけを見る(): void
+    {
+        $statement = CreditCardStatement::factory()->create();
+
+        CreditCardStatementLine::factory()->create([
+            'credit_card_statement_id' => $statement->id,
+            'status' => CreditCardStatementLine::STATUS_UNREVIEWED,
+            'is_active' => false,
+        ]);
+
+        $this->assertSame(CreditCardStatement::STATUS_EMPTY, $statement->fresh()->computed_status);
+    }
 }

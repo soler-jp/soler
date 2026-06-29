@@ -475,6 +475,109 @@ class FiscalYearSummaryTest extends TestCase
     }
 
     #[Test]
+    public function inactiveな実績取引は年度集計に含まれない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'inactive実績集計']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
+        $expense = $this->subAccountByTypeOrName($unit, 'expense');
+        $asset = $this->subAccountByTypeOrName($unit, 'asset');
+        $liability = $this->subAccountByTypeOrName($unit, 'liability');
+
+        $registrar = new TransactionRegistrar;
+
+        $activeRevenue = $registrar->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '有効な売上',
+        ], [
+            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 10000],
+            ['sub_account_id' => $asset->id, 'type' => 'debit', 'net_amount' => 10000],
+        ]);
+
+        $inactiveExpense = $registrar->register($fiscalYear, [
+            'date' => '2025-04-02',
+            'description' => '無効化される経費',
+        ], [
+            ['sub_account_id' => $expense->id, 'type' => 'debit', 'net_amount' => 5000],
+            ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 5000],
+        ]);
+
+        $inactiveExpense->deactivate($user, '誤登録');
+
+        $summary = $fiscalYear->calculateSummary()['actual'];
+
+        $this->assertTrue($activeRevenue->fresh()->is_active);
+        $this->assertFalse($inactiveExpense->fresh()->is_active);
+        $this->assertSame(10000, $summary['total_income']);
+        $this->assertSame(0, $summary['total_expense']);
+        $this->assertSame(10000, $summary['profit']);
+    }
+
+    #[Test]
+    public function inactiveな予定取引は金額集計に含まれない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'inactive予定集計']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
+        $expense = $this->subAccountByTypeOrName($unit, 'expense');
+        $asset = $this->subAccountByTypeOrName($unit, 'asset');
+        $liability = $this->subAccountByTypeOrName($unit, 'liability');
+
+        $registrar = new TransactionRegistrar;
+
+        $activePlannedRevenue = $registrar->register($fiscalYear, [
+            'date' => '2025-05-01',
+            'description' => '有効な予定売上',
+            'is_planned' => true,
+        ], [
+            [
+                'sub_account_id' => $revenue->id,
+                'type' => 'credit',
+                'net_amount' => 20000,
+                'tax_amount' => 2000,
+                'tax_type' => 'taxable_sales_10',
+            ],
+            ['sub_account_id' => $asset->id, 'type' => 'debit', 'net_amount' => 22000],
+        ]);
+
+        $inactivePlannedExpense = $registrar->register($fiscalYear, [
+            'date' => '2025-05-02',
+            'description' => '無効化される予定経費',
+            'is_planned' => true,
+        ], [
+            [
+                'sub_account_id' => $expense->id,
+                'type' => 'debit',
+                'net_amount' => 3000,
+                'tax_amount' => 300,
+                'tax_type' => 'taxable_purchases_10',
+            ],
+            ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 3300],
+        ]);
+
+        $inactivePlannedExpense->deactivate($user, '取消');
+
+        $summary = $fiscalYear->calculateAmountSummary();
+
+        $this->assertTrue($activePlannedRevenue->fresh()->is_active);
+        $this->assertFalse($inactivePlannedExpense->fresh()->is_active);
+        $this->assertSame([
+            'net_amount' => 20000,
+            'tax_amount' => 2000,
+            'gross_amount' => 22000,
+        ], $summary['planned']['sales']);
+        $this->assertSame([
+            'net_amount' => 0,
+            'tax_amount' => 0,
+            'gross_amount' => 0,
+        ], $summary['planned']['expenses']);
+    }
+
+    #[Test]
     #[Group('mysql')]
     public function only_full_group_byが有効でもダッシュボードを表示できる()
     {
