@@ -65,9 +65,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['credit_card_import_batch_id', 'line_number'], 'credit_card_batch_line_number_unique');
-            $table->index(['credit_card_statement_id', 'status']);
-            $table->index(['credit_card_statement_id', 'is_active']);
-            $table->index(['credit_card_statement_id', 'fingerprint']);
+            $table->index(['credit_card_statement_id', 'status'], 'ccsl_stmt_status_idx');
+            $table->index(['credit_card_statement_id', 'is_active'], 'ccsl_stmt_active_idx');
+            $table->index(['credit_card_statement_id', 'fingerprint'], 'ccsl_stmt_fingerprint_idx');
             $table->index('used_on');
         });
     }

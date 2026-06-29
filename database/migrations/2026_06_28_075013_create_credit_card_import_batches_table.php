@@ -63,7 +63,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['credit_card_statement_id', 'status']);
-            $table->index(['credit_card_statement_id', 'is_active']);
+            $table->index(['credit_card_statement_id', 'is_active'], 'ccib_stmt_active_idx');
         });
     }
 
