@@ -17,6 +17,14 @@ class BusinessUnit extends Model
 {
     use HasFactory;
 
+    public const CREDIT_SOURCE_CATEGORY_CASH = 'cash';
+
+    public const CREDIT_SOURCE_CATEGORY_BANK = 'bank';
+
+    public const CREDIT_SOURCE_CATEGORY_CARD = 'card';
+
+    public const CREDIT_SOURCE_CATEGORY_PRIVATE = 'private';
+
     public const TYPE_GENERAL = 'general';
 
     public const TYPE_AGRICULTURE = 'agriculture';
@@ -33,6 +41,13 @@ class BusinessUnit extends Model
         self::TYPE_GENERAL => '一般',
         self::TYPE_AGRICULTURE => '農業',
         self::TYPE_REAL_ESTATE => '不動産',
+    ];
+
+    public const CREDIT_SOURCE_CATEGORY_LABELS = [
+        self::CREDIT_SOURCE_CATEGORY_CASH => '現金',
+        self::CREDIT_SOURCE_CATEGORY_BANK => '銀行口座',
+        self::CREDIT_SOURCE_CATEGORY_CARD => 'クレジットカード',
+        self::CREDIT_SOURCE_CATEGORY_PRIVATE => 'プライベート資金',
     ];
 
     protected $fillable = [
@@ -251,6 +266,28 @@ class BusinessUnit extends Model
         return $this->hasMany(CreditCard::class);
     }
 
+    /**
+     * @return Collection<int, array{
+     *     key: string,
+     *     category: string,
+     *     category_label: string,
+     *     label: string,
+     *     description: string,
+     *     sub_account_id: int,
+     *     account_id: int,
+     *     sort_order: int
+     * }>
+     */
+    public function availableCreditSources(): Collection
+    {
+        return $this->buildCashCreditSources()
+            ->concat($this->buildBankCreditSources())
+            ->concat($this->buildCreditCardSources())
+            ->concat($this->buildPrivateCreditSources())
+            ->sortBy('sort_order')
+            ->values();
+    }
+
     public function createRecurringTransactionPlan(array $attributes): RecurringTransactionPlan
     {
         $attributes['business_unit_id'] = $this->id;
@@ -329,5 +366,204 @@ class BusinessUnit extends Model
         if (is_null($this->current_fiscal_year_id)) {
             $this->setCurrentFiscalYear($fiscalYear);
         }
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     key: string,
+     *     category: string,
+     *     category_label: string,
+     *     label: string,
+     *     description: string,
+     *     sub_account_id: int,
+     *     account_id: int,
+     *     sort_order: int
+     * }>
+     */
+    private function buildCashCreditSources(): Collection
+    {
+        $account = $this->getAccountByName('現金');
+
+        if ($account === null) {
+            return collect();
+        }
+
+        $explicitSubAccounts = $account->subAccounts
+            ->filter(fn (SubAccount $subAccount): bool => $subAccount->name !== $account->name);
+
+        $hasUsage = $this->hasAnyActiveJournalEntryForAccount($account);
+
+        if (! $hasUsage && $explicitSubAccounts->isEmpty()) {
+            return collect();
+        }
+
+        $availableSubAccounts = $hasUsage
+            ? $account->subAccounts
+            : $explicitSubAccounts;
+
+        return $availableSubAccounts
+            ->map(fn (SubAccount $subAccount): array => $this->makeCreditSourceOption(
+                key: 'cash-sub-account:'.$subAccount->id,
+                category: self::CREDIT_SOURCE_CATEGORY_CASH,
+                label: $subAccount->name,
+                description: '手元の現金から支払う',
+                subAccount: $subAccount,
+                sortOrder: 10,
+            ))
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     key: string,
+     *     category: string,
+     *     category_label: string,
+     *     label: string,
+     *     description: string,
+     *     sub_account_id: int,
+     *     account_id: int,
+     *     sort_order: int
+     * }>
+     */
+    private function buildBankCreditSources(): Collection
+    {
+        $account = $this->getAccountByName('その他の預金');
+
+        if ($account === null) {
+            return collect();
+        }
+
+        $explicitSubAccounts = $account->subAccounts
+            ->filter(fn (SubAccount $subAccount): bool => $subAccount->name !== 'その他の預金');
+
+        $hasUsage = $this->hasAnyActiveJournalEntryForAccount($account);
+
+        if (! $hasUsage && $explicitSubAccounts->isEmpty()) {
+            return collect();
+        }
+
+        return $explicitSubAccounts
+            ->map(fn (SubAccount $subAccount): array => $this->makeCreditSourceOption(
+                key: 'bank-sub-account:'.$subAccount->id,
+                category: self::CREDIT_SOURCE_CATEGORY_BANK,
+                label: $subAccount->name,
+                description: '事業用の銀行口座から支払う',
+                subAccount: $subAccount,
+                sortOrder: 20,
+            ))
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     key: string,
+     *     category: string,
+     *     category_label: string,
+     *     label: string,
+     *     description: string,
+     *     sub_account_id: int,
+     *     account_id: int,
+     *     sort_order: int
+     * }>
+     */
+    private function buildCreditCardSources(): Collection
+    {
+        return $this->creditCards()
+            ->with('liabilitySubAccount.account')
+            ->where('ownership_type', CreditCard::OWNERSHIP_TYPE_BUSINESS)
+            ->where('is_active', true)
+            ->get()
+            ->filter(fn (CreditCard $creditCard): bool => $creditCard->liabilitySubAccount !== null)
+            ->map(function (CreditCard $creditCard): array {
+                /** @var SubAccount $subAccount */
+                $subAccount = $creditCard->liabilitySubAccount;
+
+                return $this->makeCreditSourceOption(
+                    key: 'card:'.$creditCard->id,
+                    category: self::CREDIT_SOURCE_CATEGORY_CARD,
+                    label: $creditCard->display_label,
+                    description: '事業用クレジットカードで支払う',
+                    subAccount: $subAccount,
+                    sortOrder: 30,
+                );
+            })
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     key: string,
+     *     category: string,
+     *     category_label: string,
+     *     label: string,
+     *     description: string,
+     *     sub_account_id: int,
+     *     account_id: int,
+     *     sort_order: int
+     * }>
+     */
+    private function buildPrivateCreditSources(): Collection
+    {
+        $account = $this->getAccountByName('事業主借');
+
+        if ($account === null) {
+            return collect();
+        }
+
+        return $account->subAccounts
+            ->map(function (SubAccount $subAccount): array {
+                $label = $subAccount->name === '事業主借'
+                    ? 'プライベートの財布・クレジットから支払い'
+                    : $subAccount->name;
+
+                return $this->makeCreditSourceOption(
+                    key: 'private-sub-account:'.$subAccount->id,
+                    category: self::CREDIT_SOURCE_CATEGORY_PRIVATE,
+                    label: $label,
+                    description: '個人のお金で立て替えて支払った場合',
+                    subAccount: $subAccount,
+                    sortOrder: 40,
+                );
+            })
+            ->values();
+    }
+
+    /**
+     * @return array{
+     *     key: string,
+     *     category: string,
+     *     category_label: string,
+     *     label: string,
+     *     description: string,
+     *     sub_account_id: int,
+     *     account_id: int,
+     *     sort_order: int
+     * }
+     */
+    private function makeCreditSourceOption(
+        string $key,
+        string $category,
+        string $label,
+        string $description,
+        SubAccount $subAccount,
+        int $sortOrder,
+    ): array {
+        return [
+            'key' => $key,
+            'category' => $category,
+            'category_label' => self::CREDIT_SOURCE_CATEGORY_LABELS[$category],
+            'label' => $label,
+            'description' => $description,
+            'sub_account_id' => $subAccount->id,
+            'account_id' => $subAccount->account_id,
+            'sort_order' => $sortOrder,
+        ];
+    }
+
+    private function hasAnyActiveJournalEntryForAccount(Account $account): bool
+    {
+        return $account->journalEntries()
+            ->whereHas('transaction', fn ($query) => $query->active())
+            ->exists();
     }
 }

@@ -3,7 +3,9 @@
 namespace Tests\Unit;
 
 use App\Models\BusinessUnit;
+use App\Models\CreditCard;
 use App\Models\User;
+use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
@@ -358,5 +360,175 @@ class BusinessUnitTest extends TestCase
 
         $this->assertCount(1, $subAccounts);
         $this->assertEquals('現金', $subAccounts->first()->name);
+    }
+
+    #[Test]
+    public function available_credit_sourcesは利用可能な貸方候補だけを返す(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業所',
+        ]);
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $cashAccount = $businessUnit->getAccountByName('現金');
+        $bankAccount = $businessUnit->getAccountByName('その他の預金');
+        $privateAccount = $businessUnit->getAccountByName('事業主借');
+        $liabilityAccount = $businessUnit->getAccountByName('未払金');
+
+        $cashAccount?->createSubAccount(['name' => '金庫現金']);
+        $bankA = $bankAccount?->createSubAccount(['name' => 'XX銀行']);
+        $bankB = $bankAccount?->createSubAccount(['name' => 'OO銀行']);
+        $privateAccount?->createSubAccount(['name' => '家族立替']);
+        $cardLiability = $liabilityAccount?->createSubAccount(['name' => 'Amex Business']);
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-01-15',
+            'description' => '現金利用実績',
+        ], [
+            [
+                'sub_account_id' => $privateAccount?->subAccounts()->first()?->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $cashAccount?->subAccounts()->first()?->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-01-20',
+            'description' => '銀行利用実績',
+        ], [
+            [
+                'sub_account_id' => $privateAccount?->subAccounts()->first()?->id,
+                'type' => 'debit',
+                'net_amount' => 2000,
+            ],
+            [
+                'sub_account_id' => $bankA?->id,
+                'type' => 'credit',
+                'net_amount' => 2000,
+            ],
+        ]);
+
+        $businessCard = CreditCard::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'issuer_name' => 'Amex',
+            'network' => 'amex',
+            'last_four' => '1234',
+            'ownership_type' => CreditCard::OWNERSHIP_TYPE_BUSINESS,
+            'liability_sub_account_id' => $cardLiability?->id,
+            'is_active' => true,
+        ]);
+
+        CreditCard::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'ownership_type' => CreditCard::OWNERSHIP_TYPE_PERSONAL,
+            'owner_draw_sub_account_id' => $privateAccount?->subAccounts()->first()?->id,
+        ]);
+
+        CreditCard::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'ownership_type' => CreditCard::OWNERSHIP_TYPE_BUSINESS,
+            'liability_sub_account_id' => $cardLiability?->id,
+            'is_active' => false,
+        ]);
+
+        $sources = $businessUnit->availableCreditSources();
+
+        $this->assertSame([
+            '現金',
+            '現金',
+            '銀行口座',
+            '銀行口座',
+            'クレジットカード',
+            'プライベート資金',
+            'プライベート資金',
+        ], $sources->pluck('category_label')->all());
+
+        $this->assertSame([
+            '現金',
+            '金庫現金',
+            'XX銀行',
+            'OO銀行',
+            $businessCard->display_label,
+            'プライベートの財布・クレジットから支払い',
+            '家族立替',
+        ], $sources->pluck('label')->all());
+
+        $this->assertFalse($sources->contains(fn (array $source): bool => $source['label'] === 'その他の預金'));
+        $this->assertFalse($sources->contains(fn (array $source): bool => $source['category'] === BusinessUnit::CREDIT_SOURCE_CATEGORY_CARD && $source['label'] !== $businessCard->display_label));
+
+        $privateSource = $sources->firstWhere('category', BusinessUnit::CREDIT_SOURCE_CATEGORY_PRIVATE);
+        $this->assertSame('プライベート資金', $privateSource['category_label']);
+        $this->assertSame('個人のお金で立て替えて支払った場合', $privateSource['description']);
+
+        $bankSource = $sources->firstWhere('sub_account_id', $bankA?->id);
+        $this->assertSame($bankAccount?->id, $bankSource['account_id']);
+
+        $cardSource = $sources->firstWhere('category', BusinessUnit::CREDIT_SOURCE_CATEGORY_CARD);
+        $this->assertSame($cardLiability?->id, $cardSource['sub_account_id']);
+    }
+
+    #[Test]
+    public function 現金の仕訳実績がなければavailable_credit_sourcesに現金を含めない(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業所',
+        ]);
+
+        $sources = $businessUnit->availableCreditSources();
+
+        $this->assertFalse(
+            $sources->contains(
+                fn (array $source): bool => $source['category'] === BusinessUnit::CREDIT_SOURCE_CATEGORY_CASH
+            )
+        );
+    }
+
+    #[Test]
+    public function 明示的に追加した現金のsub_accountは仕訳実績がなくてもavailable_credit_sourcesに含める(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業所',
+        ]);
+
+        $cashAccount = $businessUnit->getAccountByName('現金');
+        $cashSubAccount = $cashAccount?->createSubAccount(['name' => '金庫現金']);
+
+        $sources = $businessUnit->availableCreditSources();
+
+        $cashSource = $sources->firstWhere('sub_account_id', $cashSubAccount?->id);
+
+        $this->assertNotNull($cashSource);
+        $this->assertSame(BusinessUnit::CREDIT_SOURCE_CATEGORY_CASH, $cashSource['category']);
+        $this->assertSame('金庫現金', $cashSource['label']);
+        $this->assertFalse($sources->contains(fn (array $source): bool => $source['label'] === '現金'));
+    }
+
+    #[Test]
+    public function 明示的に追加した銀行口座のsub_accountは仕訳実績がなくてもavailable_credit_sourcesに含める(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業所',
+        ]);
+
+        $bankAccount = $businessUnit->getAccountByName('その他の預金');
+        $bankSubAccount = $bankAccount?->createSubAccount(['name' => 'XX銀行']);
+
+        $sources = $businessUnit->availableCreditSources();
+
+        $bankSource = $sources->firstWhere('sub_account_id', $bankSubAccount?->id);
+
+        $this->assertNotNull($bankSource);
+        $this->assertSame(BusinessUnit::CREDIT_SOURCE_CATEGORY_BANK, $bankSource['category']);
+        $this->assertSame('XX銀行', $bankSource['label']);
+        $this->assertFalse($sources->contains(fn (array $source): bool => $source['label'] === 'その他の預金'));
     }
 }
