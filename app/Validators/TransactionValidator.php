@@ -54,7 +54,6 @@ class TransactionValidator
             'date' => '取引日',
             'description' => '摘要',
             'remarks' => '備考',
-            'tax_type' => '消費税区分',
             'is_opening_entry' => '期首仕訳フラグ',
             'is_adjusting_entry' => '決算整理仕訳フラグ',
             'recurring_transaction_plan_id' => '定期取引計画ID',
