@@ -83,14 +83,8 @@ class DepreciationService
             // 2. 金額計算
             $taxableAmount = $fixedAssetData['taxable_amount'];
             $taxAmount = $fixedAssetData['tax_amount'] ?? 0;
-            $acquisitionCost = $taxableAmount + $taxAmount;
 
-            // 3. 減価償却の基礎金額( 課税業者の場合は税抜価格、免税業者の場合は税込価格 )
-            $depreciationBaseAmount = $fiscalYear->is_taxable
-                ? $taxableAmount
-                : $acquisitionCost;
-
-            // 4. 固定資産登録
+            // 3. 固定資産登録
             $asset = FixedAsset::create([
                 'business_unit_id' => $businessUnit->id,
                 'account_id' => $assetSubAccount->account_id,
@@ -99,12 +93,11 @@ class DepreciationService
                 'acquisition_date' => $acquisitionDate,
                 'taxable_amount' => $taxableAmount,
                 'tax_amount' => $taxAmount,
-                'depreciation_base_amount' => $depreciationBaseAmount,
                 'useful_life' => $fixedAssetData['useful_life'],
                 'depreciation_method' => $fixedAssetData['depreciation_method'],
             ]);
 
-            // 5. 取得仕訳の登録（2本仕訳：借方=資産, 貸方=支払）
+            // 4. 取得仕訳の登録（2本仕訳：借方=資産, 貸方=支払）
             $transaction = Transaction::create([
                 'fiscal_year_id' => $fiscalYear->id,
                 'date' => $transactionData['date'],
@@ -146,7 +139,7 @@ class DepreciationService
 
         $usefulLife = (int) $asset->useful_life;
         $ordinaryMonthlyAmount = $usefulLife > 0
-            ? intdiv((int) $asset->depreciation_base_amount, $usefulLife)
+            ? intdiv((int) $asset->acquisition_cost, $usefulLife)
             : 0;
 
         $fiscalYears = $upToFiscalYear->businessUnit->fiscalYears()

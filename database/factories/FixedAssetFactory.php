@@ -39,7 +39,6 @@ class FixedAssetFactory extends Factory
             'acquisition_date' => $this->faker->date(),
             'taxable_amount' => 2_000_000,
             'tax_amount' => 200_000,
-            'depreciation_base_amount' => 2_200_000,
             'useful_life' => 72,
             'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
             'is_disposed' => false,
