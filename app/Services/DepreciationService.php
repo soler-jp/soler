@@ -33,7 +33,8 @@ class DepreciationService
         FiscalYear $fiscalYear,
         SubAccount $paymentSubAccount,
         array $fixedAssetData,
-        array $transactionData
+        array $transactionData,
+        bool $allowRegistration = false
     ): FixedAsset {
         $assetSubAccount = $this->resolveVehicleAssetSubAccount($fiscalYear);
 
@@ -43,6 +44,7 @@ class DepreciationService
             $paymentSubAccount,
             array_merge($fixedAssetData, self::NEW_STANDARD_CAR_PRESET),
             $transactionData,
+            $allowRegistration,
         );
     }
 
@@ -50,7 +52,8 @@ class DepreciationService
         FiscalYear $fiscalYear,
         SubAccount $paymentSubAccount,
         array $fixedAssetData,
-        array $transactionData
+        array $transactionData,
+        bool $allowRegistration = false
     ): FixedAsset {
         $assetSubAccount = $this->resolveVehicleAssetSubAccount($fiscalYear);
 
@@ -60,6 +63,7 @@ class DepreciationService
             $paymentSubAccount,
             array_merge($fixedAssetData, self::NEW_LIGHT_CAR_PRESET),
             $transactionData,
+            $allowRegistration,
         );
     }
 
@@ -68,8 +72,18 @@ class DepreciationService
         SubAccount $assetSubAccount,
         SubAccount $paymentSubAccount,
         array $fixedAssetData,
-        array $transactionData
+        array $transactionData,
+        bool $allowRegistration = false
     ): FixedAsset {
+        $acquisitionDate = $fixedAssetData['acquisition_date'];
+
+        if (
+            ! $allowRegistration
+            && Carbon::parse($acquisitionDate)->lt(Carbon::parse($fiscalYear->start_date))
+        ) {
+            throw new \InvalidArgumentException('過去に取得した固定資産は allowRegistration を true にしないと登録できません。');
+        }
+
         return DB::transaction(function () use (
             $fiscalYear,
             $assetSubAccount,

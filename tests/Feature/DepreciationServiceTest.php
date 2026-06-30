@@ -17,7 +17,7 @@ class DepreciationServiceTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function 去年取得した車を登録対象年度に登録しても取得仕訳は作成されない()
+    public function 去年取得した車を登録対象年度に登録すると例外になる()
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults([
@@ -33,31 +33,37 @@ class DepreciationServiceTest extends TestCase
 
         $summaryBefore = $fiscalYear->calculateSummary();
 
-        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
-            $fiscalYear,
-            $paymentSubAccount,
-            [
-                'name' => '去年取得のPRIUS',
-                'acquisition_date' => '2024-10-03',
-                'taxable_amount' => 3_000_000,
-                'tax_amount' => 300_000,
-            ],
-            [
-                'date' => '2024-10-03',
-                'description' => '去年取得のPRIUSを購入',
-            ],
-        );
+        try {
+            app(DepreciationService::class)->registerNewStandardCar(
+                $fiscalYear,
+                $paymentSubAccount,
+                [
+                    'name' => '去年取得のPRIUS',
+                    'acquisition_date' => '2024-10-03',
+                    'taxable_amount' => 3_000_000,
+                    'tax_amount' => 300_000,
+                ],
+                [
+                    'date' => '2024-10-03',
+                    'description' => '去年取得のPRIUSを購入',
+                ],
+            );
 
-        $this->assertModelExists($fixedAsset);
-        $this->assertDatabaseMissing('transactions', [
-            'fiscal_year_id' => $fiscalYear->id,
-            'description' => '去年取得のPRIUSを購入',
-        ]);
-        $this->assertSame($summaryBefore, $fiscalYear->calculateSummary());
+            $this->fail('Expected InvalidArgumentException was not thrown.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertSame($summaryBefore, $fiscalYear->calculateSummary());
+            $this->assertDatabaseMissing('fixed_assets', [
+                'name' => '去年取得のPRIUS',
+            ]);
+            $this->assertDatabaseMissing('transactions', [
+                'fiscal_year_id' => $fiscalYear->id,
+                'description' => '去年取得のPRIUSを購入',
+            ]);
+        }
     }
 
     #[Test]
-    public function register_fixed_assetでも去年取得の車は取得仕訳を作成しない()
+    public function register_fixed_assetでallow_registrationを付けると去年取得の車を強制登録できる()
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults([
@@ -96,6 +102,7 @@ class DepreciationServiceTest extends TestCase
                 'date' => '2024-10-03',
                 'description' => '去年取得のN-BOXを購入',
             ],
+            true,
         );
 
         $this->assertModelExists($fixedAsset);
@@ -104,6 +111,152 @@ class DepreciationServiceTest extends TestCase
             'description' => '去年取得のN-BOXを購入',
         ]);
         $this->assertSame($summaryBefore, $fiscalYear->calculateSummary());
+    }
+
+    #[Test]
+    public function 登録年度しか_fiscal_yearがない場合は存在する年度分だけ_entryが作成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+        $fiscalYear2024 = $unit->createFiscalYear(2024);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query) {
+                $query->where('name', 'その他の預金');
+            })
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerNewLightCar(
+            $fiscalYear2024,
+            $paymentSubAccount,
+            [
+                'name' => '過年度取得の軽自動車',
+                'acquisition_date' => '2022-01-01',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 120_000,
+            ],
+            [
+                'date' => '2024-01-01',
+                'description' => '過年度取得の軽自動車を登録',
+            ],
+            true,
+        );
+
+        $entry = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->firstOrFail();
+
+        $this->assertSame(1, DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->count());
+        $this->assertSame($fiscalYear2024->id, $entry->fiscal_year_id);
+        $this->assertSame(12, $entry->months);
+        $this->assertSame(330_000, $entry->ordinary_amount);
+        $this->assertSame(330_000, $entry->total_amount);
+        $this->assertSame(330_000, $entry->deductible_amount);
+    }
+
+    #[Test]
+    public function 過去の_fiscal_yearがある場合は存在する年度分の_entryが作成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+        $fiscalYear2023 = $unit->createFiscalYear(2023);
+        $fiscalYear2024 = $unit->createFiscalYear(2024);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query) {
+                $query->where('name', 'その他の預金');
+            })
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerNewLightCar(
+            $fiscalYear2024,
+            $paymentSubAccount,
+            [
+                'name' => '過年度取得の軽自動車',
+                'acquisition_date' => '2022-01-01',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 120_000,
+            ],
+            [
+                'date' => '2024-01-01',
+                'description' => '過年度取得の軽自動車を登録',
+            ],
+            true,
+        );
+
+        $entries = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)
+            ->orderBy('fiscal_year_id')
+            ->get()
+            ->keyBy('fiscal_year_id');
+
+        $this->assertSame(2, $entries->count());
+        $this->assertDatabaseMissing('depreciation_entries', [
+            'fixed_asset_id' => $fixedAsset->id,
+            'fiscal_year_id' => $unit->fiscalYears()->where('year', 2022)->value('id'),
+        ]);
+        $this->assertSame(12, $entries[$fiscalYear2023->id]->months);
+        $this->assertSame(330_000, $entries[$fiscalYear2023->id]->ordinary_amount);
+        $this->assertSame(330_000, $entries[$fiscalYear2023->id]->total_amount);
+        $this->assertSame(330_000, $entries[$fiscalYear2023->id]->deductible_amount);
+        $this->assertSame(12, $entries[$fiscalYear2024->id]->months);
+        $this->assertSame(330_000, $entries[$fiscalYear2024->id]->ordinary_amount);
+        $this->assertSame(330_000, $entries[$fiscalYear2024->id]->total_amount);
+        $this->assertSame(330_000, $entries[$fiscalYear2024->id]->deductible_amount);
+    }
+
+    #[Test]
+    public function 年の途中で取得した軽自動車は取得月から年末までの_monthsで_entryが作成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+        $fiscalYear2022 = $unit->createFiscalYear(2022);
+        $fiscalYear2023 = $unit->createFiscalYear(2023);
+        $fiscalYear2024 = $unit->createFiscalYear(2024);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query) {
+                $query->where('name', 'その他の預金');
+            })
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerNewLightCar(
+            $fiscalYear2024,
+            $paymentSubAccount,
+            [
+                'name' => '年の途中取得の軽自動車',
+                'acquisition_date' => '2022-10-01',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 120_000,
+            ],
+            [
+                'date' => '2024-01-01',
+                'description' => '年の途中取得の軽自動車を登録',
+            ],
+            true,
+        );
+
+        $entries = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)
+            ->orderBy('fiscal_year_id')
+            ->get()
+            ->keyBy('fiscal_year_id');
+
+        $this->assertSame(3, $entries->count());
+        $this->assertSame(3, $entries[$fiscalYear2022->id]->months);
+        $this->assertSame(82_500, $entries[$fiscalYear2022->id]->ordinary_amount);
+        $this->assertSame(82_500, $entries[$fiscalYear2022->id]->total_amount);
+        $this->assertSame(82_500, $entries[$fiscalYear2022->id]->deductible_amount);
+        $this->assertSame(12, $entries[$fiscalYear2023->id]->months);
+        $this->assertSame(330_000, $entries[$fiscalYear2023->id]->ordinary_amount);
+        $this->assertSame(330_000, $entries[$fiscalYear2023->id]->total_amount);
+        $this->assertSame(330_000, $entries[$fiscalYear2023->id]->deductible_amount);
+        $this->assertSame(12, $entries[$fiscalYear2024->id]->months);
+        $this->assertSame(330_000, $entries[$fiscalYear2024->id]->ordinary_amount);
+        $this->assertSame(330_000, $entries[$fiscalYear2024->id]->total_amount);
+        $this->assertSame(330_000, $entries[$fiscalYear2024->id]->deductible_amount);
     }
 
     #[Test]
@@ -430,6 +583,7 @@ class DepreciationServiceTest extends TestCase
                 'useful_life' => 60,
             ],
             ['date' => '2025-01-01', 'description' => 'サーバー機器購入（過去年度）'],
+            true,
         );
 
         $this->assertSame(3, DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->count());
@@ -496,6 +650,7 @@ class DepreciationServiceTest extends TestCase
                 'useful_life' => 60,
             ],
             ['date' => '2025-01-01', 'description' => 'コピー機購入（過去年度）'],
+            true,
         );
 
         // 2024年度が存在しないので2件だけ
@@ -543,6 +698,7 @@ class DepreciationServiceTest extends TestCase
                 'business_usage_ratio' => 0.80,
             ],
             ['date' => '2025-01-01', 'description' => '自家用兼事業用PC購入'],
+            true,
         );
 
         // 2024年: 12ヶ月 × 25_000 = 300_000 → 80% = 240_000
