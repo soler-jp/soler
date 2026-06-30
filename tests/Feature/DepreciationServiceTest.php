@@ -16,6 +16,96 @@ class DepreciationServiceTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
+    public function 去年取得した車を登録対象年度に登録しても取得仕訳は作成されない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query) {
+                $query->where('name', 'その他の預金');
+            })
+            ->firstOrFail();
+
+        $summaryBefore = $fiscalYear->calculateSummary();
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear,
+            $paymentSubAccount,
+            [
+                'name' => '去年取得のPRIUS',
+                'acquisition_date' => '2024-10-03',
+                'taxable_amount' => 3_000_000,
+                'tax_amount' => 300_000,
+            ],
+            [
+                'date' => '2024-10-03',
+                'description' => '去年取得のPRIUSを購入',
+            ],
+        );
+
+        $this->assertModelExists($fixedAsset);
+        $this->assertDatabaseMissing('transactions', [
+            'fiscal_year_id' => $fiscalYear->id,
+            'description' => '去年取得のPRIUSを購入',
+        ]);
+        $this->assertSame($summaryBefore, $fiscalYear->calculateSummary());
+    }
+
+    #[Test]
+    public function register_fixed_assetでも去年取得の車は取得仕訳を作成しない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query) {
+                $query->where('name', '車両運搬具');
+            })
+            ->firstOrFail();
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query) {
+                $query->where('name', 'その他の預金');
+            })
+            ->firstOrFail();
+
+        $summaryBefore = $fiscalYear->calculateSummary();
+
+        $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
+            $fiscalYear,
+            $assetSubAccount,
+            $paymentSubAccount,
+            [
+                'name' => '去年取得のN-BOX',
+                'asset_category' => '新車-軽自動車',
+                'acquisition_date' => '2024-10-03',
+                'taxable_amount' => 2_000_000,
+                'tax_amount' => 200_000,
+                'useful_life' => 48,
+                'depreciation_method' => 'straight_line',
+            ],
+            [
+                'date' => '2024-10-03',
+                'description' => '去年取得のN-BOXを購入',
+            ],
+        );
+
+        $this->assertModelExists($fixedAsset);
+        $this->assertDatabaseMissing('transactions', [
+            'fiscal_year_id' => $fiscalYear->id,
+            'description' => '去年取得のN-BOXを購入',
+        ]);
+        $this->assertSame($summaryBefore, $fiscalYear->calculateSummary());
+    }
+
+    #[Test]
     public function 固定資産を登録すると取得仕訳も同時に登録される_免税事業者()
     {
         $user = User::factory()->create();

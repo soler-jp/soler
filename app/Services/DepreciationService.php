@@ -97,25 +97,32 @@ class DepreciationService
                 'depreciation_method' => $fixedAssetData['depreciation_method'],
             ]);
 
-            // 4. 取得仕訳の登録（2本仕訳：借方=資産, 貸方=支払）
-            $transaction = Transaction::create([
-                'fiscal_year_id' => $fiscalYear->id,
-                'date' => $transactionData['date'],
-                'description' => $transactionData['description'],
-            ]);
+            // 4. 取得仕訳の登録（取得日が今年度内の場合のみ）
+            if (
+                Carbon::parse($acquisitionDate)->betweenIncluded(
+                    $fiscalYear->start_date,
+                    $fiscalYear->end_date
+                )
+            ) {
+                $transaction = Transaction::create([
+                    'fiscal_year_id' => $fiscalYear->id,
+                    'date' => $transactionData['date'],
+                    'description' => $transactionData['description'],
+                ]);
 
-            $transaction->journalEntries()->createMany([
-                [
-                    'sub_account_id' => $assetSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => $asset->acquisition_cost,
-                ],
-                [
-                    'sub_account_id' => $paymentSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => $asset->acquisition_cost,
-                ],
-            ]);
+                $transaction->journalEntries()->createMany([
+                    [
+                        'sub_account_id' => $assetSubAccount->id,
+                        'type' => 'debit',
+                        'net_amount' => $asset->acquisition_cost,
+                    ],
+                    [
+                        'sub_account_id' => $paymentSubAccount->id,
+                        'type' => 'credit',
+                        'net_amount' => $asset->acquisition_cost,
+                    ],
+                ]);
+            }
 
             $this->createDepreciationEntriesUpTo($fiscalYear, $asset, $acquisitionDate, $fixedAssetData);
 
