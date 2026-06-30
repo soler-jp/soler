@@ -141,42 +141,108 @@ class DepreciationService
         string $acquisitionDate,
         array $fixedAssetData
     ): void {
-        $acquisitionYear = (int) Carbon::parse($acquisitionDate)->format('Y');
         $businessUsageRatio = (float) ($fixedAssetData['business_usage_ratio'] ?? 1.00);
 
-        $usefulLife = (int) $asset->useful_life;
-        $ordinaryMonthlyAmount = $usefulLife > 0
-            ? intdiv((int) $asset->acquisition_cost, $usefulLife)
-            : 0;
+        $fullSchedule = $this->calculateDepreciationScheduleUntilFullyDepreciated($asset);
+        $acquisitionYear = (int) Carbon::parse($acquisitionDate)->format('Y');
 
-        $fiscalYears = $upToFiscalYear->businessUnit->fiscalYears()
-            ->whereBetween('year', [$acquisitionYear, $upToFiscalYear->year])
-            ->orderBy('year')
-            ->get();
+        foreach ($fullSchedule as $year => $values) {
+            if ($year > $upToFiscalYear->year) {
+                break;
+            }
 
-        foreach ($fiscalYears as $fiscalYear) {
-            $months = $this->calculateDepreciationMonthsForFiscalYear($fiscalYear, $acquisitionDate);
-            $ordinaryAmount = $ordinaryMonthlyAmount * $months;
-            $specialAmount = 0;
-            $totalAmount = $ordinaryAmount + $specialAmount;
-            $deductibleAmount = (int) floor($totalAmount * $businessUsageRatio);
+            if ($year < $acquisitionYear) {
+                continue;
+            }
+
+            $fiscalYear = $upToFiscalYear->businessUnit->fiscalYears()
+                ->where('year', $year)
+                ->first();
+
+            if ($fiscalYear === null) {
+                continue;
+            }
 
             DepreciationEntry::updateOrCreate(
                 [
                     'fiscal_year_id' => $fiscalYear->id,
                     'fixed_asset_id' => $asset->id,
                 ],
-                [
-                    'months' => $months,
-                    'ordinary_amount' => $ordinaryAmount,
-                    'special_amount' => $specialAmount,
-                    'total_amount' => $totalAmount,
+                $values + [
                     'business_usage_ratio' => $businessUsageRatio,
-                    'deductible_amount' => $deductibleAmount,
+                    'deductible_amount' => (int) floor($values['total_amount'] * $businessUsageRatio),
                     'transaction_id' => null,
-                ]
+                ],
             );
         }
+    }
+
+    /**
+     * 取得年度から耐用年数を使い切るまでの減価償却予定を年別に返す。
+     *
+     * @return array<int, array{months: int, ordinary_amount: int, special_amount: int, total_amount: int, ending_balance: int}>
+     */
+    public function calculateDepreciationScheduleUntilFullyDepreciated(
+        FixedAsset $asset
+    ): array {
+        $acquisitionDate = $asset->acquisition_date?->toDateString();
+
+        if ($acquisitionDate === null) {
+            return [];
+        }
+
+        $acquisitionYear = (int) Carbon::parse($acquisitionDate)->format('Y');
+        $remainingAmount = (int) $asset->acquisition_cost;
+        $remainingMonths = max(0, (int) $asset->useful_life);
+        $depreciationRate = $this->calculateDepreciationRate($asset);
+        $annualAmount = $depreciationRate === null
+            ? 0
+            : (int) round($remainingAmount * $depreciationRate, 0, PHP_ROUND_HALF_UP);
+
+        $schedule = [];
+
+        for ($year = $acquisitionYear; $remainingMonths > 0 && $remainingAmount > 0; $year++) {
+            $months = $this->calculateDepreciationMonthsForCalendarYear(
+                $year,
+                $acquisitionDate,
+                $remainingMonths,
+            );
+
+            if ($months === 0) {
+                continue;
+            }
+
+            $ordinaryAmount = (int) round($annualAmount * ($months / 12), 0, PHP_ROUND_HALF_UP);
+
+            if ($ordinaryAmount > $remainingAmount) {
+                $ordinaryAmount = $remainingAmount;
+            }
+
+            $totalAmount = $ordinaryAmount;
+            $remainingAmount -= $ordinaryAmount;
+            $remainingMonths -= $months;
+
+            $schedule[$year] = [
+                'months' => $months,
+                'ordinary_amount' => $ordinaryAmount,
+                'special_amount' => 0,
+                'total_amount' => $totalAmount,
+                'ending_balance' => max(0, $remainingAmount),
+            ];
+        }
+
+        return $schedule;
+    }
+
+    private function calculateDepreciationRate(FixedAsset $asset): ?float
+    {
+        $usefulLife = (int) $asset->useful_life;
+
+        if ($usefulLife <= 0) {
+            return null;
+        }
+
+        return ceil((12 / $usefulLife) * 1000) / 1000;
     }
 
     private function resolveVehicleAssetSubAccount(FiscalYear $fiscalYear): SubAccount
@@ -205,6 +271,26 @@ class DepreciationService
         }
 
         return $depreciationStart->diffInMonths($fiscalEnd) + 1;
+    }
+
+    private function calculateDepreciationMonthsForCalendarYear(
+        int $year,
+        string $acquisitionDate,
+        int $remainingMonths
+    ): int {
+        $fiscalStart = Carbon::create($year, 1, 1)->startOfMonth();
+        $fiscalEnd = Carbon::create($year, 12, 31)->endOfMonth();
+        $acquisitionMonth = Carbon::parse($acquisitionDate)->startOfMonth();
+
+        $depreciationStart = $acquisitionMonth->greaterThan($fiscalStart)
+            ? $acquisitionMonth
+            : $fiscalStart;
+
+        if ($depreciationStart->greaterThan($fiscalEnd)) {
+            return 0;
+        }
+
+        return min($depreciationStart->diffInMonths($fiscalEnd) + 1, $remainingMonths);
     }
 
     public function prepareEntriesFor(FiscalYear $fiscalYear): void

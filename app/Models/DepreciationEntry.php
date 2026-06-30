@@ -75,7 +75,7 @@ class DepreciationEntry extends Model
             return null;
         }
 
-        return number_format(12 / $usefulLife, 3, '.', '');
+        return number_format(ceil((12 / $usefulLife) * 1000) / 1000, 3, '.', '');
     }
 
     public function getEndingUndepreciatedBalanceAttribute(): ?int

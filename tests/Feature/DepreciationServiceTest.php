@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\DepreciationEntry;
+use App\Models\FixedAsset;
 use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
@@ -174,11 +175,11 @@ class DepreciationServiceTest extends TestCase
             'fiscal_year_id' => $fiscalYear->id,
             'fixed_asset_id' => $fixedAsset->id,
             'months' => 7,
-            'ordinary_amount' => 32081,
+            'ordinary_amount' => 32148,
             'special_amount' => 0,
-            'total_amount' => 32081,
+            'total_amount' => 32148,
             'business_usage_ratio' => 1.00,
-            'deductible_amount' => 32081,
+            'deductible_amount' => 32148,
             'transaction_id' => null,
         ]);
 
@@ -242,6 +243,81 @@ class DepreciationServiceTest extends TestCase
             'useful_life' => 72,
             'depreciation_method' => 'straight_line',
         ]);
+    }
+
+    #[Test]
+    public function 減価償却予定は年度ごとの配列として取得できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query) {
+                $query->where('name', '機械装置');
+            })
+            ->firstOrFail();
+
+        $asset = FixedAsset::create([
+            'business_unit_id' => $unit->id,
+            'account_id' => $assetSubAccount->account_id,
+            'name' => 'サーバー機器',
+            'asset_category' => 'machinery',
+            'acquisition_date' => '2023-10-01',
+            'taxable_amount' => 480000,
+            'tax_amount' => 0,
+            'useful_life' => 48,
+            'depreciation_method' => 'straight_line',
+        ]);
+
+        $schedule = app(DepreciationService::class)->calculateDepreciationScheduleUntilFullyDepreciated(
+            $asset,
+        );
+
+        $this->assertSame([
+            2023 => [
+                'months' => 3,
+                'ordinary_amount' => 30000,
+                'special_amount' => 0,
+                'total_amount' => 30000,
+                'ending_balance' => 450000,
+            ],
+            2024 => [
+                'months' => 12,
+                'ordinary_amount' => 120000,
+                'special_amount' => 0,
+                'total_amount' => 120000,
+                'ending_balance' => 330000,
+            ],
+            2025 => [
+                'months' => 12,
+                'ordinary_amount' => 120000,
+                'special_amount' => 0,
+                'total_amount' => 120000,
+                'ending_balance' => 210000,
+            ],
+            2026 => [
+                'months' => 12,
+                'ordinary_amount' => 120000,
+                'special_amount' => 0,
+                'total_amount' => 120000,
+                'ending_balance' => 90000,
+            ],
+            2027 => [
+                'months' => 9,
+                'ordinary_amount' => 90000,
+                'special_amount' => 0,
+                'total_amount' => 90000,
+                'ending_balance' => 0,
+            ],
+        ], $schedule);
+
+        $this->assertArrayHasKey(2023, $schedule);
+        $this->assertArrayHasKey(2024, $schedule);
+        $this->assertArrayHasKey(2025, $schedule);
+        $this->assertArrayHasKey(2026, $schedule);
+        $this->assertArrayHasKey(2027, $schedule);
     }
 
     #[Test]
