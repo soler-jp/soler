@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Models\BusinessUnit;
 use App\Models\CreditCard;
+use App\Models\FixedAsset;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -188,6 +189,59 @@ class BusinessUnitTest extends TestCase
 
         $this->assertTrue($unit->currentFiscalYear->is($fiscal2025));
         $this->assertEquals(2025, $unit->currentFiscalYear->year);
+    }
+
+    #[Test]
+    public function fixed_assetsの一覧と償却中一覧を取得できる(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => '固定資産テスト事業体',
+        ]);
+
+        $unit->createFiscalYear(2031);
+
+        $assetAccount = $unit->getAccountByName('車両運搬具');
+        $this->assertNotNull($assetAccount);
+
+        $ongoingAsset = FixedAsset::create([
+            'business_unit_id' => $unit->id,
+            'account_id' => $assetAccount->id,
+            'name' => '2025年度時点で償却継続中の車両',
+            'asset_category' => '新車-普通車',
+            'acquisition_date' => '2024-03-01',
+            'taxable_amount' => 1_000_000,
+            'tax_amount' => 100_000,
+            'useful_life' => 72,
+            'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
+            'is_disposed' => false,
+        ]);
+
+        $completedAsset = FixedAsset::create([
+            'business_unit_id' => $unit->id,
+            'account_id' => $assetAccount->id,
+            'name' => '2025年度時点で償却完了の車両',
+            'asset_category' => '新車-普通車',
+            'acquisition_date' => '2018-03-01',
+            'taxable_amount' => 1_000_000,
+            'tax_amount' => 100_000,
+            'useful_life' => 72,
+            'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
+            'is_disposed' => false,
+        ]);
+
+        $allFixedAssets = $unit->allFixedAssets();
+        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $depreciatingFixedAssets = $unit->depreciatingFixedAssets($fiscalYear2025);
+
+        $this->assertSame(
+            ['2025年度時点で償却継続中の車両', '2025年度時点で償却完了の車両'],
+            $allFixedAssets->pluck('name')->all()
+        );
+        $this->assertSame(
+            ['2025年度時点で償却継続中の車両'],
+            $depreciatingFixedAssets->pluck('name')->all()
+        );
     }
 
     #[Test]
