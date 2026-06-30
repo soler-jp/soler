@@ -345,7 +345,7 @@ class DepreciationServiceTest extends TestCase
 
         $this->assertTrue(
             $transaction->journalEntries->contains(
-                fn ($e) => $e->type === 'debit' &&
+                fn($e) => $e->type === 'debit' &&
                     $e->sub_account_id === $assetSubAccount->id &&
                     $e->net_amount === 165000
             )
@@ -353,7 +353,7 @@ class DepreciationServiceTest extends TestCase
 
         $this->assertTrue(
             $transaction->journalEntries->contains(
-                fn ($e) => $e->type === 'credit' &&
+                fn($e) => $e->type === 'credit' &&
                     $e->sub_account_id === $paymentSubAccount->id &&
                     $e->net_amount === 165000
             )
@@ -474,6 +474,69 @@ class DepreciationServiceTest extends TestCase
     }
 
     #[Test]
+    public function is_fully_depreciatedは年度内に償却が発生しない場合だけtrueになる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+
+        $fiscalYear2030 = $unit->createFiscalYear(2030);
+        $fiscalYear2031 = $unit->createFiscalYear(2031);
+        $fiscalYear2032 = $unit->createFiscalYear(2032);
+
+        $assetAccount = $unit->getAccountByName('車両運搬具');
+        $this->assertNotNull($assetAccount);
+
+        $ongoingAsset = FixedAsset::create([
+            'business_unit_id' => $unit->id,
+            'account_id' => $assetAccount->id,
+            'name' => '償却継続中の車両',
+            'asset_category' => '新車-普通車',
+            'acquisition_date' => '2026-03-01',
+            'taxable_amount' => 1_000_000,
+            'tax_amount' => 100_000,
+            'useful_life' => 72,
+            'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
+            'is_disposed' => false,
+        ]);
+
+
+        $completedAsset = FixedAsset::create([
+            'business_unit_id' => $unit->id,
+            'account_id' => $assetAccount->id,
+            'name' => '償却完了の車両',
+            'asset_category' => '新車-普通車',
+            'acquisition_date' => '2024-03-01',
+            'taxable_amount' => 1_000_000,
+            'tax_amount' => 100_000,
+            'useful_life' => 72,
+            'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
+            'is_disposed' => false,
+        ]);
+
+        $service = app(DepreciationService::class);
+
+        // 2031と2032がスケジュールに含まれていることを確認
+        $onGoingSchedule = $service->calculateDepreciationScheduleUntilFullyDepreciated($ongoingAsset);
+        $this->assertArrayHasKey(2031, $onGoingSchedule);
+        $this->assertArrayHasKey(2032, $onGoingSchedule);
+        $this->assertFalse($service->isFullyDepreciated($ongoingAsset, $fiscalYear2031));
+        $this->assertFalse($service->isFullyDepreciated($ongoingAsset, $fiscalYear2032));
+
+        $completedSchedule = $service->calculateDepreciationScheduleUntilFullyDepreciated($completedAsset);
+        // 2030がスケジュールに含まれていることを確認
+        $this->assertArrayHasKey(2030, $completedSchedule);
+        // 2031がスケジュールに含まれていないことを確認
+        $this->assertArrayNotHasKey(2031, $completedSchedule);
+
+        $this->assertTrue($service->isStillDepreciating($completedAsset, $fiscalYear2030));
+        $this->assertFalse($service->isFullyDepreciated($completedAsset, $fiscalYear2030));
+        $this->assertTrue($service->isFullyDepreciated($completedAsset, $fiscalYear2031));
+        $this->assertFalse($service->isStillDepreciating($completedAsset, $fiscalYear2031));
+    }
+
+    #[Test]
     public function 軽自動車カテゴリで登録すると耐用年数48ヶ月で償却予定が作成される()
     {
         $user = User::factory()->create();
@@ -519,10 +582,10 @@ class DepreciationServiceTest extends TestCase
         $fiscalYear2023 = $unit->createFiscalYear(2023);
 
         $assetSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
+            ->whereHas('account', fn($q) => $q->where('name', '機械装置'))
             ->firstOrFail();
         $paymentSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
         $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
@@ -561,10 +624,10 @@ class DepreciationServiceTest extends TestCase
         $fiscalYear2025 = $unit->createFiscalYear(2025);
 
         $assetSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
+            ->whereHas('account', fn($q) => $q->where('name', '機械装置'))
             ->firstOrFail();
         $paymentSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
         // 耐用年数60ヶ月 → 月額 = floor(600_000 / 60) = 10_000円
@@ -630,10 +693,10 @@ class DepreciationServiceTest extends TestCase
         $fiscalYear2025 = $unit->createFiscalYear(2025);
 
         $assetSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
+            ->whereHas('account', fn($q) => $q->where('name', '機械装置'))
             ->firstOrFail();
         $paymentSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
         $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
@@ -675,10 +738,10 @@ class DepreciationServiceTest extends TestCase
         $fiscalYear2025 = $unit->createFiscalYear(2025);
 
         $assetSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
+            ->whereHas('account', fn($q) => $q->where('name', '機械装置'))
             ->firstOrFail();
         $paymentSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
         // 耐用年数48ヶ月 → 月額 = floor(1_200_000 / 48) = 25_000円
@@ -731,10 +794,10 @@ class DepreciationServiceTest extends TestCase
         $fiscalYear2025 = $unit->createFiscalYear(2025);
 
         $assetSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
+            ->whereHas('account', fn($q) => $q->where('name', '機械装置'))
             ->firstOrFail();
         $paymentSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
         $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
@@ -768,10 +831,10 @@ class DepreciationServiceTest extends TestCase
         $fiscalYear2025 = $unit->createFiscalYear(2025);
 
         $assetSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
+            ->whereHas('account', fn($q) => $q->where('name', '機械装置'))
             ->firstOrFail();
         $paymentSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->whereHas('account', fn($q) => $q->where('name', 'その他の預金'))
             ->firstOrFail();
 
         $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
@@ -805,13 +868,13 @@ class DepreciationServiceTest extends TestCase
         $fiscalYear2025 = $unit->createFiscalYear(2025);
 
         $assetSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($query) => $query->where('name', '機械装置'))
+            ->whereHas('account', fn($query) => $query->where('name', '機械装置'))
             ->firstOrFail();
         $paymentSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->whereHas('account', fn($query) => $query->where('name', 'その他の預金'))
             ->firstOrFail();
         $expenseSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($query) => $query->where('name', '減価償却費'))
+            ->whereHas('account', fn($query) => $query->where('name', '減価償却費'))
             ->firstOrFail();
 
         $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
@@ -849,7 +912,7 @@ class DepreciationServiceTest extends TestCase
 
         $this->assertTrue(
             $transaction->journalEntries->contains(
-                fn (JournalEntry $journalEntry) => $journalEntry->type === JournalEntry::TYPE_DEBIT
+                fn(JournalEntry $journalEntry) => $journalEntry->type === JournalEntry::TYPE_DEBIT
                     && $journalEntry->sub_account_id === $expenseSubAccount->id
                     && $journalEntry->net_amount === $entry->deductible_amount
                     && $journalEntry->tax_type === JournalEntry::TAX_TYPE_NON_TAXABLE
@@ -858,7 +921,7 @@ class DepreciationServiceTest extends TestCase
 
         $this->assertTrue(
             $transaction->journalEntries->contains(
-                fn (JournalEntry $journalEntry) => $journalEntry->type === JournalEntry::TYPE_CREDIT
+                fn(JournalEntry $journalEntry) => $journalEntry->type === JournalEntry::TYPE_CREDIT
                     && $journalEntry->sub_account_id === $assetSubAccount->id
                     && $journalEntry->net_amount === $entry->deductible_amount
                     && $journalEntry->tax_type === JournalEntry::TAX_TYPE_NON_TAXABLE
@@ -874,10 +937,10 @@ class DepreciationServiceTest extends TestCase
         $fiscalYear2025 = $unit->createFiscalYear(2025);
 
         $assetSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($query) => $query->where('name', '機械装置'))
+            ->whereHas('account', fn($query) => $query->where('name', '機械装置'))
             ->firstOrFail();
         $paymentSubAccount = $unit->subAccounts()
-            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->whereHas('account', fn($query) => $query->where('name', 'その他の預金'))
             ->firstOrFail();
 
         $fixedAsset = app(DepreciationService::class)->registerFixedAsset(

@@ -248,6 +248,16 @@ class DepreciationService
         return $schedule;
     }
 
+    public function isFullyDepreciated(FixedAsset $asset, FiscalYear $fiscalYear): bool
+    {
+        return ! array_key_exists($fiscalYear->year, $this->calculateDepreciationScheduleUntilFullyDepreciated($asset));
+    }
+
+    public function isStillDepreciating(FixedAsset $asset, FiscalYear $fiscalYear): bool
+    {
+        return ! $this->isFullyDepreciated($asset, $fiscalYear);
+    }
+
     private function calculateDepreciationRate(FixedAsset $asset): ?float
     {
         $usefulLife = (int) $asset->useful_life;

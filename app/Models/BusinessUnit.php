@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\DepreciationService;
 use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -93,9 +94,27 @@ class BusinessUnit extends Model
     }
 
     // 固定資産
-    public function fixedAssets()
+    public function fixedAssets(): HasMany
     {
         return $this->hasMany(FixedAsset::class);
+    }
+
+    public function allFixedAssets(): Collection
+    {
+        return $this->fixedAssets()
+            ->with('depreciationEntries')
+            ->orderByDesc('acquisition_date')
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    public function depreciatingFixedAssets(FiscalYear $fiscalYear): Collection
+    {
+        $depreciationService = app(DepreciationService::class);
+
+        return $this->allFixedAssets()
+            ->filter(fn (FixedAsset $fixedAsset): bool => $depreciationService->isStillDepreciating($fixedAsset, $fiscalYear))
+            ->values();
     }
 
     // 初期勘定科目リスト
