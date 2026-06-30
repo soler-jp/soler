@@ -41,6 +41,58 @@ class DepreciationEntry extends Model
         return $this->belongsTo(Transaction::class);
     }
 
+    public function getAcquisitionYearMonthAttribute(): ?string
+    {
+        return $this->fixedAsset?->acquisition_date?->format('Y-m');
+    }
+
+    public function getDepreciationBaseAmountAttribute(): ?int
+    {
+        return $this->fixedAsset?->acquisition_cost;
+    }
+
+    public function getDepreciationMethodAttribute(): ?string
+    {
+        return $this->fixedAsset?->depreciation_method;
+    }
+
+    public function getUsefulLifeAttribute(): ?int
+    {
+        $usefulLife = $this->fixedAsset?->useful_life;
+
+        if ($usefulLife === null) {
+            return null;
+        }
+
+        return intdiv($usefulLife, 12);
+    }
+
+    public function getDepreciationRateAttribute(): ?string
+    {
+        $usefulLife = $this->fixedAsset?->useful_life;
+
+        if ($usefulLife === null || $usefulLife <= 0) {
+            return null;
+        }
+
+        return number_format(12 / $usefulLife, 3, '.', '');
+    }
+
+    public function getEndingUndepreciatedBalanceAttribute(): ?int
+    {
+        if ($this->fixedAsset === null) {
+            return null;
+        }
+
+        $depreciatedAmount = $this->fixedAsset->depreciationEntries()
+            ->whereHas('fiscalYear', function ($query): void {
+                $query->where('year', '<=', $this->fiscalYear->year);
+            })
+            ->sum('total_amount');
+
+        return max(0, $this->fixedAsset->acquisition_cost - (int) $depreciatedAmount);
+    }
+
     // 未記帳かどうかを判定（便利メソッド）
     public function isUnposted(): bool
     {

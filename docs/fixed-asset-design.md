@@ -172,6 +172,49 @@
 5. 実際に仕訳を起こすと `Transaction` を作成する
 6. `DepreciationEntry` に、どの `Transaction` で記帳したかを紐づける
 
+### `DepreciationEntry` の算出と表示対応
+
+`DepreciationEntry` は年度ごとの償却明細であり、表示ラベルごとに参照元を固定する。
+
+#### 算出ルール
+
+- `償却の基礎になる金額`
+  - `FixedAsset.acquisition_cost` を使う
+  - つまり `taxable_amount + tax_amount`
+- `償却率`
+  - `12 / FixedAsset.useful_life_months` を小数第3位で丸める
+  - 例: `72ヶ月 -> 0.167`
+- `本年中の償却期間`
+  - 取得年度の取得月から会計年度末までの月数
+  - 翌年度以降は原則12ヶ月
+- `本年分の普通償却費`
+  - `償却の基礎になる金額 × 償却率` を年額として丸めたうえで、月額に直し、本年中の償却期間を掛ける
+- `本年分の償却費合計`
+  - 初版では `本年分の普通償却費` と同じ
+- `事業専用割合`
+  - `FixedAsset` 登録時の見込み値を使う
+- `本年分の必要経費算入額`
+  - `本年分の償却費合計 × 事業専用割合`
+- `未償却残高(期末残高)`
+  - `償却の基礎になる金額 - 本年分の普通償却費`
+
+#### ラベルと取得元の対応表
+
+| 表示ラベル | 取得元 |
+| --- | --- |
+| 減価償却資産の名称等 | `FixedAsset.name` |
+| 面積または数量 | `1` |
+| 取得年月 | `FixedAsset.acquisition_date` の年月 |
+| 償却の基礎になる金額 | `FixedAsset.acquisition_cost` |
+| 耐用年数 | `FixedAsset.useful_life_months` を年換算した表示値 |
+| 償却率 | `12 / FixedAsset.useful_life_months` |
+| 本年中の償却期間 | `DepreciationEntry.months` |
+| 本年分の普通償却費 | `DepreciationEntry.ordinary_amount` |
+| 本年分の償却費合計 | `DepreciationEntry.total_amount` |
+| 事業専用割合 | `DepreciationEntry.business_usage_ratio` |
+| 本年分の必要経費算入額 | `DepreciationEntry.deductible_amount` |
+| 未償却残高(期末残高) | `FixedAsset.acquisition_cost - DepreciationEntry.ordinary_amount` |
+
 ### `Transaction`
 
 取得仕訳、償却仕訳、売却・除却仕訳の会計イベント本体とする。
