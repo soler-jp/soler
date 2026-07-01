@@ -40,6 +40,7 @@ class TransactionValidator
             'is_planned' => ['nullable', 'boolean'],
             'is_opening_entry' => ['nullable', 'boolean'],
             'recurring_transaction_plan_id' => ['nullable', 'exists:recurring_transaction_plans,id'],
+            'counterparty_id' => ['nullable', 'exists:counterparties,id'],
             'created_by' => ['nullable', 'exists:users,id'],
         ];
     }
@@ -57,6 +58,7 @@ class TransactionValidator
             'is_opening_entry' => '期首仕訳フラグ',
             'is_adjusting_entry' => '決算整理仕訳フラグ',
             'recurring_transaction_plan_id' => '定期取引計画ID',
+            'counterparty_id' => '取引先',
             'created_by' => '登録ユーザー',
         ];
     }

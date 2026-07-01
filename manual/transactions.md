@@ -10,6 +10,39 @@
 - 現在の `FiscalYear` があること
 - 仕訳に使う補助科目が事業体に属していること
 
+## 取引先を登録
+
+`TransactionRegistrar` では、取引先を次の 3 パターンで扱えます。
+
+- `counterparty_id` を指定する
+- `counterparty_name` を指定して自動作成する
+- 何も指定しない
+
+注意点:
+
+- `counterparty_id` と `counterparty_name` は同時に指定できません
+- `counterparty_name` は前後の空白を `trim` し、空文字なら未指定として扱います
+- `counterparty_registration_number` は任意です
+- `counterparty_registration_number` は空白を除去して正規化し、`1234567890123` のような 13 桁数字は `T1234567890123` に変換して保存します
+- `T` 付きの値はそのまま保存できます
+- 取引先名だけを指定した場合は、同名の取引先がなければ自動でマスター登録されます
+- 取引先を指定しない登録も可能です
+
+```php
+app(TransactionRegistrar::class)->register(
+    $fiscalYear,
+    [
+        'date' => '2025-04-01',
+        'description' => 'ABC商店への支払い',
+        'counterparty_name' => 'ABC商店',
+        'counterparty_registration_number' => '1234567890123',
+    ],
+    [
+        // journal entries...
+    ],
+);
+```
+
 ## 売上を登録
 
 売上登録では、通常は以下の2行を作ります。

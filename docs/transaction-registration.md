@@ -31,8 +31,25 @@
 - 取引データと仕訳データのバリデーション
 - 借方・貸方の整合確認
 - 税情報を含む金額の正規化
+- 取引先の解決と正規化
 - `Transaction` と `JournalEntry` の永続化
 - DB トランザクション境界の管理
+
+## 取引先の扱い
+
+`TransactionRegistrar` は、取引先の入力を次の 3 パターンで解釈する。
+
+- `counterparty_id` を指定して既存の取引先を紐づける
+- `counterparty_name` を指定して取引先マスターを自動作成し、紐づける
+- どちらも指定せず、取引先未設定で登録する
+
+補足:
+
+- `counterparty_id` と `counterparty_name` は同時指定しない
+- `counterparty_name` は前後の空白を除去してから扱う
+- `counterparty_registration_number` は任意入力として扱う
+- `counterparty_registration_number` は保存前に正規化し、`1234567890123` なら `T1234567890123` にそろえる
+- 取引先未設定の取引も、従来どおり登録できる
 
 ## 取引状態変更との責務分離
 
@@ -68,13 +85,16 @@
 
 ## 正規化の基本方針
 
-入力元の UI やユースケースが税込入力を受け取っても、保存前に `TransactionRegistrar` で内部表現へ正規化する。
+入力元の UI やユースケースが税込入力や取引先入力を受け取っても、保存前に `TransactionRegistrar` で内部表現へ正規化する。
 
 想定する流れは以下。
 
 1. 入力値から本体額と税額を決める
 2. 借方・貸方それぞれの総額が一致することを確認する
 3. `JournalEntry` には本体額と税額を分けて保存する
+
+取引先が入力されている場合は、同じ入口で `counterparty_id` を確定する。
+`counterparty_name` だけが渡された場合は、必要に応じて取引先マスターを作成して紐づける。
 
 将来的に税込入力と税抜入力の両方を扱う場合も、入口は変えずに `TransactionRegistrar` 側で解釈を切り替える。
 
@@ -102,6 +122,7 @@
 - 保存前に `gross_amount / net_amount / tax_amount / tax_type` へ正規化する
 - `gross_amount = net_amount + tax_amount` を必須条件とする
 - 貸借一致は総額ベースで判定する
+- 取引先入力は、取引登録の補助情報として同一のユースケース内で解釈する
 
 ## 入力形式と保存形式の分離
 

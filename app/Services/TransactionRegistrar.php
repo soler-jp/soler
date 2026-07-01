@@ -37,6 +37,7 @@ class TransactionRegistrar
 
         // バリデーション（失敗すると ValidationException をスロー）
         $transactionData['fiscal_year_id'] = $fiscalYear->id;
+        $transactionData = $this->resolveCounterparty($fiscalYear, $transactionData);
         $transactionData = TransactionValidator::validate($transactionData);
 
         $normalizedEntries = $this->normalizeEntries($fiscalYear, $journalEntriesData);
@@ -83,6 +84,94 @@ class TransactionRegistrar
     public function totalWithTax(array $entries): int
     {
         return collect($entries)->sum(fn ($e) => (int) ($e['net_amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
+    }
+
+    protected function resolveCounterparty(FiscalYear $fiscalYear, array $transactionData): array
+    {
+        $businessUnit = $fiscalYear->businessUnit;
+        $counterpartyId = $transactionData['counterparty_id'] ?? null;
+        $counterpartyName = $this->normalizeCounterpartyName($transactionData['counterparty_name'] ?? null);
+        $registrationNumber = $this->normalizeRegistrationNumber($transactionData['counterparty_registration_number'] ?? null);
+
+        unset($transactionData['counterparty_name'], $transactionData['counterparty_registration_number']);
+
+        if ($counterpartyId !== null && $counterpartyName !== null) {
+            throw ValidationException::withMessages([
+                'counterparty_name' => ['取引先IDと取引先名は同時に指定できません。'],
+            ]);
+        }
+
+        if ($counterpartyId !== null) {
+            $counterparty = $businessUnit->counterparties()->whereKey($counterpartyId)->first();
+
+            if (! $counterparty) {
+                throw ValidationException::withMessages([
+                    'counterparty_id' => ['選択中の事業体に属する取引先を指定してください。'],
+                ]);
+            }
+
+            $transactionData['counterparty_id'] = $counterparty->id;
+
+            return $transactionData;
+        }
+
+        if ($counterpartyName === null) {
+            unset($transactionData['counterparty_id']);
+
+            return $transactionData;
+        }
+
+        $counterparty = $businessUnit->counterparties()->firstOrCreate([
+            'name' => $counterpartyName,
+        ]);
+
+        if ($registrationNumber !== null && (
+            $counterparty->wasRecentlyCreated || blank($counterparty->registration_number)
+        )) {
+            $counterparty->forceFill([
+                'registration_number' => $registrationNumber,
+            ])->save();
+        }
+
+        $transactionData['counterparty_id'] = $counterparty->id;
+
+        return $transactionData;
+    }
+
+    protected function normalizeCounterpartyName(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $name = trim((string) $value);
+
+        return $name === '' ? null : $name;
+    }
+
+    protected function normalizeRegistrationNumber(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $number = strtoupper(preg_replace('/\s+/', '', trim((string) $value)));
+
+        if ($number === '') {
+            return null;
+        }
+
+        if (preg_match('/^T\d{13}$/', $number) === 1) {
+            return $number;
+        }
+
+        if (preg_match('/^\d{13}$/', $number) === 1) {
+            return 'T'.$number;
+        }
+
+        throw ValidationException::withMessages([
+            'counterparty_registration_number' => ['適格請求書発行事業者登録番号の形式が正しくありません。'],
+        ]);
     }
 
     protected function normalizeEntries(FiscalYear $fiscalYear, array $journalEntriesData): array

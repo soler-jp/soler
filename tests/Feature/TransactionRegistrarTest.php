@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\Counterparty;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\User;
@@ -105,6 +106,336 @@ class TransactionRegistrarTest extends TestCase
         $this->assertDatabaseHas('journal_entries', [
             'transaction_id' => $transaction->id,
             'net_amount' => 1000,
+        ]);
+    }
+
+    #[Test]
+    public function counterparty_nameを指定すると取引先が自動作成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先自動作成事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '取引先自動作成',
+            'counterparty_name' => '  ABC商店  ',
+            'counterparty_registration_number' => ' 1234567890123 ',
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+
+        $this->assertSame('ABC商店', $transaction->counterparty->name);
+        $this->assertSame('T1234567890123', $transaction->counterparty->registration_number);
+        $this->assertSame($unit->id, $transaction->counterparty->business_unit_id);
+    }
+
+    #[Test]
+    public function counterparty_registration_numberに_t付きの値を指定するとそのまま保存される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先自動作成事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => 'T付き登録番号',
+            'counterparty_name' => 'ABC商店',
+            'counterparty_registration_number' => ' T1234567890123 ',
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+
+        $this->assertSame('ABC商店', $transaction->counterparty->name);
+        $this->assertSame('T1234567890123', $transaction->counterparty->registration_number);
+    }
+
+    #[Test]
+    public function counterparty_nameだけを指定すると取引先が自動作成され登録番号はnullのままになる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先自動作成事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '取引先名のみ',
+            'counterparty_name' => 'XYZストア',
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+
+        $this->assertSame('XYZストア', $transaction->counterparty->name);
+        $this->assertNull($transaction->counterparty->registration_number);
+        $this->assertSame($unit->id, $transaction->counterparty->business_unit_id);
+    }
+
+    #[Test]
+    public function 同じcounterparty_nameを指定すると既存の取引先が再利用される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先再利用事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        $first = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '1回目',
+            'counterparty_name' => 'ABC商店',
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+
+        $second = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '2回目',
+            'counterparty_name' => 'ABC商店',
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+
+        $this->assertSame($first->counterparty_id, $second->counterparty_id);
+        $this->assertDatabaseCount('counterparties', 1);
+    }
+
+    #[Test]
+    public function counterparty_registration_numberの形式が不正だと登録できない()
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('適格請求書発行事業者登録番号の形式が正しくありません。');
+
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先エラー事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '登録番号フォーマットエラー',
+            'counterparty_name' => 'ABC商店',
+            'counterparty_registration_number' => 'ABC123',
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+    }
+
+    #[Test]
+    public function 存在しないcounterparty_idは登録できない()
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('選択中の事業体に属する取引先を指定してください。');
+
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先エラー事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '存在しない取引先ID',
+            'counterparty_id' => 999999,
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+    }
+
+    #[Test]
+    public function 他事業体のcounterparty_idは登録できない()
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('選択中の事業体に属する取引先を指定してください。');
+
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
+        $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $otherUnit->id,
+            'name' => '外部の取引先',
+        ]);
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '他事業体の取引先ID',
+            'counterparty_id' => $counterparty->id,
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+    }
+
+    #[Test]
+    public function counterparty_nameが空白だけなら取引先は未設定になる()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '取引先未設定',
+            'counterparty_name' => '   ',
+            'counterparty_registration_number' => '   ',
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+
+        $this->assertNull($transaction->counterparty_id);
+    }
+
+    #[Test]
+    public function counterparty_idを指定して既存取引先を紐づけられる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先紐づけ事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $unit->id,
+            'name' => 'XYZストア',
+            'registration_number' => 'T1234567890123',
+        ]);
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '既存取引先を紐づけ',
+            'counterparty_id' => $counterparty->id,
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+
+        $this->assertTrue($transaction->counterparty->is($counterparty));
+        $this->assertSame('XYZストア', $transaction->counterparty->name);
+        $this->assertSame('T1234567890123', $transaction->counterparty->registration_number);
+    }
+
+    #[Test]
+    public function counterparty_idとcounterparty_nameを同時指定すると登録できない()
+    {
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('取引先IDと取引先名は同時に指定できません。');
+
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先矛盾事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $unit->id,
+            'name' => '既存取引先',
+        ]);
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '矛盾する入力',
+            'counterparty_id' => $counterparty->id,
+            'counterparty_name' => '新規取引先',
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
         ]);
     }
 
@@ -1220,8 +1551,8 @@ class TransactionRegistrarTest extends TestCase
         $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $ownExpense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
-        $foreignAsset = $otherUnit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
+        $ownExpense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
+        $foreignAsset = $otherUnit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('選択中の事業体に属する補助科目を指定してください。');
@@ -1282,8 +1613,8 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
-        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
 
         $registrar = new TransactionRegistrar;
 
@@ -1323,9 +1654,9 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
-        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
-        $liability = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '未払金'))->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
+        $liability = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '未払金'))->first();
 
         $registrar = new TransactionRegistrar;
 
@@ -1385,8 +1716,8 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
-        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
 
         $registrar = new TransactionRegistrar;
 
@@ -1422,7 +1753,7 @@ class TransactionRegistrarTest extends TestCase
         $this->assertFalse($cancelled->is_planned);
         $this->assertSame('取消予定取引（取消）', $cancelled->description);
         $this->assertCount(2, $cancelled->journalEntries);
-        $this->assertTrue($cancelled->journalEntries->every(fn($e) => $e->net_amount === 0));
+        $this->assertTrue($cancelled->journalEntries->every(fn ($e) => $e->net_amount === 0));
 
         foreach ($cancelled->journalEntries as $entry) {
             $this->assertContains($entry->id, $originalIds);
@@ -1438,8 +1769,8 @@ class TransactionRegistrarTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
-        $expense = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '通信費'))->first();
-        $asset = $unit->subAccounts()->whereHas('account', fn($q) => $q->where('name', '現金'))->first();
+        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
 
         $registrar = new TransactionRegistrar;
 
