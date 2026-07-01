@@ -234,3 +234,77 @@ $schedule = app(DepreciationService::class)
 ```
 
 この結果は [`tests/Feature/DepreciationServiceTest.php`](../tests/Feature/DepreciationServiceTest.php) の `減価償却予定は年度ごとの配列として取得できる` で同じ配列を検証しています。
+
+## 減価償却明細を扱うには
+
+`DepreciationEntry` は `FiscalYear` と `FixedAsset` に紐づく減価償却明細です。
+`registerFixedAsset()` や `registerNewStandardCar()` などの登録処理の中で、取得年度から登録対象年度までの分がまとめて作成されます。
+
+### 作成方法
+
+`DepreciationEntry` は、固定資産の登録時に自動生成されます。
+存在する `FiscalYear` の分だけ保存され、未作成の年度はスキップされます。
+
+```php
+DepreciationEntry::updateOrCreate(
+    [
+        'fiscal_year_id' => $fiscalYear->id,
+        'fixed_asset_id' => $asset->id,
+    ],
+    [
+        'months' => 12,
+        'ordinary_amount' => 120_000,
+        'special_amount' => 0,
+        'total_amount' => 120_000,
+        'business_usage_ratio' => 1.00,
+        'deductible_amount' => 120_000,
+        'transaction_id' => null,
+    ],
+);
+```
+
+`business_usage_ratio` は固定資産の使用割合です。
+`deductible_amount` は `total_amount × business_usage_ratio` から計算されます。
+`FiscalYear` が未作成の年度はスキップされます。
+
+### 修正の考え方
+
+修正するときは、`$fiscalYear` から対象の `DepreciationEntry` を取得して `update()` します。
+このアプリでは、取得時の金額を正とし、途中で残高が変わった場合もその時点の `FixedAsset` の値を基準にします。
+
+```php
+$entry = $fiscalYear->depreciationEntries()
+    ->where('fixed_asset_id', $fixedAsset->id)
+    ->firstOrFail();
+
+$entry->update([
+    'months' => 12,
+    'ordinary_amount' => 120_000,
+    'special_amount' => 0,
+    'total_amount' => 120_000,
+    'business_usage_ratio' => 1.00,
+    'deductible_amount' => 120_000,
+]);
+```
+
+- 修正対象は `DepreciationEntry` です
+- 取得価額を変えるなら `FixedAsset` 側を正にします
+- 後続年度分の再計算はしません
+- 明細の値は、その年度の記録として更新します
+
+### Transaction に変換して保存するには
+
+未記帳の `DepreciationEntry` は、`DepreciationService::registerTransactionFor()` で仕訳に変換できます。
+変換後は `transaction_id` が入るので、`DepreciationEntry::isUnposted()` は `false` になります。
+
+```php
+$entry = $fiscalYear->depreciationEntries()
+    ->where('fixed_asset_id', $fixedAsset->id)
+    ->firstOrFail();
+
+app(DepreciationService::class)->registerTransactionFor($entry);
+```
+
+この処理では、年度末日付の調整仕訳が作られます。
+借方は `減価償却費`、貸方は対象固定資産の補助科目で、どちらも `deductible_amount` を使います。
+すでに記帳済みの明細に対して呼ぶと例外になります。
