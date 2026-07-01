@@ -93,6 +93,11 @@ class BusinessUnit extends Model
         );
     }
 
+    public function counterparties(): HasMany
+    {
+        return $this->hasMany(Counterparty::class);
+    }
+
     // 固定資産
     public function fixedAssets(): HasMany
     {

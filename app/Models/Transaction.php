@@ -22,6 +22,7 @@ class Transaction extends Model
         'is_adjusting_entry',
         'is_planned',
         'recurring_transaction_plan_id',
+        'counterparty_id',
         'created_by',
         'credit_card_import_batch_id',
         'is_active',
@@ -66,6 +67,11 @@ class Transaction extends Model
     public function creditCardImportBatch(): BelongsTo
     {
         return $this->belongsTo(CreditCardImportBatch::class, 'credit_card_import_batch_id');
+    }
+
+    public function counterparty(): BelongsTo
+    {
+        return $this->belongsTo(Counterparty::class);
     }
 
     /**
