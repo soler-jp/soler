@@ -1,14 +1,18 @@
-# Counterparty Qualification Design
+# Counterparty Qualification and Summary Design
 
-このドキュメントは、取引先の適格判定をどう保存し、どう過去日時点で判定するかを整理した設計メモである。
+このドキュメントは、`Counterparty` の適格判定と取引集計をどう扱うかを整理する。
 
 ## 目的
 
 - 取引先の現在状態と履歴の役割を分けて定義する
 - 後から届いた報告をどう反映するかを明確にする
 - `unknown` を含む判定ルールを固定する
+- 取引先ごとの集計を、UI ではなくコードから再利用できる形にする
+- 年別と全体を同じ入口で扱えるようにする
+- 支出は勘定科目別内訳と合計、収入は合計を返す
+- 全体集計と年別集計、年指定集計を同じ設計で扱う
 
-## 基本方針
+## 適格判定の基本方針
 
 取引先の適格判定は、次の2層で扱う。
 
@@ -129,6 +133,109 @@
 - 1 回の判定変更を表す
 - 現在値ではなく履歴の事実を保存する
 - `effective_from` と `recorded_at` の差分を表現できる
+
+## 集計の入口
+
+現在の public API は次の2つとする。
+
+```php
+$summary = $counterparty->calculateAmountSummary();
+$summary = $counterparty->calculateAmountSummaryForFiscalYear(2025);
+```
+
+`calculateAmountSummary()` の返却値は次の形にする。
+
+```php
+[
+    'all' => [
+        'expense' => [
+            'accounts' => [
+                ['account_id' => 12, 'account_name' => '消耗品費', 'amount' => 3300],
+                ['account_id' => 13, 'account_name' => '通信費', 'amount' => 2200],
+            ],
+            'total_amount' => 5500,
+        ],
+        'income' => [
+            'accounts' => [
+                ['account_id' => 8, 'account_name' => '売上高', 'amount' => 9900],
+            ],
+            'total_amount' => 9900,
+        ],
+    ],
+    'fiscal_years' => [
+        2025 => [
+            'expense' => [
+                'accounts' => [
+                    ['account_id' => 12, 'account_name' => '消耗品費', 'amount' => 3300],
+                    ['account_id' => 13, 'account_name' => '通信費', 'amount' => 2200],
+                ],
+                'total_amount' => 5500,
+            ],
+            'income' => [
+                'accounts' => [
+                    ['account_id' => 8, 'account_name' => '売上高', 'amount' => 9900],
+                ],
+                'total_amount' => 9900,
+            ],
+        ],
+    ],
+]
+```
+
+`calculateAmountSummaryForFiscalYear()` の返却値は、指定年だけを抜き出した同じ形になる。
+
+```php
+[
+    'expense' => [
+        'accounts' => [
+            ['account_id' => 12, 'account_name' => '消耗品費', 'amount' => 3300],
+            ['account_id' => 13, 'account_name' => '通信費', 'amount' => 2200],
+        ],
+        'total_amount' => 5500,
+    ],
+    'income' => [
+        'accounts' => [
+            ['account_id' => 8, 'account_name' => '売上高', 'amount' => 9900],
+        ],
+        'total_amount' => 9900,
+    ],
+]
+```
+
+## 集計対象
+
+- `transactions.counterparty_id` が対象の取引
+- `transactions.is_active = true` の取引のみ
+- 取引に紐づく `journal_entries`
+
+この実装では、無効化済みの取引は集計から除外する。
+
+## 集計内容
+
+各 `fiscal_years.year` ごとに、次の単位で集計する。
+
+- 支出
+  - 勘定科目別の `amount`
+  - 支出合計の `total_amount`
+- 収入
+  - 勘定科目別の `amount`
+  - 収入合計の `total_amount`
+
+全体集計も同じ項目で返す。
+
+## 実装方針
+
+- 適格判定の履歴記録は `Counterparty` と `CounterpartyQualificationEvent` に寄せる
+- 集計SQLは `CounterpartySummaryCalculator` に寄せる
+- モデルは `calculateAmountSummary()` だけを公開し、呼び出し側に実装詳細を漏らさない
+- 年別集計は `fiscal_years.year` でまとめる
+- 年指定集計は `fiscal_years.year = 指定値` で絞る
+
+## 既知の前提
+
+- `gross_amount` は `net_amount + tax_amount` として計算する
+- 同じ取引先に複数の取引があれば、すべて加算する
+- 取引が1件もない場合は、ゼロ値と空配列を返す
 
 ## 今後の拡張余地
 

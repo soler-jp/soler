@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\CounterpartySummaryCalculator;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -68,6 +69,34 @@ class Counterparty extends Model
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);
+    }
+
+    /**
+     * @return array{
+     *     all: array{
+     *         expense: array{accounts: array<int, array{account_id: int, account_name: string, amount: int}>, total_amount: int},
+     *         income: array{accounts: array<int, array{account_id: int, account_name: string, amount: int}>, total_amount: int}
+     *     },
+     *     fiscal_years: array<int, array{
+     *         expense: array{accounts: array<int, array{account_id: int, account_name: string, amount: int}>, total_amount: int},
+     *         income: array{accounts: array<int, array{account_id: int, account_name: string, amount: int}>, total_amount: int}
+     *     }>
+     * }
+     */
+    public function calculateAmountSummary(): array
+    {
+        return app(CounterpartySummaryCalculator::class)->calculate($this);
+    }
+
+    /**
+     * @return array{
+     *     expense: array{accounts: array<int, array{account_id: int, account_name: string, amount: int}>, total_amount: int},
+     *     income: array{accounts: array<int, array{account_id: int, account_name: string, amount: int}>, total_amount: int}
+     * }
+     */
+    public function calculateAmountSummaryForFiscalYear(int $fiscalYear): array
+    {
+        return app(CounterpartySummaryCalculator::class)->calculateForFiscalYear($this, $fiscalYear);
     }
 
     public function setQualificationStatus(string $qualificationStatus, ?Carbon $effectiveFrom = null): void

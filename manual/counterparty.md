@@ -1,6 +1,6 @@
-# 取引先の適格判定を登録する
+# 取引先の適格判定と集計を扱う
 
-この手順書は、取引先の適格判定をどう入力し、どう過去日時点の状態を確認するかをまとめたものです。
+この手順書は、取引先の適格判定をどう入力し、どう過去日時点の状態を確認するかと、取引先の集計をどう取得するかをまとめたものです。
 
 ## できること
 
@@ -15,7 +15,7 @@
 ただし、`unknown` は初期状態としてのみ使います。
 登録後に `unknown` へ戻すことはできません。
 
-## 現在の判定を登録する
+## 適格判定を更新する
 
 現在の判定を更新するには、事業体経由で取引先を取得してから `setQualificationStatus()` を使います。
 
@@ -28,7 +28,9 @@ $counterparty = $businessUnit->counterparties()->findOrFail($id);
 $counterparty->setQualificationStatus(Counterparty::QUALIFICATION_STATUS_QUALIFIED);
 ```
 
-`qualified` と `non_qualified` のみ登録できます。
+登録できるのは `qualified` と `non_qualified` だけです。
+
+`unknown` は初期状態としてのみ使います。
 
 ```php
 $counterparty->setQualificationStatus(Counterparty::QUALIFICATION_STATUS_NON_QUALIFIED);
@@ -88,6 +90,153 @@ $status = $counterparty->qualificationStatusAt(
 - `unknown` を入力したい場合は、新規作成時の初期状態として扱う
 - 既存の判定を未確定に戻す運用はしない
 - 「いつから適格だったか」が分かる場合は、`effectiveFrom` を指定して登録する
+
+## 取引先の集計を取る
+
+集計には2つの入口があります。
+
+- `calculateAmountSummary()` は、全体集計と年別集計を返す
+- `calculateAmountSummaryForFiscalYear(2025)` は、指定した年だけの集計を返す
+
+```php
+$summary = $counterparty->calculateAmountSummary();
+$summary2025 = $counterparty->calculateAmountSummaryForFiscalYear(2025);
+```
+
+### 全体集計と年別集計
+
+`calculateAmountSummary()` の返り値は次の形です。
+
+```php
+[
+    'all' => [
+        'expense' => [
+            'accounts' => [
+                [
+                    'account_id' => 12,
+                    'account_name' => '消耗品費',
+                    'amount' => 3300,
+                ],
+                [
+                    'account_id' => 13,
+                    'account_name' => '通信費',
+                    'amount' => 2200,
+                ],
+            ],
+            'total_amount' => 5500,
+        ],
+        'income' => [
+            'accounts' => [
+                [
+                    'account_id' => 8,
+                    'account_name' => '売上高',
+                    'amount' => 9900,
+                ],
+            ],
+            'total_amount' => 9900,
+        ],
+    ],
+    'fiscal_years' => [
+        2024 => [
+            'expense' => [
+                'accounts' => [
+                    [
+                        'account_id' => 12,
+                        'account_name' => '消耗品費',
+                        'amount' => 1100,
+                    ],
+                    [
+                        'account_id' => 13,
+                        'account_name' => '通信費',
+                        'amount' => 2200,
+                    ],
+                ],
+                'total_amount' => 3300,
+            ],
+            'income' => [
+                'accounts' => [
+                    [
+                        'account_id' => 8,
+                        'account_name' => '売上高',
+                        'amount' => 4400,
+                    ],
+                ],
+                'total_amount' => 4400,
+            ],
+        ],
+        2025 => [
+            'expense' => [
+                'accounts' => [],
+                'total_amount' => 0,
+            ],
+            'income' => [
+                'accounts' => [
+                    [
+                        'account_id' => 8,
+                        'account_name' => '売上高',
+                        'amount' => 5500,
+                    ],
+                ],
+                'total_amount' => 5500,
+            ],
+        ],
+    ],
+]
+```
+
+### 全体集計から読む場合
+
+```php
+$summary = $counterparty->calculateAmountSummary();
+$expenseTotal = $summary['all']['expense']['total_amount'];
+$year2025IncomeTotal = $summary['fiscal_years'][2025]['income']['total_amount'];
+```
+
+### 指定年だけ欲しい場合
+
+`calculateAmountSummaryForFiscalYear(2025)` の返り値は次の形です。
+
+```php
+[
+    'expense' => [
+        'accounts' => [
+            [
+                'account_id' => 12,
+                'account_name' => '消耗品費',
+                'amount' => 3300,
+            ],
+            [
+                'account_id' => 13,
+                'account_name' => '通信費',
+                'amount' => 2200,
+            ],
+        ],
+        'total_amount' => 5500,
+    ],
+    'income' => [
+        'accounts' => [
+            [
+                'account_id' => 8,
+                'account_name' => '売上高',
+                'amount' => 9900,
+            ],
+        ],
+        'total_amount' => 9900,
+    ],
+]
+```
+
+```php
+$summary2025 = $counterparty->calculateAmountSummaryForFiscalYear(2025);
+$summary2025Expense = $summary2025['expense']['total_amount'];
+```
+
+## 補足
+
+- 集計対象は有効な取引のみです
+- 年別集計は `fiscal_years.year` をキーにします
+- 取引がない場合は、`accounts` は空配列、`total_amount` は `0` が返ります
+- 年指定集計は、指定した年の `expense` と `income` を直接返します
 
 ## 使う場面
 
