@@ -244,6 +244,7 @@ $schedule = app(DepreciationService::class)
 
 `DepreciationEntry` は、固定資産の登録時に自動生成されます。
 存在する `FiscalYear` の分だけ保存され、未作成の年度はスキップされます。
+後から `FiscalYear` を作成した場合は、その年度分が自動で補完されます。
 
 ```php
 DepreciationEntry::updateOrCreate(

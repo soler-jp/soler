@@ -319,7 +319,37 @@ class DepreciationService
 
     public function prepareEntriesFor(FiscalYear $fiscalYear): void
     {
-        // 実装は後で
+        $businessUnit = $fiscalYear->businessUnit;
+
+        $fixedAssets = $businessUnit->fixedAssets()
+            ->with(['depreciationEntries' => function ($query): void {
+                $query->orderBy('fiscal_year_id');
+            }])
+            ->orderBy('acquisition_date')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($fixedAssets as $fixedAsset) {
+            $schedule = $this->calculateDepreciationScheduleUntilFullyDepreciated($fixedAsset);
+            $values = $schedule[$fiscalYear->year] ?? null;
+
+            if ($values === null) {
+                continue;
+            }
+
+            $businessUsageRatio = $this->resolveBusinessUsageRatio($fixedAsset);
+
+            $fixedAsset->depreciationEntries()->firstOrCreate(
+                [
+                    'fiscal_year_id' => $fiscalYear->id,
+                ],
+                $values + [
+                    'business_usage_ratio' => $businessUsageRatio,
+                    'deductible_amount' => (int) floor($values['total_amount'] * $businessUsageRatio),
+                    'transaction_id' => null,
+                ],
+            );
+        }
     }
 
     public function registerTransactionFor(DepreciationEntry $entry): void
@@ -361,6 +391,19 @@ class DepreciationService
         $entry->forceFill([
             'transaction_id' => $transaction->id,
         ])->save();
+    }
+
+    private function resolveBusinessUsageRatio(FixedAsset $asset): float
+    {
+        $businessUsageRatio = $asset->depreciationEntries()
+            ->orderBy('fiscal_year_id')
+            ->value('business_usage_ratio');
+
+        if ($businessUsageRatio === null) {
+            return 1.00;
+        }
+
+        return (float) $businessUsageRatio;
     }
 
     private function resolveDepreciationExpenseSubAccount(FiscalYear $fiscalYear): SubAccount

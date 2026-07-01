@@ -2,7 +2,7 @@
 
 このドキュメントは、固定資産および減価償却機能の初期設計案を整理するためのメモである。
 
-現時点では `FixedAsset`、`DepreciationEntry`、対応 migration、`DepreciationService` の基礎実装は存在するが、責務分離と残ユースケースの定義はまだ不十分である。
+現時点では `FixedAsset`、`DepreciationEntry`、対応 migration、`DepreciationService` の実装があり、固定資産登録時の償却明細生成と、`FiscalYear` 作成時の補完まで動作している。
 
 このドキュメントでは、まず初版で扱うユースケースを固定し、そのうえでモデル責務と見直し方針を明確にする。
 
@@ -22,15 +22,15 @@
 - `depreciation_entries`
   - 年度ごとの償却金額と `Transaction` への記帳参照を持つ
 - `DepreciationService`
-  - `registerFixedAsset()` は一部実装済み
-  - `registerTransactionFor()` は単票記帳まで実装済み
-  - `prepareEntriesFor()` は未実装
+  - `registerFixedAsset()` は固定資産登録と初回の償却明細生成を行う
+  - `registerTransactionFor()` は減価償却仕訳の記帳を行う
+  - `prepareEntriesFor()` は後から作成した `FiscalYear` に対して不足分の償却明細を補完する
 
 一方で、現状には次の問題がある。
 
-- 固定資産登録が `TransactionRegistrar` を経由していない
-- `DepreciationEntry` に計算用カラムと記帳状態カラムが混在しており、最小責務がまだ固まりきっていない
-- 取得、年度償却、除却がまだユースケースとして分解されていない
+- 固定資産登録は `DepreciationService` が `FixedAsset` と関連する `Transaction` をまとめて扱う
+- `DepreciationEntry` は年度償却明細として、計算結果と記帳状態を両方持つ
+- 取得、年度償却、除却はユースケースとして分かれているが、除却はまだ拡張余地がある
 - `BusinessUnit` の償却中資産判定は、明示的に `FiscalYear` を受け取る
 
 ## 責務方針
@@ -42,6 +42,7 @@
   - 新車の登録
   - 償却予定スケジュールの算出
   - `DepreciationEntry` の生成
+  - `FiscalYear` 作成時の補完
   - 償却仕訳の記帳
 - `FixedAsset`
   - 台帳としての状態保持
@@ -50,6 +51,7 @@
 - `BusinessUnit`
   - 事業体の固定資産一覧取得
   - 償却中資産の問い合わせ
+  - `FiscalYear` 作成時に既存固定資産の当年度分を補完する
 
 この方針により、`FixedAsset` の生成や年度横断の償却ロジックがモデルや `BusinessUnit` に分散しないようにする。
 
@@ -64,7 +66,8 @@
 - 耐用年数は固定値とする
   - `new_standard_car`: 6年
   - `new_light_car`: 4年
-- `business_usage_ratio` は固定資産登録時の見込み値として扱う
+- `business_usage_ratio` は固定資産登録時の見込み値として扱い、後から年度を補完するときは既存明細の値を踏襲する
+- 後から `FiscalYear` が追加された場合は、その年度分の `DepreciationEntry` を補完する
 - 減価償却方法は初版では `straight_line` のみ対応する
 - 固定資産の登録と償却予定の算出は `DepreciationService` に寄せる
 
@@ -184,16 +187,15 @@
 - `Transaction`
   - 実際の記帳結果
 
-未記帳の `DepreciationEntry` は見込み値ベースの償却予定であり、記帳直前に当年度の実績値へ更新する。
+未記帳の `DepreciationEntry` は年度ごとの償却明細であり、固定資産登録時または `FiscalYear` 作成時に自動生成される。
 
 したがって、流れは次の通りである。
 
 1. `FixedAsset` を登録する
-2. 取得初年度の `DepreciationEntry` を見込み値で作成する
-3. 継続年度は期初処理で `DepreciationEntry` を見込み値で作成する
-4. 期末に当年度 `DepreciationEntry` の事業利用割合を実績値へ更新する
-5. 実際に仕訳を起こすと `Transaction` を作成する
-6. `DepreciationEntry` に、どの `Transaction` で記帳したかを紐づける
+2. 取得初年度の `DepreciationEntry` を作成する
+3. 継続年度は `FiscalYear` 作成時に `DepreciationEntry` を補完する
+4. 実際に仕訳を起こすと `Transaction` を作成する
+5. `DepreciationEntry` に、どの `Transaction` で記帳したかを紐づける
 
 ### `DepreciationEntry` の算出と表示対応
 
@@ -215,11 +217,11 @@
 - `本年分の償却費合計`
   - 初版では `本年分の普通償却費` と同じ
 - `事業専用割合`
-  - `FixedAsset` 登録時の見込み値を使う
+  - `DepreciationEntry.business_usage_ratio` を使う
 - `本年分の必要経費算入額`
   - `本年分の償却費合計 × 事業専用割合`
 - `未償却残高(期末残高)`
-  - `償却の基礎になる金額 - 本年分の普通償却費`
+  - `FixedAsset.acquisition_cost - 当年度までの累計償却額`
 
 #### ラベルと取得元の対応表
 
@@ -236,7 +238,7 @@
 | 本年分の償却費合計 | `DepreciationEntry.total_amount` |
 | 事業専用割合 | `DepreciationEntry.business_usage_ratio` |
 | 本年分の必要経費算入額 | `DepreciationEntry.deductible_amount` |
-| 未償却残高(期末残高) | `FixedAsset.acquisition_cost - DepreciationEntry.ordinary_amount` |
+| 未償却残高(期末残高) | `DepreciationEntry.ending_undepreciated_balance` |
 
 ### `Transaction`
 

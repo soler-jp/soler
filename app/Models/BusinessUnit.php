@@ -235,20 +235,23 @@ class BusinessUnit extends Model
      */
     public function createFiscalYear(int $year): FiscalYear
     {
+        return DB::transaction(function () use ($year): FiscalYear {
+            $hasActive = $this->fiscalYears()->where('is_active', true)->exists();
 
-        $hasActive = $this->fiscalYears()->where('is_active', true)->exists();
+            $fiscalYear = $this->fiscalYears()->create([
+                'year' => $year,
+                'start_date' => "$year-01-01",
+                'end_date' => "$year-12-31",
+                'is_closed' => false,
+                'is_active' => ! $hasActive,  // まだなければtrueにする
+            ]);
 
-        $fiscalYear = $this->fiscalYears()->create([
-            'year' => $year,
-            'start_date' => "$year-01-01",
-            'end_date' => "$year-12-31",
-            'is_closed' => false,
-            'is_active' => ! $hasActive,  // まだなければtrueにする
-        ]);
+            $this->setCurrentFiscalYearIfNotSet($fiscalYear);
 
-        $this->setCurrentFiscalYearIfNotSet($fiscalYear);
+            app(DepreciationService::class)->prepareEntriesFor($fiscalYear);
 
-        return $fiscalYear;
+            return $fiscalYear;
+        });
     }
 
     public function getAccountByName(string $name): ?Account
