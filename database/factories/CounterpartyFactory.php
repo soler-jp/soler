@@ -22,8 +22,22 @@ class CounterpartyFactory extends Factory
             'business_unit_id' => BusinessUnit::factory(),
             'name' => $this->faker->company,
             'registration_number' => 'T'.$this->faker->numerify('#############'),
-            'is_qualified_invoice_issuer' => $this->faker->boolean(35),
+            'qualification_status' => Counterparty::QUALIFICATION_STATUS_UNKNOWN,
             'notes' => $this->faker->optional()->sentence(),
         ];
+    }
+
+    public function qualified(): static
+    {
+        return $this->state([
+            'qualification_status' => Counterparty::QUALIFICATION_STATUS_QUALIFIED,
+        ]);
+    }
+
+    public function nonQualified(): static
+    {
+        return $this->state([
+            'qualification_status' => Counterparty::QUALIFICATION_STATUS_NON_QUALIFIED,
+        ]);
     }
 }
