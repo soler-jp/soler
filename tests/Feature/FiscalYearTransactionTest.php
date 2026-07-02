@@ -39,7 +39,7 @@ class FiscalYearTransactionTest extends TestCase
         [$fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => '文房具を現金で購入',
         ];
 
@@ -67,7 +67,7 @@ class FiscalYearTransactionTest extends TestCase
         [$fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => 'バランスエラー',
         ];
 
@@ -94,7 +94,7 @@ class FiscalYearTransactionTest extends TestCase
         $fiscalYear = $unit->createFiscalYear(2025);
 
         $transactionData = [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => '仕訳なし',
         ];
 
@@ -138,7 +138,7 @@ class FiscalYearTransactionTest extends TestCase
         $fiscalYear = $unit->createFiscalYear(2025);
 
         $transactionData = [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => '仕訳バリデーション',
         ];
 
@@ -156,7 +156,7 @@ class FiscalYearTransactionTest extends TestCase
         [$fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => 'fiscal_year_id自動設定',
         ];
 
@@ -176,7 +176,7 @@ class FiscalYearTransactionTest extends TestCase
         [$fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => '紐づき確認',
         ];
 

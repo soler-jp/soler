@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Counterparty;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -118,7 +119,7 @@ class TransactionRegistrarTest extends TestCase
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => '取引先自動作成',
             'counterparty_name' => '  ABC商店  ',
             'counterparty_registration_number' => ' 1234567890123 ',
@@ -149,7 +150,7 @@ class TransactionRegistrarTest extends TestCase
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => 'T付き登録番号',
             'counterparty_name' => 'ABC商店',
             'counterparty_registration_number' => ' T1234567890123 ',
@@ -179,7 +180,7 @@ class TransactionRegistrarTest extends TestCase
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => '取引先名のみ',
             'counterparty_name' => 'XYZストア',
         ], [
@@ -209,7 +210,7 @@ class TransactionRegistrarTest extends TestCase
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $first = (new TransactionRegistrar)->register($fiscalYear, [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => '1回目',
             'counterparty_name' => 'ABC商店',
         ], [
@@ -226,7 +227,7 @@ class TransactionRegistrarTest extends TestCase
         ]);
 
         $second = (new TransactionRegistrar)->register($fiscalYear, [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => '2回目',
             'counterparty_name' => 'ABC商店',
         ], [
@@ -383,7 +384,7 @@ class TransactionRegistrarTest extends TestCase
         ]);
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => '既存取引先を紐づけ',
             'counterparty_id' => $counterparty->id,
         ], [
@@ -1587,7 +1588,7 @@ class TransactionRegistrarTest extends TestCase
         $registrar = new TransactionRegistrar;
 
         $transaction = $registrar->register($fiscalYear, [
-            'date' => now()->toDateString(),
+            'date' => '2025-06-15',
             'description' => '予定取引テスト',
             'is_planned' => true,
         ], [
@@ -1870,5 +1871,68 @@ class TransactionRegistrarTest extends TestCase
         ]);
 
         $registrar->cancelPlanned($transaction);
+    }
+
+    private function registerWithDate(FiscalYear $fiscalYear, string $date): Transaction
+    {
+        [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
+
+        return (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => $date,
+            'description' => '年度境界テスト',
+        ], [
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $subAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ]);
+    }
+
+    #[Test]
+    public function 会計年度の開始日当日の取引は登録できる()
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+
+        $transaction = $this->registerWithDate($fiscalYear, '2025-01-01');
+
+        $this->assertSame('2025-01-01', $transaction->date->toDateString());
+    }
+
+    #[Test]
+    public function 会計年度の終了日当日の取引は登録できる()
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+
+        $transaction = $this->registerWithDate($fiscalYear, '2025-12-31');
+
+        $this->assertSame('2025-12-31', $transaction->date->toDateString());
+    }
+
+    #[Test]
+    public function 会計年度の開始日より前の取引は登録できない()
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('取引日は会計年度の期間内（2025-01-01〜2025-12-31）で指定してください。');
+
+        $this->registerWithDate($fiscalYear, '2024-12-31');
+    }
+
+    #[Test]
+    public function 会計年度の終了日より後の取引は登録できない()
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('取引日は会計年度の期間内（2025-01-01〜2025-12-31）で指定してください。');
+
+        $this->registerWithDate($fiscalYear, '2026-01-01');
     }
 }

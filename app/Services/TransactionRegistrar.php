@@ -8,6 +8,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Validators\JournalEntryValidator;
 use App\Validators\TransactionValidator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -40,6 +41,8 @@ class TransactionRegistrar
         $transactionData['fiscal_year_id'] = $fiscalYear->id;
         $transactionData = $this->resolveCounterparty($fiscalYear, $transactionData);
         $transactionData = TransactionValidator::validate($transactionData);
+
+        $this->ensureDateWithinFiscalYear($fiscalYear, $transactionData['date']);
 
         $normalizedEntries = $this->normalizeEntries($fiscalYear, $journalEntriesData);
         $validatedEntries = [];
@@ -85,6 +88,27 @@ class TransactionRegistrar
     public function totalWithTax(array $entries): int
     {
         return collect($entries)->sum(fn ($e) => (int) ($e['net_amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
+    }
+
+    /**
+     * 取引日が会計年度の期間内であることを確認する
+     *
+     * fiscal_year_id 基準で集計する処理（年度サマリ・残高集計など）は
+     * 取引日が年度期間内であることを前提にしているため、登録時に保証する。
+     */
+    protected function ensureDateWithinFiscalYear(FiscalYear $fiscalYear, mixed $date): void
+    {
+        $transactionDate = Carbon::parse($date)->startOfDay();
+
+        if ($transactionDate->lt($fiscalYear->start_date) || $transactionDate->gt($fiscalYear->end_date)) {
+            throw ValidationException::withMessages([
+                'date' => [sprintf(
+                    '取引日は会計年度の期間内（%s〜%s）で指定してください。',
+                    $fiscalYear->start_date->toDateString(),
+                    $fiscalYear->end_date->toDateString(),
+                )],
+            ]);
+        }
     }
 
     protected function resolveCounterparty(FiscalYear $fiscalYear, array $transactionData): array
