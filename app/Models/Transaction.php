@@ -149,12 +149,14 @@ class Transaction extends Model
             return;
         }
 
-        $this->forceFill([
-            'is_active' => false,
-            'deactivated_at' => now(),
-            'deactivated_by' => $user?->id,
-            'deactivation_reason' => $reason,
-        ])->save();
+        DB::transaction(function () use ($user, $reason) {
+            $this->forceFill([
+                'is_active' => false,
+                'deactivated_at' => now(),
+                'deactivated_by' => $user?->id,
+                'deactivation_reason' => $reason,
+            ])->save();
+        });
     }
 
     public function getCreditAccountsLabelAttribute(): string

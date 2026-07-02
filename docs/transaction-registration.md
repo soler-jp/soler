@@ -59,6 +59,13 @@
 - `is_active` / `deactivated_at` / `deactivated_by` / `deactivation_reason` の更新は `Transaction` 自身の明示メソッドで扱う
 - `Transaction` の無効化は `Transaction::deactivate()` を正規ルートとする
 
+仕訳削除機能を導入する場合も、初期方針は物理削除ではなく `Transaction::deactivate()` に寄せる。
+
+- `JournalEntry` は原則として履歴保持のため残す
+- 「仕訳を削除したい」は「親 `Transaction` を無効化したい」として解釈する
+- 集計や表示では親 `Transaction` の active 状態を参照して除外する
+- 物理削除が必要になった場合は、別ユースケースとして監査要件を整理してから扱う
+
 この方針を採る理由は次の通り。
 
 - 登録サービスに更新・削除責務まで混ぜないため

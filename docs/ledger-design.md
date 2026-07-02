@@ -124,7 +124,7 @@
 
 そのため、無効化済み取引に紐づく `JournalEntry` が残っていても、元帳には表示しない。
 
-この点は、`Transaction::deactivate()` と元帳の可視性をどう結びつけるかという設計判断になる。
+この実装により、`Transaction::deactivate()` を仕訳削除の初期運用ルートとして使える。
 
 ### 5. `Transaction::getCreditAccountsLabelAttribute()` は元帳と近い責務を持つ
 

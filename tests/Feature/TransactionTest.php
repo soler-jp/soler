@@ -66,6 +66,26 @@ class TransactionTest extends TestCase
         $this->assertSame('誤登録のため無効化', $transaction->deactivation_reason);
     }
 
+    #[Test]
+    public function 既に無効化済みのtransactionを再度deactivateしても記録は上書きされない()
+    {
+        $firstUser = User::factory()->create();
+        $secondUser = User::factory()->create();
+        $transaction = Transaction::factory()->create();
+
+        $transaction->deactivate($firstUser, '初回の無効化');
+        $firstDeactivatedAt = $transaction->fresh()->deactivated_at;
+
+        $transaction->fresh()->deactivate($secondUser, '再無効化');
+
+        $transaction->refresh();
+
+        $this->assertFalse($transaction->is_active);
+        $this->assertSame($firstUser->id, $transaction->deactivated_by);
+        $this->assertSame('初回の無効化', $transaction->deactivation_reason);
+        $this->assertTrue($transaction->deactivated_at?->eq($firstDeactivatedAt));
+    }
+
     // /////////////////////////
 
     #[Test]
