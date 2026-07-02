@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 
 class Transaction extends Model
@@ -25,6 +26,8 @@ class Transaction extends Model
         'counterparty_id',
         'created_by',
         'credit_card_import_batch_id',
+        'revised_from_transaction_id',
+        'revision_reason',
         'is_active',
         'deactivated_at',
         'deactivated_by',
@@ -95,6 +98,16 @@ class Transaction extends Model
     public function recurringTransactionPlan(): BelongsTo
     {
         return $this->belongsTo(RecurringTransactionPlan::class);
+    }
+
+    public function revisedFrom(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'revised_from_transaction_id');
+    }
+
+    public function revision(): HasOne
+    {
+        return $this->hasOne(self::class, 'revised_from_transaction_id');
     }
 
     public function scopeActive(Builder $query): Builder

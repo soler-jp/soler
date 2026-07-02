@@ -305,6 +305,68 @@ app(TransactionRegistrar::class)->register(
 
 この場合は、8% と 10% の経費を別の仕訳明細として登録します。
 
+
+
+## 登録済み仕訳を修正する
+
+登録済み仕訳の修正は、`JournalEntry` 1 行だけを直接書き換えるのではなく、`Transaction` 全体の改訂として扱います。
+
+- 修正対象は、初期実装では通常取引のみです
+- 修正できる内容は、主に金額と勘定科目です
+- 修正前の取引は履歴として残り、無効化されます
+- 修正後の内容は、新しい `Transaction` と `JournalEntry` として再登録されます
+
+そのため、見た目上は 1 件の修正でも、保存上は「旧版の無効化 + 新版の作成」になります。
+
+補足:
+
+- 修正前の伝票番号は履歴として残ります
+- 修正後の取引には新しい伝票番号が付きます
+- 元帳や集計では、有効な最新版だけが通常表示されます
+- 期首仕訳、予定取引、定期取引由来、減価償却仕訳、クレジットカード取込由来取引は、この修正フローの対象外です
+
+### code例
+
+```php
+use App\Models\JournalEntry;
+use App\Models\Transaction;
+use App\Services\TransactionRevisor;
+
+$transaction = Transaction::with('journalEntries')->findOrFail($transactionId);
+$businessUnit = auth()->user()->selectedBusinessUnit;
+
+$revisedExpenseSubAccount = $businessUnit->getAccountByName('消耗品費')->subAccounts()->first();
+$revisedCreditSubAccount = $businessUnit->getAccountByName('事業主借')->subAccounts()->first();
+
+$revised = app(TransactionRevisor::class)->revise(
+    $transaction,
+    auth()->user(),
+    [
+        'transaction' => [
+            'revision_reason' => '金額入力ミスの修正',
+        ],
+        'journal_entries' => [
+            [
+                'sub_account_id' => $revisedExpenseSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 2000,
+                'tax_amount' => 200,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            ],
+            [
+                'sub_account_id' => $revisedCreditSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 2200,
+                'tax_amount' => 0,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ],
+    ],
+);
+```
+
+この例では、既存取引を改訂し、借方の金額と勘定科目、貸方の金額と勘定科目をまとめて修正しています。
+
 ## 補足
 
 - 売上登録と経費登録は、どちらも同じ登録処理のバリエーションです

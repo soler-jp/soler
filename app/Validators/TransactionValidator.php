@@ -42,6 +42,8 @@ class TransactionValidator
             'recurring_transaction_plan_id' => ['nullable', 'exists:recurring_transaction_plans,id'],
             'counterparty_id' => ['nullable', 'exists:counterparties,id'],
             'created_by' => ['nullable', 'exists:users,id'],
+            'revised_from_transaction_id' => ['nullable', 'exists:transactions,id'],
+            'revision_reason' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -60,6 +62,8 @@ class TransactionValidator
             'recurring_transaction_plan_id' => '定期取引計画ID',
             'counterparty_id' => '取引先',
             'created_by' => '登録ユーザー',
+            'revised_from_transaction_id' => '改訂元取引',
+            'revision_reason' => '修正理由',
         ];
     }
 }
