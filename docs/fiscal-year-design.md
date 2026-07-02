@@ -230,6 +230,14 @@
 - `calculateAmountSummary()` の返り値との整合
 - UI や帳票での見せ方
 
+### 5. 資産・負債・資本の残高集計を追加する
+
+売上・経費の集計だけでは、現金や預金の帳簿残高を実残高と突合できない。
+
+残高集計の設計は別ドキュメントに分けた。
+
+- `docs/fiscal-year-balance-design.md`
+
 ## テストで現在固定していること
 
 - `calculateSummary()` の既存返り値 shape が壊れない

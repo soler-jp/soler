@@ -115,5 +115,6 @@ $summary = $fiscalYear->calculateSummary();
 
 - `app/Models/FiscalYear.php`
 - `app/Services/FiscalYearSummaryCalculator.php`
+- [`manual/balance.md`](balance.md)
 - `manual/recurring-transactions.md`
 - `docs/fiscal-year-design.md`

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\FiscalYearBalanceCalculator;
 use App\Services\FiscalYearSummaryCalculator;
 use App\Services\OpeningEntryRegistrar;
 use App\Services\TransactionRegistrar;
@@ -69,6 +70,11 @@ class FiscalYear extends Model
     public function calculateAmountSummary(): array
     {
         return app(FiscalYearSummaryCalculator::class)->calculateAmountSummary($this);
+    }
+
+    public function calculateBalanceSummary(): array
+    {
+        return app(FiscalYearBalanceCalculator::class)->calculate($this);
     }
 
     public function registerOpeningEntry(array $entries): ?Transaction
