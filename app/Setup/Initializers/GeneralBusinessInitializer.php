@@ -4,6 +4,7 @@ namespace App\Setup\Initializers;
 
 use App\Models\BusinessUnit;
 use App\Models\User;
+use App\Services\OpeningEntryRegistrar;
 use InvalidArgumentException;
 
 class GeneralBusinessInitializer
@@ -30,7 +31,7 @@ class GeneralBusinessInitializer
             'is_tax_exclusive' => $inputs['is_tax_exclusive'],
         ]);
 
-        $fiscalYear->registerOpeningEntry($inputs['opening_entries'] ?? []);
+        app(OpeningEntryRegistrar::class)->register($fiscalYear, $inputs['opening_entries'] ?? []);
 
         $revenueAccount = $unit->getAccountByName('売上高');
 

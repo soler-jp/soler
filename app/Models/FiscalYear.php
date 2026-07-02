@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\FiscalYearSummaryCalculator;
+use App\Services\OpeningEntryRegistrar;
 use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -72,77 +73,6 @@ class FiscalYear extends Model
 
     public function registerOpeningEntry(array $entries): ?Transaction
     {
-        if ($entries === []) {
-            return null;
-        }
-
-        return \DB::transaction(function () use ($entries) {
-
-            $allowedDebitAccounts = ['現金', '定期預金', 'その他の預金', '車両運搬具', '棚卸資産'];
-
-            $transactionData = [
-                'date' => $this->start_date,
-                'description' => '期首残高設定',
-                'is_opening_entry' => true,
-                'fiscal_year_id' => $this->id,
-            ];
-
-            $journalEntriesData = [];
-            $totalAmount = 0;
-
-            $capitalAccount = $this->businessUnit->accounts()
-                ->where('name', '元入金')
-                ->firstOrFail();
-
-            $capitalSub = $capitalAccount->subAccounts()->firstOrCreate([
-                'name' => $capitalAccount->name,
-            ]);
-
-            foreach ($entries as $entry) {
-
-                if (empty($entry['sub_account_name'])) {
-                    throw new \InvalidArgumentException('sub_account_name は必須です。');
-                }
-
-                if (! isset($entry['amount']) || ! is_numeric($entry['amount']) || $entry['amount'] <= 0) {
-                    throw new \InvalidArgumentException("金額が不正です: {$entry['amount']}");
-                }
-
-                $account = $this->businessUnit->accounts()
-                    ->where('name', $entry['account_name'])
-                    ->firstOrFail();
-
-                $subAccount = $account->subAccounts()->firstOrCreate([
-                    'name' => $entry['sub_account_name'],
-                ]);
-
-                if (! $subAccount) {
-                    throw new \InvalidArgumentException("補助科目「{$entry['sub_account_name']}」が存在しませんが、 account_nameも指定されていません。");
-                }
-
-                if (! in_array($account->name, $allowedDebitAccounts)) {
-                    throw new \InvalidArgumentException(
-                        '借方の勘定科目は「現金」「定期預金」「その他の預金」「車両運搬具」「棚卸資産」のみ使用できます。'
-                    );
-                }
-
-                $journalEntriesData[] = [
-                    'sub_account_id' => $subAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => (int) $entry['amount'],
-
-                ];
-
-                $totalAmount += $entry['amount'];
-            }
-
-            $journalEntriesData[] = [
-                'sub_account_id' => $capitalSub->id,
-                'type' => 'credit',
-                'net_amount' => $totalAmount,
-            ];
-
-            return $this->registerTransaction($transactionData, $journalEntriesData);
-        });
+        return app(OpeningEntryRegistrar::class)->register($this, $entries);
     }
 }

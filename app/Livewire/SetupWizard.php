@@ -130,7 +130,7 @@ class SetupWizard extends Component
         ];
 
         try {
-            $initializer = new GeneralBusinessInitializer;
+            $initializer = app(GeneralBusinessInitializer::class);
             $initializer->initialize(auth()->user(), $inputs);
 
             return $this->redirect(route('dashboard'));

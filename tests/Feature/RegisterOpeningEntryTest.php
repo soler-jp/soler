@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\SubAccount;
 use App\Models\User;
+use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -113,7 +114,7 @@ class RegisterOpeningEntryTest extends TestCase
         ]);
 
         $subAccountNames = $transaction->journalEntries
-            ->filter(fn($e) => $e->subAccount)
+            ->filter(fn ($e) => $e->subAccount)
             ->pluck('subAccount.name')
             ->all();
 
@@ -156,5 +157,32 @@ class RegisterOpeningEntryTest extends TestCase
             ->count();
 
         $this->assertEquals(1, $count); // 「金庫」が重複していない
+    }
+
+    #[Test]
+    public function 同じ会計年度に期首仕訳を複数登録できない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $fiscalYear->registerOpeningEntry([
+            [
+                'account_name' => '現金',
+                'sub_account_name' => '現金',
+                'amount' => 100000,
+            ],
+        ]);
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('この会計年度にはすでに期首仕訳が登録されています。');
+
+        $fiscalYear->registerOpeningEntry([
+            [
+                'account_name' => 'その他の預金',
+                'sub_account_name' => '普通預金',
+                'amount' => 200000,
+            ],
+        ]);
     }
 }
