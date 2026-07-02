@@ -1761,6 +1761,84 @@ class TransactionRegistrarTest extends TestCase
     }
 
     #[Test]
+    public function 予定取引をcancelPlannedで取消すると非アクティブ化される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
+
+        $registrar = new TransactionRegistrar;
+
+        $transaction = $registrar->register($fiscalYear, [
+            'date' => '2025-05-01',
+            'description' => '取消予定取引',
+            'is_planned' => true,
+        ], [
+            [
+                'sub_account_id' => $expense->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+                'tax_amount' => 100,
+            ],
+            [
+                'sub_account_id' => $asset->id,
+                'type' => 'credit',
+                'net_amount' => 1100,
+            ],
+        ]);
+
+        $cancelled = $registrar->cancelPlanned($transaction, $user);
+
+        $this->assertFalse($cancelled->is_active);
+        $this->assertNotNull($cancelled->deactivated_at);
+        $this->assertSame($user->id, $cancelled->deactivated_by);
+        $this->assertSame('予定取消', $cancelled->deactivation_reason);
+
+        // 予測の取消なので確定仕訳にはせず、予定のまま残す（再生成ブロックのため）
+        $this->assertTrue($cancelled->is_planned);
+        $this->assertSame('取消予定取引', $cancelled->description);
+        $this->assertSame(1000, $cancelled->journalEntries->firstWhere('type', 'debit')->net_amount);
+    }
+
+    #[Test]
+    public function 取消済みの予定取引がある日付には定期取引が再生成されない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
+        $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => 'インターネット回線',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'debit_sub_account_id' => $expense->id,
+            'credit_sub_account_id' => $asset->id,
+            'amount' => 5000,
+            'tax_amount' => 500,
+            'tax_type' => 'taxable_purchases_10',
+            'is_income' => false,
+        ]);
+
+        $registrar = new TransactionRegistrar;
+
+        $generated = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+        $this->assertCount(12, $generated);
+
+        $registrar->cancelPlanned($generated->first(), $user);
+
+        // 存在チェックは is_active を見ないため、取消済みでも再生成されない
+        $regenerated = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+        $this->assertCount(0, $regenerated);
+    }
+
+    #[Test]
     public function 本登録済みの取引は取消できない()
     {
         $this->expectException(\InvalidArgumentException::class);

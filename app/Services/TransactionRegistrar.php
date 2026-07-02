@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Validators\JournalEntryValidator;
 use App\Validators\TransactionValidator;
 use Illuminate\Support\Facades\DB;
@@ -291,32 +292,21 @@ class TransactionRegistrar
         });
     }
 
-    public function cancelPlanned(Transaction $transaction): Transaction
+    /**
+     * 予定取引を取消する
+     *
+     * 帳簿の記録ではなく予測の取消なので、確定仕訳は作らず deactivate する。
+     * is_planned は true のまま残すことで、定期取引の再生成をブロックする
+     * （BusinessUnit::generatePlannedTransactionsForPlan の存在チェックは is_active を見ない）。
+     */
+    public function cancelPlanned(Transaction $transaction, ?User $user = null): Transaction
     {
         if (! $transaction->is_planned) {
             throw new \InvalidArgumentException('本登録された取引は取消できません。');
         }
 
-        $originalEntries = $transaction->journalEntries()->get();
+        $transaction->deactivate($user, '予定取消');
 
-        if ($originalEntries->isEmpty()) {
-            throw new \RuntimeException('元の仕訳が存在しません。');
-        }
-
-        $zeroedEntries = $originalEntries->map(function ($entry) {
-            return [
-                'sub_account_id' => $entry->sub_account_id,
-                'type' => $entry->type,
-                'net_amount' => 0,
-                'tax_type' => null,
-                'tax_amount' => 0,
-            ];
-        })->all();
-
-        return $this->confirmPlanned($transaction, [
-            'description' => $transaction->description.'（取消）',
-            'date' => $transaction->date->toDateString(),
-            'journal_entries' => $zeroedEntries,
-        ]);
+        return $transaction->fresh();
     }
 }
