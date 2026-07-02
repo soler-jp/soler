@@ -15,7 +15,8 @@ class GeneralLedgerService
             ->whereHas('transaction', function ($query) use ($fiscalYear) {
                 $query->where('date', '>=', $fiscalYear->start_date)
                     ->where('date', '<=', $fiscalYear->end_date)
-                    ->where('is_active', true);
+                    ->where('is_active', true)
+                    ->where('is_planned', false);
             })
             ->get()
             ->sortBy(fn ($entry) => $entry->transaction->date)
@@ -58,7 +59,8 @@ class GeneralLedgerService
             ->whereHas('transaction', function ($query) use ($fiscalYear) {
                 $query->where('date', '>=', $fiscalYear->start_date)
                     ->where('date', '<=', $fiscalYear->end_date)
-                    ->where('is_active', true);
+                    ->where('is_active', true)
+                    ->where('is_planned', false);
             })
             ->get()
             ->sortBy(fn ($entry) => $entry->transaction->date)

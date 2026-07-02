@@ -303,6 +303,207 @@ class GeneralLedgerServiceTest extends TestCase
     }
 
     #[Test]
+    public function 予定取引の仕訳は_ledgerに含まれない()
+    {
+        $user = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => '予定取引元帳テスト',
+        ]);
+
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
+        $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
+
+        $registrar = new TransactionRegistrar;
+
+        $registrar->register(
+            fiscalYear: $fiscalYear,
+            transactionData: [
+                'date' => '2025-01-10',
+                'description' => '実績の取引',
+            ],
+            journalEntriesData: [
+                [
+                    'sub_account_id' => $cashSubAccount->id,
+                    'type' => 'debit',
+                    'net_amount' => 100000,
+                ],
+                [
+                    'sub_account_id' => $ownerSubAccount->id,
+                    'type' => 'credit',
+                    'net_amount' => 100000,
+                ],
+            ]
+        );
+
+        $registrar->register(
+            fiscalYear: $fiscalYear,
+            transactionData: [
+                'date' => '2025-01-15',
+                'description' => '予定の取引',
+                'is_planned' => true,
+            ],
+            journalEntriesData: [
+                [
+                    'sub_account_id' => $cashSubAccount->id,
+                    'type' => 'debit',
+                    'net_amount' => 30000,
+                ],
+                [
+                    'sub_account_id' => $ownerSubAccount->id,
+                    'type' => 'credit',
+                    'net_amount' => 30000,
+                ],
+            ]
+        );
+
+        $ledger = (new GeneralLedgerService)->generate($cashSubAccount->account, $fiscalYear);
+
+        $this->assertCount(1, $ledger);
+        $this->assertSame('2025-01-10', $ledger[0]['date']);
+        $this->assertSame('実績の取引', $ledger[0]['description']);
+        $this->assertSame(100000, $ledger[0]['debit']);
+        $this->assertNull($ledger[0]['credit']);
+        $this->assertSame(100000, $ledger[0]['balance']);
+    }
+
+    #[Test]
+    public function 予定取引の仕訳は補助科目の_ledgerに含まれない()
+    {
+        $user = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => '予定取引補助科目元帳テスト',
+        ]);
+
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
+        $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
+
+        $registrar = new TransactionRegistrar;
+
+        $registrar->register(
+            fiscalYear: $fiscalYear,
+            transactionData: [
+                'date' => '2025-01-10',
+                'description' => '実績の取引',
+            ],
+            journalEntriesData: [
+                [
+                    'sub_account_id' => $cashSubAccount->id,
+                    'type' => 'debit',
+                    'net_amount' => 50000,
+                ],
+                [
+                    'sub_account_id' => $ownerSubAccount->id,
+                    'type' => 'credit',
+                    'net_amount' => 50000,
+                ],
+            ]
+        );
+
+        $registrar->register(
+            fiscalYear: $fiscalYear,
+            transactionData: [
+                'date' => '2025-01-15',
+                'description' => '予定の取引',
+                'is_planned' => true,
+            ],
+            journalEntriesData: [
+                [
+                    'sub_account_id' => $cashSubAccount->id,
+                    'type' => 'debit',
+                    'net_amount' => 20000,
+                ],
+                [
+                    'sub_account_id' => $ownerSubAccount->id,
+                    'type' => 'credit',
+                    'net_amount' => 20000,
+                ],
+            ]
+        );
+
+        $ledger = (new GeneralLedgerService)->generateForSubAccount($cashSubAccount, $fiscalYear);
+
+        $this->assertCount(1, $ledger);
+        $this->assertSame('2025-01-10', $ledger[0]['date']);
+        $this->assertSame('実績の取引', $ledger[0]['description']);
+        $this->assertSame(50000, $ledger[0]['debit']);
+        $this->assertNull($ledger[0]['credit']);
+        $this->assertSame(50000, $ledger[0]['balance']);
+    }
+
+    #[Test]
+    public function 予定取引の仕訳は現金出納帳に含まれない()
+    {
+        $user = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => '予定取引出納帳テスト',
+        ]);
+
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $cashSubAccount = $unit->getAccountByName('現金')->subAccounts()->first();
+        $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
+
+        $registrar = new TransactionRegistrar;
+
+        $registrar->register(
+            fiscalYear: $fiscalYear,
+            transactionData: [
+                'date' => '2025-01-05',
+                'description' => '実績の現金入金',
+            ],
+            journalEntriesData: [
+                [
+                    'sub_account_id' => $cashSubAccount->id,
+                    'type' => 'debit',
+                    'net_amount' => 30000,
+                ],
+                [
+                    'sub_account_id' => $ownerSubAccount->id,
+                    'type' => 'credit',
+                    'net_amount' => 30000,
+                ],
+            ]
+        );
+
+        $registrar->register(
+            fiscalYear: $fiscalYear,
+            transactionData: [
+                'date' => '2025-01-10',
+                'description' => '予定の現金支出',
+                'is_planned' => true,
+            ],
+            journalEntriesData: [
+                [
+                    'sub_account_id' => $cashSubAccount->id,
+                    'type' => 'credit',
+                    'net_amount' => 10000,
+                ],
+                [
+                    'sub_account_id' => $ownerSubAccount->id,
+                    'type' => 'debit',
+                    'net_amount' => 10000,
+                ],
+            ]
+        );
+
+        $cashbook = (new GeneralLedgerService)->generateCashbook($fiscalYear);
+
+        $this->assertCount(1, $cashbook);
+        $this->assertSame('2025-01-05', $cashbook[0]['date']);
+        $this->assertSame('実績の現金入金', $cashbook[0]['description']);
+        $this->assertSame(30000, $cashbook[0]['debit']);
+        $this->assertNull($cashbook[0]['credit']);
+        $this->assertSame(30000, $cashbook[0]['balance']);
+    }
+
+    #[Test]
     public function 指定年度外の仕訳は_ledgerに含まれない()
     {
         $user = User::factory()->create();
