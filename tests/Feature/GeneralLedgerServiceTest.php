@@ -234,6 +234,75 @@ class GeneralLedgerServiceTest extends TestCase
     }
 
     #[Test]
+    public function 無効化済み取引の仕訳は_ledgerに含まれない()
+    {
+        $user = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => '無効化元帳テスト',
+        ]);
+
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
+        $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
+
+        $registrar = new TransactionRegistrar;
+
+        $activeTransaction = $registrar->register(
+            fiscalYear: $fiscalYear,
+            transactionData: [
+                'date' => '2025-01-10',
+                'description' => '有効な取引',
+            ],
+            journalEntriesData: [
+                [
+                    'sub_account_id' => $cashSubAccount->id,
+                    'type' => 'debit',
+                    'net_amount' => 100000,
+                ],
+                [
+                    'sub_account_id' => $ownerSubAccount->id,
+                    'type' => 'credit',
+                    'net_amount' => 100000,
+                ],
+            ]
+        );
+
+        $inactiveTransaction = $registrar->register(
+            fiscalYear: $fiscalYear,
+            transactionData: [
+                'date' => '2025-01-15',
+                'description' => '削除済み取引',
+            ],
+            journalEntriesData: [
+                [
+                    'sub_account_id' => $cashSubAccount->id,
+                    'type' => 'debit',
+                    'net_amount' => 30000,
+                ],
+                [
+                    'sub_account_id' => $ownerSubAccount->id,
+                    'type' => 'credit',
+                    'net_amount' => 30000,
+                ],
+            ]
+        );
+
+        $inactiveTransaction->deactivate($user, '誤登録');
+
+        $ledger = (new GeneralLedgerService)->generate($cashSubAccount->account, $fiscalYear);
+
+        $this->assertCount(1, $ledger);
+        $this->assertSame('2025-01-10', $ledger[0]['date']);
+        $this->assertSame('有効な取引', $ledger[0]['description']);
+        $this->assertSame(100000, $ledger[0]['debit']);
+        $this->assertNull($ledger[0]['credit']);
+        $this->assertSame(100000, $ledger[0]['balance']);
+        $this->assertTrue($activeTransaction->fresh()->is_active);
+    }
+
+    #[Test]
     public function 指定年度外の仕訳は_ledgerに含まれない()
     {
         $user = User::factory()->create();

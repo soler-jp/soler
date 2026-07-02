@@ -108,7 +108,8 @@ $cashbook = app(GeneralLedgerService::class)->generateCashbook($fiscalYear);
 - 取得対象は、`FiscalYear` の開始日から終了日までの取引です
 - 元帳は `transaction.date` の昇順で並びます
 - 同じ日付の複数仕訳については、日付以外の順序は保証しません
-- `Transaction.is_active` を明示的に除外する処理は、現時点の `GeneralLedgerService` にはありません
+- `Transaction.is_active = false` の取引は元帳に表示しません
+- そのため、仕訳削除は初期実装では物理削除ではなく取引の無効化として扱えます
 - `generateForSubAccount()` は補助科目単位で絞る派生 API です
 - `generateCashbook()` は `現金` 勘定のショートカットです
 

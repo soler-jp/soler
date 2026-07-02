@@ -118,11 +118,11 @@
 - 勘定科目タイプや定数で参照する
 - `BusinessUnit` 側でキャッシュ系アカウントを返す専用メソッドを持つ
 
-### 4. `Transaction.is_active` を明示的に除外していない
+### 4. `Transaction.is_active` を明示的に除外する
 
-現状の `GeneralLedgerService` は、`JournalEntry` と `Transaction.date` を条件にしているだけで、`is_active` を見ていない。
+現状の `GeneralLedgerService` は、`JournalEntry` と `Transaction.date` に加えて、`Transaction.is_active = true` を条件にしている。
 
-そのため、無効化済み取引を元帳に出したくないなら、追加フィルタが必要になる。
+そのため、無効化済み取引に紐づく `JournalEntry` が残っていても、元帳には表示しない。
 
 この点は、`Transaction::deactivate()` と元帳の可視性をどう結びつけるかという設計判断になる。
 
