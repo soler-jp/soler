@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Models\Account;
 use App\Models\BusinessUnit;
 use App\Models\CreditCard;
 use App\Models\FixedAsset;
@@ -100,6 +101,54 @@ class BusinessUnitTest extends TestCase
                 'type' => $account['type'],
             ]);
         }
+    }
+
+    #[Test]
+    public function 棚卸振替科目はexpenseとして初期作成される()
+    {
+        $user = User::factory()->create();
+
+        $businessUnit = BusinessUnit::createWithDefaultAccounts([
+            'user_id' => $user->id,
+            'name' => '棚卸科目テスト',
+            'type' => BusinessUnit::TYPE_GENERAL,
+        ]);
+
+        $openingInventory = $businessUnit->getAccountByName('期首商品（棚卸高）');
+        $closingInventory = $businessUnit->getAccountByName('期末商品（棚卸高）');
+
+        $this->assertNotNull($openingInventory);
+        $this->assertNotNull($closingInventory);
+        $this->assertSame(Account::TYPE_EXPENSE, $openingInventory->type);
+        $this->assertSame(Account::TYPE_EXPENSE, $closingInventory->type);
+    }
+
+    #[Test]
+    public function 棚卸振替科目のmigrationで既存assetをexpenseへ更新できる()
+    {
+        $user = User::factory()->create();
+
+        $businessUnit = BusinessUnit::factory()->create([
+            'user_id' => $user->id,
+            'name' => '既存棚卸科目テスト',
+            'type' => BusinessUnit::TYPE_GENERAL,
+        ]);
+
+        $openingInventory = $businessUnit->accounts()->create([
+            'name' => '期首商品（棚卸高）',
+            'type' => Account::TYPE_ASSET,
+        ]);
+
+        $closingInventory = $businessUnit->accounts()->create([
+            'name' => '期末商品（棚卸高）',
+            'type' => Account::TYPE_ASSET,
+        ]);
+
+        $migration = require base_path('database/migrations/2026_07_03_061251_update_inventory_closing_account_types.php');
+        $migration->up();
+
+        $this->assertSame(Account::TYPE_EXPENSE, $openingInventory->fresh()->type);
+        $this->assertSame(Account::TYPE_EXPENSE, $closingInventory->fresh()->type);
     }
 
     #[Test]

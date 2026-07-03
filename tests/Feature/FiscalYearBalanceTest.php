@@ -218,6 +218,52 @@ class FiscalYearBalanceTest extends TestCase
 
     #[Test]
     #[Group('mysql')]
+    public function 棚卸振替科目は貸借対照表に含まれず棚卸資産の残高のみ反映される(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '棚卸残高テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $openingInventory = $this->subAccountByName($unit, '期首商品（棚卸高）');
+        $closingInventory = $this->subAccountByName($unit, '期末商品（棚卸高）');
+        $inventoryAsset = $this->subAccountByName($unit, '棚卸資産');
+
+        $registrar = new TransactionRegistrar;
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-01-01',
+            'description' => '期首棚卸の振替',
+        ], [
+            ['sub_account_id' => $openingInventory->id, 'type' => 'debit', 'gross_amount' => 1000],
+            ['sub_account_id' => $inventoryAsset->id, 'type' => 'credit', 'gross_amount' => 1000],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-12-31',
+            'description' => '期末棚卸の振替',
+        ], [
+            ['sub_account_id' => $inventoryAsset->id, 'type' => 'debit', 'gross_amount' => 400],
+            ['sub_account_id' => $closingInventory->id, 'type' => 'credit', 'gross_amount' => 400],
+        ]);
+
+        $summary = $fiscalYear->calculateBalanceSummary();
+
+        $inventoryAssetAccount = $this->accountByName($summary['asset']['accounts'], '棚卸資産');
+
+        $this->assertSame(-600, $summary['asset']['total_balance']);
+        $this->assertSame(-600, $inventoryAssetAccount['balance']);
+        $this->assertSame(-600, $inventoryAssetAccount['sub_accounts'][0]['balance']);
+
+        $allAccountNames = collect($summary)
+            ->flatMap(fn (array $typeSummary): array => $typeSummary['accounts'])
+            ->pluck('account_name');
+
+        $this->assertFalse($allAccountNames->contains('期首商品（棚卸高）'));
+        $this->assertFalse($allAccountNames->contains('期末商品（棚卸高）'));
+    }
+
+    #[Test]
+    #[Group('mysql')]
     public function 取引がない年度では全タイプが空で返る(): void
     {
         $user = User::factory()->create();

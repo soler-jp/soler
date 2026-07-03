@@ -143,9 +143,6 @@ class BusinessUnit extends Model
         ['name' => '車両運搬具', 'type' => Account::TYPE_ASSET],
         ['name' => '工具器具備品', 'type' => Account::TYPE_ASSET],
         ['name' => '土地', 'type' => Account::TYPE_ASSET],
-        ['name' => '期首商品（棚卸高）', 'type' => Account::TYPE_ASSET],
-        ['name' => '期末商品（棚卸高）', 'type' => Account::TYPE_ASSET],
-
         // 負債（liability）
         ['name' => '支払手形', 'type' => Account::TYPE_LIABILITY],
         ['name' => '買掛金', 'type' => Account::TYPE_LIABILITY],
@@ -165,6 +162,8 @@ class BusinessUnit extends Model
         ['name' => '家事消費等', 'type' => Account::TYPE_REVENUE],
 
         // 費用（expense）
+        ['name' => '期首商品（棚卸高）', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '期末商品（棚卸高）', 'type' => Account::TYPE_EXPENSE],
         ['name' => '仕入金額', 'type' => Account::TYPE_EXPENSE],
         ['name' => '租税公課', 'type' => Account::TYPE_EXPENSE],
         ['name' => '荷造運賃', 'type' => Account::TYPE_EXPENSE],

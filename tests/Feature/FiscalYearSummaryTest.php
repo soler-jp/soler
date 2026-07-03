@@ -17,7 +17,7 @@ class FiscalYearSummaryTest extends TestCase
     private function subAccountByTypeOrName($unit, string $typeOrName)
     {
         return $unit->subAccounts()
-            ->whereHas('account', fn($q) => $q->where('type', $typeOrName)->orWhere('name', $typeOrName))
+            ->whereHas('account', fn ($q) => $q->where('type', $typeOrName)->orWhere('name', $typeOrName))
             ->first();
     }
 
@@ -288,6 +288,50 @@ class FiscalYearSummaryTest extends TestCase
             'net_amount' => 3500,
             'tax_amount' => 0,
             'gross_amount' => 3500,
+        ], $amountSummary['expenses']);
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function 棚卸振替は棚卸資産ではなく棚卸高調整科目の純額として損益に反映される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '棚卸損益集計']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $openingInventory = $this->subAccountByTypeOrName($unit, '期首商品（棚卸高）');
+        $closingInventory = $this->subAccountByTypeOrName($unit, '期末商品（棚卸高）');
+        $inventoryAsset = $this->subAccountByTypeOrName($unit, '棚卸資産');
+
+        $registrar = new TransactionRegistrar;
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '期首棚卸の振替',
+        ], [
+            ['sub_account_id' => $openingInventory->id, 'type' => 'debit', 'net_amount' => 1000],
+            ['sub_account_id' => $inventoryAsset->id, 'type' => 'credit', 'net_amount' => 1000],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-12-31',
+            'description' => '期末棚卸の振替',
+        ], [
+            ['sub_account_id' => $inventoryAsset->id, 'type' => 'debit', 'net_amount' => 400],
+            ['sub_account_id' => $closingInventory->id, 'type' => 'credit', 'net_amount' => 400],
+        ]);
+
+        $summary = $fiscalYear->calculateSummary()['actual'];
+        $amountSummary = $fiscalYear->calculateAmountSummary()['actual'];
+
+        $this->assertSame(0, $summary['total_income']);
+        $this->assertSame(600, $summary['total_expense']);
+        $this->assertSame(-600, $summary['profit']);
+
+        $this->assertSame([
+            'net_amount' => 600,
+            'tax_amount' => 0,
+            'gross_amount' => 600,
         ], $amountSummary['expenses']);
     }
 
@@ -674,7 +718,7 @@ class FiscalYearSummaryTest extends TestCase
 
         $this->assertFalse(
             collect($executedQueries)->contains(
-                fn(string $sql): bool => str_contains($sql, 'laravel_through_key')
+                fn (string $sql): bool => str_contains($sql, 'laravel_through_key')
             )
         );
     }
