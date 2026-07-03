@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\FiscalYear;
+use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Validators\TransactionValidator;
@@ -84,6 +85,87 @@ class TransactionTest extends TestCase
         $this->assertSame($firstUser->id, $transaction->deactivated_by);
         $this->assertSame('初回の無効化', $transaction->deactivation_reason);
         $this->assertTrue($transaction->deactivated_at?->eq($firstDeactivatedAt));
+    }
+
+    #[Test]
+    public function transactionのbusiness_ratio_stateは按分なしならnot_allocatedになる()
+    {
+        $transaction = $this->createTransactionWithJournalEntries([
+            [
+                'account' => '通信費',
+                'sub_account' => '通信費',
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 1000,
+            ],
+            [
+                'account' => '現金',
+                'sub_account' => '現金',
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 1000,
+            ],
+        ]);
+
+        $this->assertSame(Transaction::BUSINESS_RATIO_STATE_NOT_ALLOCATED, $transaction->business_ratio_state);
+        $this->assertNull($transaction->business_ratio);
+    }
+
+    #[Test]
+    public function transactionのbusiness_ratio_stateは単一割合ならuniformになる()
+    {
+        $transaction = $this->createTransactionWithJournalEntries([
+            [
+                'account' => '通信費',
+                'sub_account' => '通信費',
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 6000,
+                'business_ratio' => 60,
+            ],
+            [
+                'account' => '旅費交通費',
+                'sub_account' => '旅費交通費',
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 4000,
+            ],
+            [
+                'account' => '現金',
+                'sub_account' => '現金',
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 10000,
+            ],
+        ]);
+
+        $this->assertSame(Transaction::BUSINESS_RATIO_STATE_UNIFORM, $transaction->business_ratio_state);
+        $this->assertSame(60, $transaction->business_ratio);
+    }
+
+    #[Test]
+    public function transactionのbusiness_ratio_stateは複数割合が混在するとmixedになる()
+    {
+        $transaction = $this->createTransactionWithJournalEntries([
+            [
+                'account' => '通信費',
+                'sub_account' => '通信費',
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 6000,
+                'business_ratio' => 60,
+            ],
+            [
+                'account' => '旅費交通費',
+                'sub_account' => '旅費交通費',
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 4000,
+                'business_ratio' => 40,
+            ],
+            [
+                'account' => '現金',
+                'sub_account' => '現金',
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 10000,
+            ],
+        ]);
+
+        $this->assertSame(Transaction::BUSINESS_RATIO_STATE_MIXED, $transaction->business_ratio_state);
+        $this->assertNull($transaction->business_ratio);
     }
 
     // /////////////////////////
@@ -201,5 +283,45 @@ class TransactionTest extends TestCase
         ]);
 
         $this->assertEquals('2025-0001', $t->display_number);
+    }
+
+    /**
+     * @param  array<int, array{
+     *     account: string,
+     *     sub_account: string,
+     *     type: string,
+     *     net_amount: int,
+     *     business_ratio?: int|null
+     * }>  $journalEntries
+     */
+    private function createTransactionWithJournalEntries(array $journalEntries): Transaction
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'Transaction状態テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+
+        $transaction = Transaction::create([
+            'fiscal_year_id' => $fiscalYear->id,
+            'date' => '2025-06-24',
+            'description' => 'Transaction状態テスト',
+            'created_by' => $user->id,
+        ]);
+
+        foreach ($journalEntries as $entry) {
+            $subAccount = $unit->getSubAccountByName($entry['account'], $entry['sub_account']);
+
+            $transaction->journalEntries()->create([
+                'account_id' => $subAccount->account_id,
+                'sub_account_id' => $subAccount->id,
+                'type' => $entry['type'],
+                'net_amount' => $entry['net_amount'],
+                'tax_amount' => 0,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'business_ratio' => $entry['business_ratio'] ?? null,
+                'is_effective' => true,
+            ]);
+        }
+
+        return $transaction->fresh(['journalEntries']);
     }
 }

@@ -127,6 +127,12 @@ Revisor は操作者 `User` を受け取り、次のように記録する。
 
 定期取引計画由来の取引は、本登録済み（`is_planned = false`）であっても初期実装では対象外とする。改訂版に `recurring_transaction_plan_id` を引き継ぐかどうか（計画との紐付け・再生成への影響）の整理が必要なためで、対象に含める場合は将来拡張で扱う。
 
+家事按分導入後も、この制約は初期実装では維持する。
+
+- `recurring_transaction_plan_id != null` の確定済み取引は、按分割合の修正も含めて改訂対象外
+- したがって、プラン由来の按分取引は確定時点で割合を確定させる必要がある
+- 確定後の按分割合修正は将来拡張で扱う
+
 ## 初期実装で対象外にする取引
 
 次の取引は、通常仕訳修正フローの対象外とする。
@@ -153,9 +159,9 @@ Revisor は操作者 `User` を受け取り、次のように記録する。
         [
             'sub_account_id' => 123,
             'type' => 'debit',
-            'net_amount' => 1000,
-            'tax_amount' => 100,
+            'gross_amount' => 1100,
             'tax_type' => 'taxable_purchases_10',
+            'business_ratio' => 100,
         ],
         [
             'sub_account_id' => 456,
@@ -167,6 +173,26 @@ Revisor は操作者 `User` を受け取り、次のように記録する。
     ],
 ]
 ```
+
+家事按分導入後は、少なくとも按分対象の経費行については、保存済み `journal_entries` の直接編集ではなく、新規登録と同じ raw input shape を受け付ける。
+
+```php
+[
+    'sub_account_id' => 123,
+    'type' => 'debit',
+    'gross_amount' => 10000,
+    'tax_type' => 'taxable_purchases_10',
+    'business_ratio' => 60,
+]
+```
+
+按分の展開・税分解・追加行生成は `TransactionRegistrar` の正規化ロジックを再利用し、`TransactionRevisor` は自前で按分計算を持たない。
+
+したがって、修正入力の基本方針は次の通り。
+
+- 借方の経費行は raw input（`gross_amount`, `tax_type`, `business_ratio`）を受ける
+- 貸方行など按分対象外の行は従来どおり保存向け shape（`net_amount`, 必要なら `tax_amount`）を受ける
+- `TransactionRevisor` は入力された raw input を `TransactionRegistrar` に渡し、保存用 `journal_entries` への展開を再利用する
 
 初期段階では、`date` `description` `remarks` `counterparty_id` などの修正は必須対象にしない。
 

@@ -65,6 +65,30 @@ $plan = $businessUnit->createRecurringTransactionPlan([
 ]);
 ```
 
+### 家事按分つきの定期取引
+
+定期取引計画でも、借方の経費行に `business_ratio` を指定すると家事按分を使えます。
+
+```php
+use App\Models\JournalEntry;
+
+$plan = $businessUnit->createRecurringTransactionPlan([
+    'name' => '通信費',
+    'interval' => 'monthly',
+    'day_of_month' => 10,
+    'is_income' => false,
+    'debit_sub_account_id' => $debitSubAccount->id,
+    'credit_sub_account_id' => $creditSubAccount->id,
+    'amount' => 10_000,
+    'tax_amount' => 0,
+    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+    'business_ratio' => 60,
+]);
+```
+
+この設定で生成される予定取引は、登録時と同じルールで事業分と家事分に分割されます。  
+`business_ratio` を省略した場合は、全額事業分として扱われます。
+
 ## 予定取引を生成するには
 
 定期取引計画から、その年度に属する予定取引を生成するには `BusinessUnit::generatePlannedTransactionsForPlan()` を使います。
@@ -145,6 +169,20 @@ $confirmed = $plan->confirmTransaction($transaction->id, [
 - 仕訳の `net_amount` が指定金額に更新される
 - 貸方補助科目を変更できる
 - 日付も指定した値に更新できる
+
+### 事業割合を変更して確定する例
+
+予定取引の確定時に `business_ratio` を渡すと、事業割合も上書きできます。
+
+```php
+$confirmed = $plan->confirmTransaction($transaction->id, [
+    'date' => '2025-12-10',
+    'amount' => 10_000,
+    'business_ratio' => 80,
+]);
+```
+
+この場合は、借方の経費行が 80% で再計算されます。家事分があるときは、その割合で分割されます。
 
 ## `is_income` について
 

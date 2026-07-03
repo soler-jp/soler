@@ -8,11 +8,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class Transaction extends Model
 {
     use HasFactory;
+
+    public const BUSINESS_RATIO_STATE_NOT_ALLOCATED = 'not_allocated';
+
+    public const BUSINESS_RATIO_STATE_UNIFORM = 'uniform';
+
+    public const BUSINESS_RATIO_STATE_MIXED = 'mixed';
 
     protected $fillable = [
         'fiscal_year_id',
@@ -156,6 +163,30 @@ class Transaction extends Model
         return $this->journalEntries->where('type', 'credit')->sum('net_amount');
     }
 
+    public function getBusinessRatioAttribute(): ?int
+    {
+        if ($this->business_ratio_state !== self::BUSINESS_RATIO_STATE_UNIFORM) {
+            return null;
+        }
+
+        return (int) $this->businessRatioValues()->first();
+    }
+
+    public function getBusinessRatioStateAttribute(): string
+    {
+        $businessRatioValues = $this->businessRatioValues();
+
+        if ($businessRatioValues->isEmpty()) {
+            return self::BUSINESS_RATIO_STATE_NOT_ALLOCATED;
+        }
+
+        if ($businessRatioValues->count() === 1) {
+            return self::BUSINESS_RATIO_STATE_UNIFORM;
+        }
+
+        return self::BUSINESS_RATIO_STATE_MIXED;
+    }
+
     public function deactivate(?User $user = null, ?string $reason = null): void
     {
         if (! $this->is_active) {
@@ -179,5 +210,22 @@ class Transaction extends Model
             ->map(fn ($entry) => $entry->subAccount->account->name.' / '.$entry->subAccount->name)
             ->unique()
             ->implode(', ');
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    protected function businessRatioValues(): Collection
+    {
+        $journalEntries = $this->relationLoaded('journalEntries')
+            ? $this->journalEntries
+            : $this->loadMissing('journalEntries')->journalEntries;
+
+        return $journalEntries
+            ->where('type', JournalEntry::TYPE_DEBIT)
+            ->pluck('business_ratio')
+            ->filter(fn ($businessRatio) => $businessRatio !== null)
+            ->unique()
+            ->values();
     }
 }

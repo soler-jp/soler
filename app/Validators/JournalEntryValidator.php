@@ -43,6 +43,8 @@ class JournalEntryValidator
             'net_amount' => ['required', 'integer', 'min:1'],
             'tax_amount' => ['required_with:tax_type', 'numeric', 'min:0'],
             'tax_type' => ['nullable', 'in:'.implode(',', JournalEntry::TAX_TYPES)],
+            'business_ratio' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'allocation_group_id' => ['nullable', 'uuid'],
             'is_effective' => ['boolean'],
         ], $requireTransactionId ? [
             'transaction_id' => ['required', 'exists:transactions,id'],
@@ -103,6 +105,8 @@ class JournalEntryValidator
             'net_amount' => '税抜金額',
             'tax_amount' => '消費税額',
             'tax_type' => '消費税区分',
+            'business_ratio' => '事業割合',
+            'allocation_group_id' => '按分グループID',
             'is_effective' => '有効フラグ',
         ];
     }

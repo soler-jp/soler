@@ -260,6 +260,48 @@ app(TransactionRegistrar::class)->register(
 消費税 10% の経費は `JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10` を使います。  
 軽減税率 8% の経費を登録する場合は、借方の `tax_type` を `JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8` に変えます。
 
+### 家事按分を使う
+
+経費の事業使用分と家事使用分を分けたい場合は、借方の経費行に `gross_amount` と `business_ratio` を指定します。
+
+```php
+use App\Models\JournalEntry;
+use App\Services\TransactionRegistrar;
+
+$fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
+$businessUnit = $fiscalYear->businessUnit;
+
+$expenseSubAccount = $businessUnit->getSubAccountByName('通信費', '通信費');
+$cashSubAccount = $businessUnit->getSubAccountByName('現金', '現金');
+
+app(TransactionRegistrar::class)->register(
+    $fiscalYear,
+    [
+        'date' => '2025-06-01',
+        'description' => '家事按分つきの通信費',
+    ],
+    [
+        [
+            'sub_account_id' => $expenseSubAccount->id,
+            'type' => 'debit',
+            'gross_amount' => 10_000,
+            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            'business_ratio' => 60,
+        ],
+        [
+            'sub_account_id' => $cashSubAccount->id,
+            'type' => 'credit',
+            'gross_amount' => 10_000,
+            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+        ],
+    ],
+);
+```
+
+この場合、借方は 6,000 円の事業分と 4,000 円の家事分に分かれて保存されます。  
+`business_ratio` を省略した場合は、全額事業分として扱われます。  
+`business_ratio = 100` でも結果は同じで、家事分は作られません。
+
 ### 8% と 10% が混在する経費
 
 1 枚のレシートに 8% と 10% の経費が混在する場合は、借方を税率ごとに分けます。

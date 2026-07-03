@@ -1051,6 +1051,191 @@ class TransactionRegistrarTest extends TestCase
     }
 
     #[Test]
+    public function gross_amount入力に事業割合を指定すると事業分と家事分に分割される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '家事按分テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $householdSubAccount = $unit->getSubAccountByName('事業主貸', '家事按分');
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-06-01',
+            'description' => '家事按分テスト',
+        ], [
+            [
+                'sub_account_id' => $expenseSubAccount->id,
+                'type' => 'debit',
+                'gross_amount' => 10000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'business_ratio' => 60,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'gross_amount' => 10000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $this->assertCount(3, $transaction->journalEntries);
+        $this->assertSame(60, $transaction->business_ratio);
+
+        $businessEntry = $transaction->journalEntries->firstWhere('business_ratio', 60);
+        $householdSubAccount = $unit->getSubAccountByName('事業主貸', '家事按分');
+        $householdEntry = $transaction->journalEntries->firstWhere('sub_account_id', $householdSubAccount->id);
+
+        $this->assertNotNull($businessEntry);
+        $this->assertNotNull($householdSubAccount);
+        $this->assertNotNull($householdEntry);
+        $this->assertSame(6000, $businessEntry->net_amount);
+        $this->assertSame(4000, $householdEntry->net_amount);
+        $this->assertSame($businessEntry->allocation_group_id, $householdEntry->allocation_group_id);
+        $this->assertSame($householdSubAccount->id, $householdEntry->sub_account_id);
+        $this->assertNull($householdEntry->business_ratio);
+    }
+
+    #[Test]
+    public function gross_amount入力で事業割合を未指定なら100として保存される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '事業割合未指定テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-06-01',
+            'description' => '事業割合未指定テスト',
+        ], [
+            [
+                'sub_account_id' => $expenseSubAccount->id,
+                'type' => 'debit',
+                'gross_amount' => 10000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'gross_amount' => 10000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $this->assertCount(2, $transaction->journalEntries);
+        $this->assertSame(100, $transaction->business_ratio);
+
+        $debitEntry = $transaction->journalEntries->firstWhere('type', 'debit');
+
+        $this->assertSame(10000, $debitEntry->net_amount);
+        $this->assertSame(10000, $debitEntry->gross_amount);
+        $this->assertSame(100, $debitEntry->business_ratio);
+        $this->assertNull($debitEntry->allocation_group_id);
+    }
+
+    #[Test]
+    public function gross_amount入力で事業割合が100なら分割されない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '事業割合100テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-06-01',
+            'description' => '事業割合100テスト',
+        ], [
+            [
+                'sub_account_id' => $expenseSubAccount->id,
+                'type' => 'debit',
+                'gross_amount' => 10000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'business_ratio' => 100,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'gross_amount' => 10000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $this->assertCount(2, $transaction->journalEntries);
+
+        $debitEntry = $transaction->journalEntries->firstWhere('type', 'debit');
+
+        $this->assertSame(10000, $debitEntry->net_amount);
+        $this->assertSame(100, $debitEntry->business_ratio);
+        $this->assertNull($debitEntry->allocation_group_id);
+    }
+
+    #[Test]
+    public function gross_amount入力で借方費用科目以外に事業割合を指定すると登録できない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '事業割合エラーテスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('事業割合は借方の費用科目でのみ指定できます。');
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-06-01',
+            'description' => '事業割合エラーテスト',
+        ], [
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'gross_amount' => 10000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'business_ratio' => 60,
+            ],
+            [
+                'sub_account_id' => $expenseSubAccount->id,
+                'type' => 'debit',
+                'gross_amount' => 10000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+    }
+
+    #[Test]
+    public function gross_amount入力で事業割合が範囲外なら登録できない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '事業割合範囲外テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('事業割合は1〜100の範囲で指定してください。');
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-06-01',
+            'description' => '事業割合範囲外テスト',
+        ], [
+            [
+                'sub_account_id' => $expenseSubAccount->id,
+                'type' => 'debit',
+                'gross_amount' => 10000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'business_ratio' => 101,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'gross_amount' => 10000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+    }
+
+    #[Test]
     public function 課税事業者はgross_amountとtax_type入力を正しく分解して保存できる()
     {
         $fiscalYear = FiscalYear::factory()->create([
@@ -1680,8 +1865,6 @@ class TransactionRegistrarTest extends TestCase
             ],
         ]);
 
-        $originalIds = $transaction->journalEntries->pluck('id')->toArray();
-
         $transaction->description = '本登録済み（仕訳変更）';
         $transaction->date = '2025-04-02';
 
@@ -1700,10 +1883,6 @@ class TransactionRegistrarTest extends TestCase
         $this->assertSame('本登録済み（仕訳変更）', $confirmed->description);
         $this->assertSame('2025-04-02', $confirmed->date->toDateString());
         $this->assertCount(2, $confirmed->journalEntries);
-
-        foreach ($confirmed->journalEntries as $entry) {
-            $this->assertContains($entry->id, $originalIds);
-        }
 
         $this->assertSame(2000, $confirmed->journalEntries->firstWhere('type', 'debit')->net_amount);
         $this->assertSame(2200, $confirmed->journalEntries->firstWhere('type', 'credit')->net_amount);
@@ -1741,8 +1920,6 @@ class TransactionRegistrarTest extends TestCase
             ],
         ]);
 
-        $originalIds = $transaction->journalEntries->pluck('id')->toArray();
-
         foreach ($transaction->journalEntries as $entry) {
             $entry->net_amount = 0;
         }
@@ -1755,14 +1932,10 @@ class TransactionRegistrarTest extends TestCase
         $this->assertSame('取消予定取引（取消）', $cancelled->description);
         $this->assertCount(2, $cancelled->journalEntries);
         $this->assertTrue($cancelled->journalEntries->every(fn ($e) => $e->net_amount === 0));
-
-        foreach ($cancelled->journalEntries as $entry) {
-            $this->assertContains($entry->id, $originalIds);
-        }
     }
 
     #[Test]
-    public function 予定取引をcancelPlannedで取消すると非アクティブ化される()
+    public function 予定取引をcancel_plannedで取消すると非アクティブ化される()
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);

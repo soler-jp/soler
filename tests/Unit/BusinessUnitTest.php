@@ -393,7 +393,7 @@ class BusinessUnitTest extends TestCase
 
         $this->assertCount(2, $subAccounts);
         $this->assertEquals('事業主貸', $subAccounts->first()->name);
-        $this->assertEquals('源泉徴収', $subAccounts->last()->name);
+        $this->assertTrue($subAccounts->contains(fn ($subAccount): bool => $subAccount->name === '源泉徴収'));
     }
 
     #[Test]

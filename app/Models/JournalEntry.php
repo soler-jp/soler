@@ -18,12 +18,15 @@ class JournalEntry extends Model
         'net_amount',
         'tax_amount',
         'tax_type',
+        'business_ratio',
+        'allocation_group_id',
         'is_effective',
     ];
 
     protected $casts = [
         'net_amount' => 'integer',
         'tax_amount' => 'integer',
+        'business_ratio' => 'integer',
         'is_effective' => 'boolean',
     ];
 

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\JournalEntry;
 use App\Models\RecurringTransactionPlan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -687,6 +688,41 @@ class RecurringTransactionPlanTest extends TestCase
             'net_amount' => 1400,
             'sub_account_id' => $newCreditSubAccount->id,
         ]);
+    }
+
+    #[Test]
+    public function 事業割合つきの定期取引は按分された予定仕訳を生成できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '按分定期テスト事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
+        $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $householdSubAccount = $unit->getSubAccountByName('事業主貸', '家事按分');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '按分あり固定費',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'is_income' => false,
+            'debit_sub_account_id' => $debitSubAccount->id,
+            'credit_sub_account_id' => $creditSubAccount->id,
+            'amount' => 10000,
+            'tax_amount' => 0,
+            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            'business_ratio' => 60,
+        ]);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->firstOrFail();
+        $householdSubAccount = $unit->getSubAccountByName('事業主貸', '家事按分');
+
+        $this->assertTrue($transaction->is_planned);
+        $this->assertSame(60, $transaction->business_ratio);
+        $this->assertCount(3, $transaction->journalEntries);
+        $this->assertSame(6000, $transaction->journalEntries->firstWhere('business_ratio', 60)?->net_amount);
+        $this->assertNotNull($householdSubAccount);
+        $this->assertSame(4000, $transaction->journalEntries->firstWhere('sub_account_id', $householdSubAccount->id)?->net_amount);
     }
 
     #[Test]

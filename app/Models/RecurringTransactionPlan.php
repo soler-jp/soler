@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\PlannedTransactionConfirmer;
+use App\Services\TransactionRegistrar;
 use Database\Factories\RecurringTransactionPlanFactory;
 use Illuminate\Contracts\Validation\Validator as ValidatorContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -30,6 +32,7 @@ class RecurringTransactionPlan extends Model
         'amount',
         'tax_amount',
         'tax_type', //
+        'business_ratio',
         'is_active',
     ];
 
@@ -39,6 +42,7 @@ class RecurringTransactionPlan extends Model
         'day_of_month' => 'integer',
         'amount' => 'integer',
         'tax_amount' => 'integer',
+        'business_ratio' => 'integer',
     ];
 
     public function businessUnit()
@@ -71,6 +75,7 @@ class RecurringTransactionPlan extends Model
                 'amount' => ['required', 'integer', 'min:1'],
                 'tax_amount' => ['nullable', 'integer', 'min:0'],
                 'tax_type' => ['nullable', 'string', 'max:50'],
+                'business_ratio' => ['nullable', 'integer', 'min:1', 'max:100'],
                 'is_active' => ['boolean'],
                 'business_unit_id' => ['required', 'exists:business_units,id'],
             ]
@@ -175,6 +180,11 @@ class RecurringTransactionPlan extends Model
 
     public function toTransactionData(Carbon $date): array
     {
+        $taxType = $this->tax_type
+            ?? ($this->tax_amount > 0
+                ? JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10
+                : JournalEntry::TAX_TYPE_NON_TAXABLE);
+
         return [
             'transaction' => [
                 'date' => $date->toDateString(),
@@ -187,9 +197,9 @@ class RecurringTransactionPlan extends Model
                 [
                     'sub_account_id' => $this->debit_sub_account_id,
                     'type' => 'debit',
-                    'net_amount' => $this->amount,
-                    'tax_amount' => $this->tax_amount,
-                    'tax_type' => $this->tax_type,
+                    'gross_amount' => $this->amount + (int) $this->tax_amount,
+                    'tax_type' => $taxType,
+                    'business_ratio' => $this->business_ratio,
                 ],
                 [
                     'sub_account_id' => $this->credit_sub_account_id,
@@ -211,7 +221,17 @@ class RecurringTransactionPlan extends Model
             return null;
         }
 
-        $creditSubAccountId = (int) $attributes['credit_sub_account_id'];
+        $debitEntry = $transaction->journalEntries->first(function ($entry): bool {
+            return $entry->type === 'debit' && $entry->business_ratio !== null;
+        }) ?? $transaction->journalEntries->firstWhere('type', 'debit');
+
+        $creditEntry = $transaction->journalEntries->firstWhere('type', 'credit');
+
+        if (! $debitEntry || ! $creditEntry) {
+            return null;
+        }
+
+        $creditSubAccountId = (int) ($attributes['credit_sub_account_id'] ?? $creditEntry->sub_account_id);
 
         if (! $this->businessUnit->hasSubAccount($creditSubAccountId)) {
             throw ValidationException::withMessages([
@@ -219,28 +239,41 @@ class RecurringTransactionPlan extends Model
             ]);
         }
 
-        $debitEntry = $transaction->journalEntries->firstWhere('type', 'debit');
-        $creditEntry = $transaction->journalEntries->firstWhere('type', 'credit');
+        $grossAmount = (int) ($attributes['amount'] ?? $creditEntry->net_amount);
+        $businessRatio = $attributes['business_ratio'] ?? $debitEntry->business_ratio ?? $this->business_ratio;
 
-        if (! $debitEntry || ! $creditEntry) {
-            return null;
+        $overrides = [
+            'date' => $attributes['date'] ?? $transaction->date?->toDateString(),
+            'description' => $transaction->description,
+            'remarks' => $transaction->remarks,
+            'counterparty_id' => $transaction->counterparty_id,
+            'revision_reason' => $transaction->revision_reason,
+            'amount' => $grossAmount,
+            'credit_sub_account_id' => $creditSubAccountId,
+        ];
+
+        if ($businessRatio !== null) {
+            $overrides['business_ratio'] = $businessRatio;
         }
 
-        $debitEntry->net_amount = $attributes['amount'];
-        $debitEntry->save();
+        $confirmed = app(PlannedTransactionConfirmer::class)->confirm(
+            $transaction,
+            auth()->user(),
+            $overrides,
+            app(TransactionRegistrar::class)->buildPlannedJournalEntries($transaction, $overrides),
+        );
 
-        $creditEntry->net_amount = $attributes['amount'];
-        $creditEntry->sub_account_id = $creditSubAccountId;
-        $creditEntry->save();
+        if (array_key_exists('date', $attributes) && $attributes['date'] !== null) {
+            $confirmed->newQuery()
+                ->where('id', $confirmed->getKey())
+                ->update([
+                    'date' => $attributes['date'],
+                    'updated_at' => now(),
+                ]);
 
-        $transaction->is_planned = false;
-
-        if (! empty($attributes['date'])) {
-            $transaction->date = Carbon::parse($attributes['date']);
+            return $confirmed->fresh(['journalEntries', 'fiscalYear']);
         }
 
-        $transaction->save();
-
-        return $transaction->fresh(['journalEntries']);
+        return $confirmed;
     }
 }

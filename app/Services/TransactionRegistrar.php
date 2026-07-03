@@ -2,14 +2,18 @@
 
 namespace App\Services;
 
+use App\Models\Account;
+use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
+use App\Models\SubAccount;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Validators\JournalEntryValidator;
 use App\Validators\TransactionValidator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class TransactionRegistrar
@@ -44,7 +48,7 @@ class TransactionRegistrar
 
         $this->ensureDateWithinFiscalYear($fiscalYear, $transactionData['date']);
 
-        $normalizedEntries = $this->normalizeEntries($fiscalYear, $journalEntriesData);
+        $normalizedEntries = $this->prepareJournalEntries($fiscalYear, $journalEntriesData);
         $validatedEntries = [];
 
         foreach ($normalizedEntries as $entry) {
@@ -90,13 +94,94 @@ class TransactionRegistrar
         return collect($entries)->sum(fn ($e) => (int) ($e['net_amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
     }
 
+    public function prepareJournalEntries(FiscalYear $fiscalYear, array $journalEntriesData): array
+    {
+        $preparedEntries = [];
+
+        foreach ($journalEntriesData as $index => $entry) {
+            foreach ($this->prepareJournalEntry($fiscalYear, $entry, $index) as $preparedEntry) {
+                $preparedEntries[] = $preparedEntry;
+            }
+        }
+
+        return $preparedEntries;
+    }
+
+    public function buildPlannedTransactionData(Transaction $transaction, array $overrides = []): array
+    {
+        $base = [
+            'date' => $transaction->date?->toDateString(),
+            'description' => $transaction->description,
+            'remarks' => $transaction->remarks,
+            'counterparty_id' => $transaction->counterparty_id,
+            'created_by' => $transaction->created_by,
+            'recurring_transaction_plan_id' => $transaction->recurring_transaction_plan_id,
+        ];
+
+        return array_merge($base, $overrides);
+    }
+
+    public function buildPlannedJournalEntries(Transaction $transaction, array $overrides = []): array
+    {
+        $transaction->loadMissing('journalEntries');
+
+        $debitEntry = $transaction->journalEntries->first(function (JournalEntry $entry): bool {
+            return $entry->type === JournalEntry::TYPE_DEBIT && $entry->business_ratio !== null;
+        }) ?? $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+
+        $creditEntry = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+
+        if ($debitEntry === null || $creditEntry === null) {
+            return [];
+        }
+
+        $grossAmount = (int) ($overrides['amount'] ?? $creditEntry->net_amount);
+        $businessRatio = $overrides['business_ratio'] ?? $debitEntry->business_ratio;
+
+        $debitPlannedEntry = [
+            'sub_account_id' => $debitEntry->sub_account_id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'gross_amount' => $grossAmount,
+            'tax_type' => $debitEntry->tax_type,
+        ];
+
+        if ($businessRatio !== null) {
+            $debitPlannedEntry['business_ratio'] = $businessRatio;
+        }
+
+        return [
+            $debitPlannedEntry,
+            [
+                'sub_account_id' => $overrides['credit_sub_account_id'] ?? $creditEntry->sub_account_id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => $grossAmount,
+            ],
+        ];
+    }
+
+    public function confirmPlanned(Transaction $transaction): Transaction
+    {
+        if (! $transaction->is_planned) {
+            throw new \InvalidArgumentException('この取引は既に本登録されています。');
+        }
+
+        $overrides = $this->buildPlannedTransactionData($transaction);
+
+        return app(PlannedTransactionConfirmer::class)->confirm(
+            $transaction,
+            auth()->user(),
+            $overrides,
+            $this->buildPlannedJournalEntries($transaction, $overrides),
+        );
+    }
+
     /**
      * 取引日が会計年度の期間内であることを確認する
      *
      * fiscal_year_id 基準で集計する処理（年度サマリ・残高集計など）は
      * 取引日が年度期間内であることを前提にしているため、登録時に保証する。
      */
-    protected function ensureDateWithinFiscalYear(FiscalYear $fiscalYear, mixed $date): void
+    public function ensureDateWithinFiscalYear(FiscalYear $fiscalYear, mixed $date): void
     {
         $transactionDate = Carbon::parse($date)->startOfDay();
 
@@ -111,7 +196,7 @@ class TransactionRegistrar
         }
     }
 
-    protected function resolveCounterparty(FiscalYear $fiscalYear, array $transactionData): array
+    public function resolveCounterparty(FiscalYear $fiscalYear, array $transactionData): array
     {
         $businessUnit = $fiscalYear->businessUnit;
         $counterpartyId = $transactionData['counterparty_id'] ?? null;
@@ -199,15 +284,19 @@ class TransactionRegistrar
         ]);
     }
 
-    protected function normalizeEntries(FiscalYear $fiscalYear, array $journalEntriesData): array
+    protected function prepareJournalEntry(FiscalYear $fiscalYear, array $entry, int $index): array
     {
-        return array_map(fn (array $entry) => $this->normalizeEntry($fiscalYear, $entry), $journalEntriesData);
-    }
+        $hasGrossAmount = array_key_exists('gross_amount', $entry) && ! array_key_exists('net_amount', $entry);
+        $hasBusinessRatio = array_key_exists('business_ratio', $entry) && $entry['business_ratio'] !== null;
 
-    protected function normalizeEntry(FiscalYear $fiscalYear, array $entry): array
-    {
-        if (! array_key_exists('gross_amount', $entry) || array_key_exists('net_amount', $entry)) {
-            return $entry;
+        if (! $hasGrossAmount) {
+            if ($hasBusinessRatio) {
+                throw ValidationException::withMessages([
+                    "journal_entries.$index.business_ratio" => ['事業割合は税込入力の借方経費行でのみ指定できます。'],
+                ]);
+            }
+
+            return [$entry];
         }
 
         $grossAmount = (int) $entry['gross_amount'];
@@ -220,15 +309,77 @@ class TransactionRegistrar
         }
 
         $taxType ??= $this->defaultTaxTypeForExemptBusiness($entry['type'] ?? null);
-        [$netAmount, $taxAmount] = $this->splitGrossAmount($grossAmount, $taxType);
+        $subAccount = $this->resolveSubAccount($fiscalYear, $entry['sub_account_id'] ?? null);
+        $allowsAllocation = $this->canApplyHouseholdAllocation($subAccount, $entry['type'] ?? null, $hasGrossAmount);
+
+        if ($hasBusinessRatio && $subAccount !== null && ! $allowsAllocation) {
+            throw ValidationException::withMessages([
+                "journal_entries.$index.business_ratio" => ['事業割合は借方の費用科目でのみ指定できます。'],
+            ]);
+        }
+
+        $businessRatio = $hasBusinessRatio ? (int) $entry['business_ratio'] : null;
+
+        if ($allowsAllocation && $businessRatio === null) {
+            $businessRatio = 100;
+        }
+
+        if ($businessRatio !== null && ($businessRatio < 1 || $businessRatio > 100)) {
+            throw ValidationException::withMessages([
+                "journal_entries.$index.business_ratio" => ['事業割合は1〜100の範囲で指定してください。'],
+            ]);
+        }
 
         unset($entry['gross_amount']);
 
-        return array_merge($entry, [
-            'net_amount' => $netAmount,
-            'tax_amount' => $taxAmount,
+        if ($businessRatio === null) {
+            [$netAmount, $taxAmount] = $this->splitGrossAmount($grossAmount, $taxType);
+
+            return [
+                array_merge($entry, [
+                    'net_amount' => $netAmount,
+                    'tax_amount' => $taxAmount,
+                    'tax_type' => $taxType,
+                ]),
+            ];
+        }
+
+        $businessGrossAmount = intdiv($grossAmount * $businessRatio, 100);
+        $householdGrossAmount = $grossAmount - $businessGrossAmount;
+        $allocationGroupId = $businessRatio === 100 ? null : (string) Str::uuid();
+
+        [$businessNetAmount, $businessTaxAmount] = $this->splitGrossAmount($businessGrossAmount, $taxType);
+
+        $businessEntry = array_merge($entry, [
+            'net_amount' => $businessNetAmount,
+            'tax_amount' => $businessTaxAmount,
             'tax_type' => $taxType,
+            'business_ratio' => $businessRatio,
         ]);
+
+        if ($allocationGroupId !== null) {
+            $businessEntry['allocation_group_id'] = $allocationGroupId;
+        }
+
+        if ($householdGrossAmount === 0) {
+            return [$businessEntry];
+        }
+
+        $householdAllocationSubAccount = $this->resolveHouseholdAllocationSubAccount($fiscalYear);
+
+        $householdEntry = [
+            'sub_account_id' => $householdAllocationSubAccount->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => $householdGrossAmount,
+            'tax_amount' => 0,
+            'tax_type' => null,
+        ];
+
+        if ($allocationGroupId !== null) {
+            $householdEntry['allocation_group_id'] = $allocationGroupId;
+        }
+
+        return [$businessEntry, $householdEntry];
     }
 
     protected function defaultTaxTypeForExemptBusiness(?string $entryType): string
@@ -265,7 +416,7 @@ class TransactionRegistrar
         return [$netAmount, $taxAmount];
     }
 
-    protected function ensureEntriesBelongToBusinessUnit(FiscalYear $fiscalYear, array $validatedEntries): void
+    public function ensureEntriesBelongToBusinessUnit(FiscalYear $fiscalYear, array $validatedEntries): void
     {
         $businessUnit = $fiscalYear->businessUnit;
 
@@ -278,7 +429,7 @@ class TransactionRegistrar
         }
     }
 
-    protected function ensureTaxTypeAllowedForFiscalYear(FiscalYear $fiscalYear, array $validatedEntries): void
+    public function ensureTaxTypeAllowedForFiscalYear(FiscalYear $fiscalYear, array $validatedEntries): void
     {
         if (! $fiscalYear->is_taxable) {
             return;
@@ -298,24 +449,6 @@ class TransactionRegistrar
         }
     }
 
-    public function confirmPlanned(Transaction $transaction): Transaction
-    {
-        if (! $transaction->is_planned) {
-            throw new \InvalidArgumentException('この取引は既に本登録されています。');
-        }
-
-        return DB::transaction(function () use ($transaction) {
-            $transaction->is_planned = false;
-            $transaction->save();
-
-            foreach ($transaction->journalEntries as $entry) {
-                $entry->save();
-            }
-
-            return $transaction->fresh();
-        });
-    }
-
     /**
      * 予定取引を取消する
      *
@@ -332,5 +465,37 @@ class TransactionRegistrar
         $transaction->deactivate($user, '予定取消');
 
         return $transaction->fresh();
+    }
+
+    protected function resolveSubAccount(FiscalYear $fiscalYear, mixed $subAccountId): ?SubAccount
+    {
+        if ($subAccountId === null) {
+            return null;
+        }
+
+        return $fiscalYear->businessUnit->subAccounts()
+            ->with('account')
+            ->whereKey($subAccountId)
+            ->first();
+    }
+
+    protected function canApplyHouseholdAllocation(?SubAccount $subAccount, mixed $entryType, bool $hasGrossAmount): bool
+    {
+        if (! $hasGrossAmount || $subAccount === null || $entryType !== JournalEntry::TYPE_DEBIT) {
+            return false;
+        }
+
+        return $subAccount->account?->type === Account::TYPE_EXPENSE;
+    }
+
+    protected function resolveHouseholdAllocationSubAccount(FiscalYear $fiscalYear): SubAccount
+    {
+        $ownerDrawAccount = $fiscalYear->businessUnit->accounts()
+            ->where('name', '事業主貸')
+            ->firstOrFail();
+
+        return $ownerDrawAccount->subAccounts()->firstOrCreate([
+            'name' => BusinessUnit::HOUSEHOLD_ALLOCATION_SUB_ACCOUNT_NAME,
+        ]);
     }
 }

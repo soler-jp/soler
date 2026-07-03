@@ -18,6 +18,8 @@ class BusinessUnit extends Model
 {
     use HasFactory;
 
+    public const HOUSEHOLD_ALLOCATION_SUB_ACCOUNT_NAME = '家事按分';
+
     public const CREDIT_SOURCE_CATEGORY_CASH = 'cash';
 
     public const CREDIT_SOURCE_CATEGORY_BANK = 'bank';
