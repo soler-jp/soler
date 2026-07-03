@@ -72,7 +72,11 @@ class FiscalYearSummaryCalculator
         string $accountType,
         string $entryType
     ): array {
-        $totals = JournalEntry::query()
+        $reverseEntryType = $entryType === JournalEntry::TYPE_CREDIT
+            ? JournalEntry::TYPE_DEBIT
+            : JournalEntry::TYPE_CREDIT;
+
+        $positiveTotals = JournalEntry::query()
             ->whereHas('transaction', function (Builder $query) use ($fiscalYear, $isPlanned): void {
                 $query
                     ->whereBelongsTo($fiscalYear)
@@ -86,10 +90,24 @@ class FiscalYearSummaryCalculator
             ->selectRaw('COALESCE(SUM(net_amount + COALESCE(tax_amount, 0)), 0) as summary_gross_amount')
             ->first();
 
+        $negativeTotals = JournalEntry::query()
+            ->whereHas('transaction', function (Builder $query) use ($fiscalYear, $isPlanned): void {
+                $query
+                    ->whereBelongsTo($fiscalYear)
+                    ->where('is_active', true)
+                    ->where('is_planned', $isPlanned);
+            })
+            ->whereHas('subAccount.account', fn (Builder $query) => $query->where('type', $accountType))
+            ->where('type', $reverseEntryType)
+            ->selectRaw('COALESCE(SUM(net_amount), 0) as summary_net_amount')
+            ->selectRaw('COALESCE(SUM(tax_amount), 0) as summary_tax_amount')
+            ->selectRaw('COALESCE(SUM(net_amount + COALESCE(tax_amount, 0)), 0) as summary_gross_amount')
+            ->first();
+
         return [
-            'net_amount' => (int) ($totals?->summary_net_amount ?? 0),
-            'tax_amount' => (int) ($totals?->summary_tax_amount ?? 0),
-            'gross_amount' => (int) ($totals?->summary_gross_amount ?? 0),
+            'net_amount' => (int) (($positiveTotals?->summary_net_amount ?? 0) - ($negativeTotals?->summary_net_amount ?? 0)),
+            'tax_amount' => (int) (($positiveTotals?->summary_tax_amount ?? 0) - ($negativeTotals?->summary_tax_amount ?? 0)),
+            'gross_amount' => (int) (($positiveTotals?->summary_gross_amount ?? 0) - ($negativeTotals?->summary_gross_amount ?? 0)),
         ];
     }
 }

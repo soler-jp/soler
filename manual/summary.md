@@ -106,8 +106,8 @@ $summary = $fiscalYear->calculateSummary();
 
 ## 補足
 
-- 売上は `account.type = revenue` かつ `journal_entries.type = credit` を対象にします
-- 経費は `account.type = expense` かつ `journal_entries.type = debit` を対象にします
+- 売上は `account.type = revenue` を対象にし、貸方を加算・借方を控除した純額で集計します
+- 経費は `account.type = expense` を対象にし、借方を加算・貸方を控除した純額で集計します
 - `Transaction.is_planned = true` の取引は `planned` に入ります
 - `Transaction.is_active = false` の取引は集計に含めません
 

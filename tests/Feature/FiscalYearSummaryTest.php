@@ -17,7 +17,7 @@ class FiscalYearSummaryTest extends TestCase
     private function subAccountByTypeOrName($unit, string $typeOrName)
     {
         return $unit->subAccounts()
-            ->whereHas('account', fn ($q) => $q->where('type', $typeOrName)->orWhere('name', $typeOrName))
+            ->whereHas('account', fn($q) => $q->where('type', $typeOrName)->orWhere('name', $typeOrName))
             ->first();
     }
 
@@ -223,6 +223,72 @@ class FiscalYearSummaryTest extends TestCase
         $this->assertSame(0, $summary['total_income']);
         $this->assertSame(0, $summary['total_expense']);
         $this->assertSame(0, $summary['profit']);
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function 売上と経費は逆仕訳を差し引いた純額で集計される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '純額集計']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
+        $expense = $this->subAccountByTypeOrName($unit, 'expense');
+        $asset = $this->subAccountByTypeOrName($unit, 'asset');
+        $liability = $this->subAccountByTypeOrName($unit, 'liability');
+
+        $registrar = new TransactionRegistrar;
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '売上',
+        ], [
+            ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 10000],
+            ['sub_account_id' => $asset->id, 'type' => 'debit', 'net_amount' => 10000],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-04-02',
+            'description' => '売上値引',
+        ], [
+            ['sub_account_id' => $revenue->id, 'type' => 'debit', 'net_amount' => 2000],
+            ['sub_account_id' => $asset->id, 'type' => 'credit', 'net_amount' => 2000],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-04-03',
+            'description' => '経費',
+        ], [
+            ['sub_account_id' => $expense->id, 'type' => 'debit', 'net_amount' => 5000],
+            ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 5000],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-04-04',
+            'description' => '経費戻し',
+        ], [
+            ['sub_account_id' => $expense->id, 'type' => 'credit', 'net_amount' => 1500],
+            ['sub_account_id' => $liability->id, 'type' => 'debit', 'net_amount' => 1500],
+        ]);
+
+        $summary = $fiscalYear->calculateSummary()['actual'];
+        $amountSummary = $fiscalYear->calculateAmountSummary()['actual'];
+
+        $this->assertSame(8000, $summary['total_income']);
+        $this->assertSame(3500, $summary['total_expense']);
+        $this->assertSame(4500, $summary['profit']);
+
+        $this->assertSame([
+            'net_amount' => 8000,
+            'tax_amount' => 0,
+            'gross_amount' => 8000,
+        ], $amountSummary['sales']);
+        $this->assertSame([
+            'net_amount' => 3500,
+            'tax_amount' => 0,
+            'gross_amount' => 3500,
+        ], $amountSummary['expenses']);
     }
 
     #[Test]
@@ -608,7 +674,7 @@ class FiscalYearSummaryTest extends TestCase
 
         $this->assertFalse(
             collect($executedQueries)->contains(
-                fn (string $sql): bool => str_contains($sql, 'laravel_through_key')
+                fn(string $sql): bool => str_contains($sql, 'laravel_through_key')
             )
         );
     }

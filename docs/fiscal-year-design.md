@@ -137,14 +137,14 @@
 - 予定
   - `Transaction.is_planned = true`
 
-また、集計対象は勘定科目属性と仕訳区分で決めている。
+また、集計対象は勘定科目属性を基準にしつつ、借方・貸方を純額で見る。
 
 - 売上
   - `account.type = revenue`
-  - `journal_entries.type = credit`
+  - `journal_entries.type = credit` を加算し、`journal_entries.type = debit` を控除する
 - 経費
   - `account.type = expense`
-  - `journal_entries.type = debit`
+  - `journal_entries.type = debit` を加算し、`journal_entries.type = credit` を控除する
 
 加えて、`Transaction.is_active = true` の取引だけを集計対象にする。
 
@@ -171,6 +171,11 @@
 ### 4. `calculateAmountSummary()` は集計の元データを返す
 
 `calculateAmountSummary()` は、損益計算の元になる売上・経費の `net_amount` / `tax_amount` / `gross_amount` を返す。
+
+ここで返す値は片側総額ではなく純額である。
+
+- 売上は `revenue` 科目の貸方合計から借方合計を引いた値
+- 経費は `expense` 科目の借方合計から貸方合計を引いた値
 
 現時点では、`profit` はこのメソッドには含めていない。
 
