@@ -18,6 +18,14 @@
 
         {{-- 取引一覧 --}}
         <div>
+            <div class="hidden md:flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-200 bg-gray-50">
+                <div class="w-36">日付</div>
+                <div class="w-32">支払額</div>
+                <div class="w-24">事業割合</div>
+                <div class="w-32">経費額</div>
+                <div class="flex-1">支払元</div>
+                <div class="w-16 text-right">操作</div>
+            </div>
 
             @forelse ($transactions as $tx)
                 <div class="border-t border-gray-200">
@@ -42,6 +50,22 @@
                             @else
                                 ¥{{ number_format($tx->total_amount) }}
                             @endif
+                        </div>
+
+                        {{-- 事業割合 --}}
+                        <div class="w-24 text-gray-700">
+                            @if ($tx->is_planned)
+                                <input type="number" wire:model.defer="inputs.{{ $tx->id }}.business_ratio"
+                                    min="1" max="100"
+                                    class="w-full text-sm border-gray-300 rounded px-2 py-1" />
+                            @else
+                                {{ $tx->business_ratio !== null ? $tx->business_ratio.'%' : '—' }}
+                            @endif
+                        </div>
+
+                        {{-- 経費額 --}}
+                        <div class="w-32 text-gray-700">
+                            ¥{{ number_format($tx->business_expense_amount) }}
                         </div>
 
                         {{-- 支払元 --}}

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Recurring;
 
+use App\Models\Transaction;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -36,22 +37,27 @@ class TabList extends Component
         $unit = Auth::user()->selectedBusinessUnit;
         $fiscalYear = $unit->currentFiscalYear;
         $data = $this->inputs[$transactionId] ?? [];
+        $date = $data['date'] ?? null;
 
         $validated = validator($data, [
             'amount' => ['required', 'integer', 'min:1'],
+            'business_ratio' => ['nullable', 'integer', 'min:1', 'max:100'],
             'credit_sub_account_id' => ['required', $unit->subAccountExistsRule()],
             'date' => ['nullable', 'date'],
         ])->validate();
 
-        $plan = $unit->recurringTransactionPlans()
-            ->where('is_income', false)
-            ->whereHas('transactions', function ($query) use ($transactionId, $fiscalYear) {
-                $query->whereKey($transactionId)
-                    ->where('fiscal_year_id', $fiscalYear->id);
-            })
+        $transaction = Transaction::query()
+            ->with('recurringTransactionPlan')
+            ->whereKey($transactionId)
             ->first();
 
-        if (! $plan) {
+        if (! $transaction) {
+            return;
+        }
+
+        $plan = $transaction->recurringTransactionPlan;
+
+        if (! $plan || $plan->business_unit_id !== $unit->id || $plan->is_income) {
             return;
         }
 
@@ -69,6 +75,15 @@ class TabList extends Component
 
         if (! $transaction) {
             return;
+        }
+
+        if ($date !== null) {
+            Transaction::query()
+                ->whereKey($transactionId)
+                ->update([
+                    'date' => $date,
+                    'updated_at' => now(),
+                ]);
         }
 
         unset($this->inputs[$transactionId]);
@@ -100,10 +115,10 @@ class TabList extends Component
 
         foreach ($transactions as $tx) {
             if ($tx->is_planned) {
-                $debit = $tx->journalEntries->where('type', 'debit')->sortByDesc('net_amount')->first();
-                $credit = $tx->journalEntries->where('type', 'credit')->sortByDesc('net_amount')->first();
+                $credit = $tx->journalEntries->where('type', 'credit')->first();
 
-                $this->inputs[$tx->id]['amount'] ??= $debit?->net_amount;
+                $this->inputs[$tx->id]['amount'] ??= $tx->recurringTransactionPlan?->gross_amount ?? $tx->total_amount;
+                $this->inputs[$tx->id]['business_ratio'] ??= $tx->business_ratio ?? $tx->recurringTransactionPlan?->business_ratio;
                 $this->inputs[$tx->id]['credit_sub_account_id'] ??= $credit?->sub_account_id;
                 $this->inputs[$tx->id]['date'] ??= $tx->date->format('Y-m-d');
             }

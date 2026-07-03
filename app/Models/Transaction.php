@@ -172,6 +172,17 @@ class Transaction extends Model
         return (int) $this->businessRatioValues()->first();
     }
 
+    public function getBusinessExpenseAmountAttribute(): int
+    {
+        $businessRatio = $this->business_ratio;
+
+        if ($businessRatio === null) {
+            return $this->total_amount;
+        }
+
+        return intdiv($this->total_amount * $businessRatio, 100);
+    }
+
     public function getBusinessRatioStateAttribute(): string
     {
         $businessRatioValues = $this->businessRatioValues();

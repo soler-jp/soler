@@ -145,6 +145,15 @@
                 @enderror
             </div>
 
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">事業割合</label>
+                <input type="number" wire:model.defer="form.business_ratio" min="1" max="100"
+                    class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                @error('form.business_ratio')
+                    <div class="text-xs text-red-600">{{ $message }}</div>
+                @enderror
+            </div>
+
             {{-- 支払い方法（貸方補助科目） --}}
             <div class="mt-1 space-y-1">
                 <label class="block text-sm font-medium text-gray-700 mb-2">支払方法</label>

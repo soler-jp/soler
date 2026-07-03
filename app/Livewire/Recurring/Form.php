@@ -19,6 +19,7 @@ class Form extends Component
         'amount' => null,
         'tax_amount' => 0,
         'tax_type' => null,
+        'business_ratio' => null,
         'start_month_type' => 'odd',
     ];
 
@@ -54,6 +55,7 @@ class Form extends Component
             'form.debit_sub_account_id' => ['required', $unit->subAccountExistsRule()],
             'form.credit_sub_account_id' => ['nullable', $unit->subAccountExistsRule()],
             'form.amount' => ['required', 'integer', 'min:0'],
+            'form.business_ratio' => ['nullable', 'integer', 'min:1', 'max:100'],
             'form.tax_amount' => ['required', 'integer', 'min:0'],
             'form.interval' => ['required', 'in:monthly,bimonthly,yearly'],
             'form.day_of_month' => ['required', 'integer', 'min:1', 'max:31'],
@@ -77,6 +79,7 @@ class Form extends Component
                     'month_of_year' => $form['month_of_year'],
                     'tax_amount' => $form['tax_amount'],
                     'tax_type' => $form['tax_type'],
+                    'business_ratio' => $form['business_ratio'],
                     'is_income' => false,
                     'start_month' => $form['interval'] === 'bimonthly'
                         ? ($form['start_month_type'] === 'odd' ? 1 : 2)

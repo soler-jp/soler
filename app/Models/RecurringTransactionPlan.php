@@ -6,6 +6,7 @@ use App\Services\PlannedTransactionConfirmer;
 use App\Services\TransactionRegistrar;
 use Database\Factories\RecurringTransactionPlanFactory;
 use Illuminate\Contracts\Validation\Validator as ValidatorContract;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -44,6 +45,11 @@ class RecurringTransactionPlan extends Model
         'tax_amount' => 'integer',
         'business_ratio' => 'integer',
     ];
+
+    protected function grossAmount(): Attribute
+    {
+        return Attribute::get(fn () => $this->amount + (int) $this->tax_amount);
+    }
 
     public function businessUnit()
     {
@@ -197,14 +203,14 @@ class RecurringTransactionPlan extends Model
                 [
                     'sub_account_id' => $this->debit_sub_account_id,
                     'type' => 'debit',
-                    'gross_amount' => $this->amount + (int) $this->tax_amount,
+                    'gross_amount' => $this->gross_amount,
                     'tax_type' => $taxType,
                     'business_ratio' => $this->business_ratio,
                 ],
                 [
                     'sub_account_id' => $this->credit_sub_account_id,
                     'type' => 'credit',
-                    'net_amount' => $this->amount + (int) $this->tax_amount,
+                    'net_amount' => $this->gross_amount,
                 ],
             ],
         ];

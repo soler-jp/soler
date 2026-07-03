@@ -67,6 +67,48 @@ class FormTest extends TestCase
     }
 
     #[Test]
+    public function 事業割合つきの定期支出を登録できる()
+    {
+        $user = User::factory()->create();
+
+        $initializer = new GeneralBusinessInitializer;
+        $unit = $initializer->initialize($user, [
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+        ]);
+
+        $debit = $unit->getAccountByName('消耗品費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Form::class)
+            ->set('form.name', '按分あり定期支出')
+            ->set('form.debit_sub_account_id', $debit->id)
+            ->set('form.credit_sub_account_id', $credit->id)
+            ->set('form.amount', 1100)
+            ->set('form.business_ratio', 60)
+            ->set('form.tax_amount', 0)
+            ->set('form.tax_type', null)
+            ->set('form.interval', 'monthly')
+            ->set('form.day_of_month', 1)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('recurring_transaction_plans', [
+            'business_unit_id' => $unit->id,
+            'name' => '按分あり定期支出',
+            'business_ratio' => 60,
+        ]);
+    }
+
+    #[Test]
     public function 隔月支払いで「偶数月」を設定して登録ができる()
     {
         $user = User::factory()->create();

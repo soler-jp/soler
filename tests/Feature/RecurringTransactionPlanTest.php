@@ -47,6 +47,63 @@ class RecurringTransactionPlanTest extends TestCase
         $plan = $unit->createRecurringTransactionPlan($data);
 
         $this->assertDatabaseHas('recurring_transaction_plans', $data);
+        $this->assertSame(4400, $plan->gross_amount);
+    }
+
+    #[Test]
+    public function 確定時に事業割合を上書きできる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業',
+        ]);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $debit = $unit->subAccounts()->whereHas('account', function ($q) {
+            $q->where('name', '消耗品費');
+        })->firstOrFail();
+
+        $credit = $unit->subAccounts()->whereHas('account', function ($q) {
+            $q->where('name', '現金');
+        })->firstOrFail();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'business_unit_id' => $unit->id,
+            'name' => '按分あり固定費',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'is_income' => false,
+            'debit_sub_account_id' => $debit->id,
+            'credit_sub_account_id' => $credit->id,
+            'amount' => 5678,
+            'tax_amount' => 0,
+            'business_ratio' => 60,
+        ]);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->firstOrFail();
+
+        $confirmed = $plan->confirmTransaction($transaction->id, [
+            'date' => '2025-12-10',
+            'amount' => 1400,
+            'business_ratio' => 80,
+            'credit_sub_account_id' => $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail()->id,
+        ]);
+
+        $this->assertNotNull($confirmed);
+        $this->assertFalse($confirmed->is_planned);
+        $this->assertCount(3, $confirmed->journalEntries);
+
+        $businessDebit = $confirmed->journalEntries
+            ->where('type', JournalEntry::TYPE_DEBIT)
+            ->firstWhere('business_ratio', 80);
+        $householdDebit = $confirmed->journalEntries
+            ->where('type', JournalEntry::TYPE_DEBIT)
+            ->firstWhere('business_ratio', null);
+        $creditEntry = $confirmed->journalEntries->where('type', JournalEntry::TYPE_CREDIT)->first();
+
+        $this->assertSame(1120, $businessDebit?->net_amount);
+        $this->assertSame(280, $householdDebit?->net_amount);
+        $this->assertSame(1400, $creditEntry?->net_amount);
     }
 
     #[Test]

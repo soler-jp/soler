@@ -43,6 +43,10 @@ class TabListTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(TabList::class)
+            ->assertSee('支払額')
+            ->assertSee('事業割合')
+            ->assertSee('経費額')
+            ->assertSee('支払元')
             ->assertSee('サーバー代')
             ->assertSee('ソフトウェア使用料');
     }
@@ -86,18 +90,11 @@ class TabListTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(TabList::class)
-            ->set('inputs', [
-                $tx->id => [
-                    'date' => '2025-12-10',
-                    'amount' => 1400, // 税込み金額
-                    'credit_sub_account_id' => $newCreditSubAccount->id,
-                ],
-            ])
-            ->call('confirm', $tx->id);
-
-        $tx->refresh();
-
-        $this->assertSame('2025-12-10', $tx->date->toDateString());
+            ->set("inputs.{$tx->id}.date", '2025-12-10')
+            ->set("inputs.{$tx->id}.amount", 1400)
+            ->set("inputs.{$tx->id}.credit_sub_account_id", $newCreditSubAccount->id)
+            ->call('confirm', $tx->id)
+            ->assertHasNoErrors();
 
         $this->assertDatabaseHas('transactions', [
             'id' => $tx->id,
@@ -119,6 +116,40 @@ class TabListTest extends TestCase
             'tax_amount' => 0,
             'sub_account_id' => $newCreditSubAccount->id,
         ]);
+
+        $tx->refresh();
+
+        $this->assertSame('2025-12-10', $tx->date->toDateString());
+    }
+
+    #[Test]
+    public function 事業割合と経費額が表示される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $debitSubAccount = $unit->getAccountByName('消耗品費')->subAccounts()->first();
+        $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '按分あり固定費',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'amount' => 5678,
+            'tax_amount' => 0,
+            'business_ratio' => 60,
+            'is_income' => false,
+            'debit_sub_account_id' => $debitSubAccount->id,
+            'credit_sub_account_id' => $creditSubAccount->id,
+        ]);
+
+        $tx = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->firstOrFail();
+
+        Livewire::actingAs($user)
+            ->test(TabList::class)
+            ->assertSeeHtml('wire:model.defer="inputs.'.$tx->id.'.business_ratio"')
+            ->assertSee('3,406');
     }
 
     #[Test]
