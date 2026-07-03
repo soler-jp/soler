@@ -21,6 +21,10 @@ class Transaction extends Model
 
     public const BUSINESS_RATIO_STATE_MIXED = 'mixed';
 
+    public const ADJUSTING_ENTRY_TYPE_INVENTORY_CLOSING = 'inventory_closing';
+
+    public const ADJUSTING_ENTRY_TYPE_DEPRECIATION = 'depreciation';
+
     protected $fillable = [
         'fiscal_year_id',
         'date',
@@ -28,6 +32,7 @@ class Transaction extends Model
         'remarks',
         'is_opening_entry',
         'is_adjusting_entry',
+        'adjusting_entry_type',
         'is_planned',
         'recurring_transaction_plan_id',
         'counterparty_id',
