@@ -39,6 +39,12 @@ class PlannedTransactionConfirmer
                 ]);
             }
 
+            if ($fiscalYear->is_closed) {
+                throw ValidationException::withMessages([
+                    'fiscal_year_id' => ['決算済みの会計年度に属する予定取引は確定できません。'],
+                ]);
+            }
+
             $transactionData = $this->transactionRegistrar->buildPlannedTransactionData(
                 $lockedTransaction,
                 $overrides,

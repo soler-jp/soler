@@ -209,6 +209,10 @@ class Transaction extends Model
             return;
         }
 
+        if ($this->fiscalYear?->is_closed) {
+            throw new \InvalidArgumentException('決算済みの会計年度に属する取引は無効化できません。');
+        }
+
         DB::transaction(function () use ($user, $reason) {
             $this->forceFill([
                 'is_active' => false,

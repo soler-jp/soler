@@ -931,4 +931,37 @@ class RecurringTransactionPlanTest extends TestCase
             'sub_account_id' => $creditSubAccount->id,
         ]);
     }
+
+    #[Test]
+    public function 決算済み年度の予定取引は確定できない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '決算後確定不可']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
+        $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '締め後プラン',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'is_income' => false,
+            'debit_sub_account_id' => $debitSubAccount->id,
+            'credit_sub_account_id' => $creditSubAccount->id,
+            'amount' => 1100,
+            'tax_amount' => 0,
+        ]);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->firstOrFail();
+        $fiscalYear->update(['is_closed' => true]);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('決算済みの会計年度に属する予定取引は確定できません。');
+
+        $plan->confirmTransaction($transaction->id, [
+            'date' => '2025-12-10',
+            'amount' => 1100,
+            'credit_sub_account_id' => $creditSubAccount->id,
+        ]);
+    }
 }

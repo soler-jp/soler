@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\FiscalYearBalanceCalculator;
+use App\Services\FiscalYearCloser;
 use App\Services\FiscalYearSummaryCalculator;
 use App\Services\OpeningEntryRegistrar;
 use App\Services\TransactionRegistrar;
@@ -18,6 +19,8 @@ class FiscalYear extends Model
         'year',
         'is_active',
         'is_closed',    // 決算済フラグ
+        'closed_at',
+        'closed_by',
         'is_taxable',   // 課税事業者ならtrue, 免税事業者なfalse
         'is_tax_exclusive',  // 税抜経理ならtrue, 税込経理ならfalse
         'start_date',
@@ -30,6 +33,8 @@ class FiscalYear extends Model
         'is_tax_exclusive' => 'boolean',
         'is_active' => 'boolean',
         'is_closed' => 'boolean',
+        'closed_at' => 'datetime',
+        'closed_by' => 'integer',
         'start_date' => 'date',
         'end_date' => 'date',
     ];
@@ -80,5 +85,15 @@ class FiscalYear extends Model
     public function registerOpeningEntry(array $entries): ?Transaction
     {
         return app(OpeningEntryRegistrar::class)->register($this, $entries);
+    }
+
+    public function closedBy()
+    {
+        return $this->belongsTo(User::class, 'closed_by');
+    }
+
+    public function close(User $user): self
+    {
+        return app(FiscalYearCloser::class)->close($this, $user);
     }
 }

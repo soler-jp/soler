@@ -98,4 +98,41 @@ class BusinessUnitFiscalYearTest extends TestCase
             'is_active' => false,
         ]);
     }
+
+    #[Test]
+    public function closeで会計年度を決算済みにできる()
+    {
+        $user = User::factory()->create();
+        $businessUnit = BusinessUnit::factory()->create(['user_id' => $user->id]);
+
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $closedFiscalYear = $fiscalYear->close($user);
+
+        $this->assertTrue($closedFiscalYear->is_closed);
+        $this->assertFalse($closedFiscalYear->is_active);
+        $this->assertSame($user->id, $closedFiscalYear->closed_by);
+        $this->assertNotNull($closedFiscalYear->closed_at);
+        $this->assertDatabaseHas('fiscal_years', [
+            'id' => $fiscalYear->id,
+            'is_closed' => true,
+            'is_active' => false,
+            'closed_by' => $user->id,
+        ]);
+    }
+
+    #[Test]
+    public function すでに決算済みの会計年度を_closeしようとすると例外になる()
+    {
+        $user = User::factory()->create();
+        $businessUnit = BusinessUnit::factory()->create(['user_id' => $user->id]);
+
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear->update(['is_closed' => true, 'is_active' => false]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('この会計年度はすでに決算済みです。');
+
+        $fiscalYear->close($user);
+    }
 }

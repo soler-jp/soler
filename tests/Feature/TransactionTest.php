@@ -88,6 +88,26 @@ class TransactionTest extends TestCase
     }
 
     #[Test]
+    public function 決算済み会計年度のtransactionは無効化できない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => '無効化制御事業体',
+        ]);
+        $fiscalYear = $unit->createFiscalYear(2025);
+        $transaction = Transaction::factory()->create([
+            'fiscal_year_id' => $fiscalYear->id,
+        ]);
+
+        $fiscalYear->update(['is_closed' => true]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('決算済みの会計年度に属する取引は無効化できません。');
+
+        $transaction->deactivate($user, '締め後の無効化');
+    }
+
+    #[Test]
     public function transactionのbusiness_ratio_stateは按分なしならnot_allocatedになる()
     {
         $transaction = $this->createTransactionWithJournalEntries([
