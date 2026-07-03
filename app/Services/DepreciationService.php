@@ -369,6 +369,7 @@ class DepreciationService
                 'date' => $entry->fiscalYear->end_date->toDateString(),
                 'description' => sprintf('%d年 減価償却: %s', $entry->fiscalYear->year, $entry->fixedAsset->name),
                 'is_adjusting_entry' => true,
+                'adjusting_entry_type' => Transaction::ADJUSTING_ENTRY_TYPE_DEPRECIATION,
             ],
             [
                 [

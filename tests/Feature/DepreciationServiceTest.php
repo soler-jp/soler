@@ -963,6 +963,7 @@ class DepreciationServiceTest extends TestCase
         $this->assertSame('2025-12-31', $transaction->date->toDateString());
         $this->assertSame('2025年 減価償却: 工作機械', $transaction->description);
         $this->assertTrue($transaction->is_adjusting_entry);
+        $this->assertSame(Transaction::ADJUSTING_ENTRY_TYPE_DEPRECIATION, $transaction->adjusting_entry_type);
         $this->assertCount(2, $transaction->journalEntries);
 
         $this->assertTrue(
