@@ -4,10 +4,15 @@ namespace Tests\Unit;
 
 use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
+use App\Models\JournalEntry;
+use App\Models\Transaction;
 use App\Models\User;
+use App\Services\FiscalYearRollover;
+use App\Services\TransactionRegistrar;
 use App\Validators\FiscalYearValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -134,5 +139,213 @@ class BusinessUnitFiscalYearTest extends TestCase
         $this->expectExceptionMessage('この会計年度はすでに決算済みです。');
 
         $fiscalYear->close($user);
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function rollover_dataから翌期の_fiscal_yearと期首仕訳を作成できる()
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '繰越事業体',
+        ]);
+
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $cash = $businessUnit->getSubAccountByName('現金', '現金');
+        $sales = $businessUnit->getSubAccountByName('売上高', '売上高');
+        $expense = $businessUnit->getSubAccountByName('消耗品費', '消耗品費');
+
+        $fiscalYear->registerOpeningEntry([
+            [
+                'account_name' => '現金',
+                'sub_account_name' => '現金',
+                'amount' => 100000,
+            ],
+        ]);
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-04-10',
+            'description' => '売上',
+        ], [
+            [
+                'sub_account_id' => $cash->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 30000,
+            ],
+            [
+                'sub_account_id' => $sales->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 30000,
+            ],
+        ]);
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-05-10',
+            'description' => '消耗品購入',
+        ], [
+            [
+                'sub_account_id' => $expense->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 5000,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 5000,
+            ],
+        ]);
+
+        $fiscalYear->close($user);
+
+        $rolloverData = $fiscalYear->calculateRolloverData();
+
+        $this->assertSame(2026, $rolloverData['next_year']);
+        $this->assertSame(25000, $rolloverData['current_profit']);
+        $this->assertSame([
+            [
+                'account_name' => '現金',
+                'sub_account_name' => '現金',
+                'amount' => 125000,
+                'type' => 'debit',
+            ],
+        ], $rolloverData['opening_entries']);
+        $this->assertSame([
+            'account_name' => '元入金',
+            'sub_account_name' => '元入金',
+            'amount' => 125000,
+            'type' => 'credit',
+        ], $rolloverData['capital_entry']);
+
+        $nextFiscalYear = $businessUnit->createFiscalYear($rolloverData['next_year']);
+        $openingTransaction = app(FiscalYearRollover::class)->rollover($fiscalYear, $nextFiscalYear);
+
+        $this->assertInstanceOf(Transaction::class, $openingTransaction);
+        $this->assertCount(2, $openingTransaction->journalEntries);
+        $this->assertDatabaseHas('transactions', [
+            'id' => $openingTransaction->id,
+            'fiscal_year_id' => $nextFiscalYear->id,
+            'is_opening_entry' => true,
+        ]);
+        $this->assertSame(125000, $nextFiscalYear->calculateBalanceSummary()['asset']['total_balance']);
+    }
+
+    #[Test]
+    public function rollover_dataは複数の資産_sub_accountを含められる()
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '複数繰越事業体',
+        ]);
+
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $cash = $businessUnit->getSubAccountByName('現金', '現金');
+        $deposit = $businessUnit->getSubAccountByName('その他の預金', 'その他の預金');
+
+        $fiscalYear->registerOpeningEntry([
+            [
+                'account_name' => '現金',
+                'sub_account_name' => '現金',
+                'amount' => 100000,
+            ],
+            [
+                'account_name' => 'その他の預金',
+                'sub_account_name' => 'その他の預金',
+                'amount' => 50000,
+            ],
+        ]);
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-04-10',
+            'description' => '預金引落',
+        ], [
+            [
+                'sub_account_id' => $deposit->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 10000,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 10000,
+            ],
+        ]);
+
+        $fiscalYear->close($user);
+
+        $rolloverData = $fiscalYear->calculateRolloverData();
+
+        $this->assertSame([
+            [
+                'account_name' => 'その他の預金',
+                'sub_account_name' => 'その他の預金',
+                'amount' => 60000,
+                'type' => 'debit',
+            ],
+            [
+                'account_name' => '現金',
+                'sub_account_name' => '現金',
+                'amount' => 90000,
+                'type' => 'debit',
+            ],
+        ], $rolloverData['opening_entries']);
+    }
+
+    #[Test]
+    public function rollover_dataは残高0の資産_sub_accountを含めない()
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'ゼロ残高繰越事業体',
+        ]);
+
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $cash = $businessUnit->getSubAccountByName('現金', '現金');
+        $deposit = $businessUnit->getSubAccountByName('その他の預金', 'その他の預金');
+        $expense = $businessUnit->getSubAccountByName('消耗品費', '消耗品費');
+
+        $fiscalYear->registerOpeningEntry([
+            [
+                'account_name' => '現金',
+                'sub_account_name' => '現金',
+                'amount' => 100000,
+            ],
+            [
+                'account_name' => 'その他の預金',
+                'sub_account_name' => 'その他の預金',
+                'amount' => 50000,
+            ],
+        ]);
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-04-10',
+            'description' => '預金を使い切る',
+        ], [
+            [
+                'sub_account_id' => $expense->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 50000,
+            ],
+            [
+                'sub_account_id' => $deposit->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 50000,
+            ],
+        ]);
+
+        $fiscalYear->close($user);
+
+        $rolloverData = $fiscalYear->calculateRolloverData();
+
+        $this->assertSame([
+            [
+                'account_name' => '現金',
+                'sub_account_name' => '現金',
+                'amount' => 100000,
+                'type' => 'debit',
+            ],
+        ], $rolloverData['opening_entries']);
     }
 }

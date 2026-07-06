@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\FiscalYearBalanceCalculator;
 use App\Services\FiscalYearCloser;
+use App\Services\FiscalYearRolloverDataCalculator;
 use App\Services\FiscalYearSummaryCalculator;
 use App\Services\OpeningEntryRegistrar;
 use App\Services\TransactionRegistrar;
@@ -80,6 +81,19 @@ class FiscalYear extends Model
     public function calculateBalanceSummary(): array
     {
         return app(FiscalYearBalanceCalculator::class)->calculate($this);
+    }
+
+    /**
+     * @return array{
+     *     next_year: int,
+     *     opening_entries: array<int, array{account_name: string, sub_account_name: string, amount: int, type: 'debit'|'credit'}>,
+     *     capital_entry: array{account_name: string, sub_account_name: string, amount: int, type: 'debit'|'credit'},
+     *     current_profit: int
+     * }
+     */
+    public function calculateRolloverData(): array
+    {
+        return app(FiscalYearRolloverDataCalculator::class)->calculate($this);
     }
 
     public function registerOpeningEntry(array $entries): ?Transaction
