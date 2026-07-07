@@ -182,6 +182,7 @@ class BusinessUnit extends Model
         ['name' => '利子割引料', 'type' => Account::TYPE_EXPENSE],
         ['name' => '地代家賃', 'type' => Account::TYPE_EXPENSE],
         ['name' => '貸倒金', 'type' => Account::TYPE_EXPENSE],
+        ['name' => '専従者給与', 'type' => Account::TYPE_EXPENSE],
         ['name' => '雑費', 'type' => Account::TYPE_EXPENSE],
     ];
 
