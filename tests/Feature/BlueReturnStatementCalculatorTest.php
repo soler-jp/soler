@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\FiscalYear;
-use App\Models\SubAccount;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\BlueReturnStatementCalculator;
@@ -308,6 +306,248 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $this->assertSame(0, $summary['bad_debt_reserve_provision']);
     }
 
+    #[Test]
+    #[Group('mysql')]
+    public function 月別売上仕入集計が集計対象の取引だけを月ごとに返す(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '月別集計テスト',
+        ]);
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $sales = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+        $houseConsumption = $businessUnit->getAccountByName('家事消費等')->subAccounts()->firstOrFail();
+        $miscIncome = $businessUnit->getAccountByName('雑収入')->subAccounts()->firstOrFail();
+        $purchases = $businessUnit->getAccountByName('仕入金額')->subAccounts()->firstOrFail();
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-01-10',
+            'description' => '月別集計テスト',
+        ], [
+            [
+                'sub_account_id' => $sales->id,
+                'type' => 'credit',
+                'net_amount' => 10_000,
+                'tax_amount' => 0,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'net_amount' => 10_000,
+                'tax_amount' => 0,
+            ],
+        ]);
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-01-20',
+            'description' => '月別集計テスト（税込売上）',
+        ], [
+            [
+                'sub_account_id' => $sales->id,
+                'type' => 'credit',
+                'net_amount' => 5_000,
+                'tax_amount' => 500,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'net_amount' => 5_000,
+                'tax_amount' => 500,
+            ],
+        ]);
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-01-25',
+            'description' => '月別集計テスト（売上値引）',
+        ], [
+            [
+                'sub_account_id' => $sales->id,
+                'type' => 'debit',
+                'net_amount' => 1_000,
+                'tax_amount' => 100,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'credit',
+                'net_amount' => 1_000,
+                'tax_amount' => 100,
+            ],
+        ]);
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-02-10',
+            'description' => '月別集計テスト',
+        ], [
+            [
+                'sub_account_id' => $houseConsumption->id,
+                'type' => 'credit',
+                'net_amount' => 20_000,
+                'tax_amount' => 0,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'net_amount' => 20_000,
+                'tax_amount' => 0,
+            ],
+        ]);
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-02-20',
+            'description' => '月別集計テスト',
+        ], [
+            [
+                'sub_account_id' => $miscIncome->id,
+                'type' => 'credit',
+                'net_amount' => 3_000,
+                'tax_amount' => 0,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'net_amount' => 3_000,
+                'tax_amount' => 0,
+            ],
+        ]);
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-02-28',
+            'description' => '月別集計テスト',
+        ], [
+            [
+                'sub_account_id' => $miscIncome->id,
+                'type' => 'credit',
+                'net_amount' => 2_000,
+                'tax_amount' => 0,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'net_amount' => 2_000,
+                'tax_amount' => 0,
+            ],
+        ]);
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-03-10',
+            'description' => '月別集計テスト',
+        ], [
+            [
+                'sub_account_id' => $purchases->id,
+                'type' => 'debit',
+                'net_amount' => 40_000,
+                'tax_amount' => 0,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'credit',
+                'net_amount' => 40_000,
+                'tax_amount' => 0,
+            ],
+        ]);
+
+        $outOfPeriodTransaction = Transaction::factory()->create([
+            'fiscal_year_id' => $fiscalYear->id,
+            'date' => '2024-12-31',
+            'is_active' => true,
+            'is_planned' => false,
+        ]);
+
+        $outOfPeriodTransaction->journalEntries()->createMany([
+            [
+                'sub_account_id' => $sales->id,
+                'type' => 'credit',
+                'net_amount' => 99_999,
+                'tax_amount' => 0,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'net_amount' => 99_999,
+                'tax_amount' => 0,
+            ],
+        ]);
+
+        $inactiveTransaction = Transaction::factory()->create([
+            'fiscal_year_id' => $fiscalYear->id,
+            'date' => '2025-05-10',
+            'is_active' => false,
+            'is_planned' => false,
+        ]);
+
+        $inactiveTransaction->journalEntries()->createMany([
+            [
+                'sub_account_id' => $sales->id,
+                'type' => 'credit',
+                'net_amount' => 88_888,
+                'tax_amount' => 0,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'net_amount' => 88_888,
+                'tax_amount' => 0,
+            ],
+        ]);
+
+        $plannedTransaction = Transaction::factory()->create([
+            'fiscal_year_id' => $fiscalYear->id,
+            'date' => '2025-06-10',
+            'is_active' => true,
+            'is_planned' => true,
+        ]);
+
+        $plannedTransaction->journalEntries()->createMany([
+            [
+                'sub_account_id' => $sales->id,
+                'type' => 'credit',
+                'net_amount' => 77_777,
+                'tax_amount' => 0,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'net_amount' => 77_777,
+                'tax_amount' => 0,
+            ],
+        ]);
+
+        $monthlySummary = app(BlueReturnStatementCalculator::class)->calculate($fiscalYear, 0)['monthly_sales_and_purchases'];
+        $months = collect($monthlySummary['months'])->keyBy('year_month');
+
+        $this->assertCount(12, $monthlySummary['months']);
+        $this->assertSame('2025-01', $monthlySummary['months'][0]['year_month']);
+        $this->assertSame('2025-12', $monthlySummary['months'][11]['year_month']);
+
+        // 1月売上: 10,000 + 税込 5,500 − 値引（借方売上）1,100 = 14,400
+        $this->assertSame(14_400, $months['2025-01']['sales_amount']);
+        $this->assertSame(0, $months['2025-01']['house_consumption_amount']);
+        $this->assertSame(0, $months['2025-01']['misc_income_amount']);
+        $this->assertSame(0, $months['2025-01']['purchases_amount']);
+
+        $this->assertSame(0, $months['2025-02']['sales_amount']);
+        $this->assertSame(20_000, $months['2025-02']['house_consumption_amount']);
+        $this->assertSame(5_000, $months['2025-02']['misc_income_amount']);
+        $this->assertSame(0, $months['2025-02']['purchases_amount']);
+
+        $this->assertSame(40_000, $months['2025-03']['purchases_amount']);
+        $this->assertSame(0, $months['2025-04']['sales_amount']);
+        $this->assertSame(0, $months['2025-04']['house_consumption_amount']);
+        $this->assertSame(0, $months['2025-04']['misc_income_amount']);
+        $this->assertSame(0, $months['2025-04']['purchases_amount']);
+
+        // 無効（is_active=false）・予定（is_planned=true）の取引は集計されない
+        $this->assertSame(0, $months['2025-05']['sales_amount']);
+        $this->assertSame(0, $months['2025-06']['sales_amount']);
+
+        $this->assertSame(14_400, $monthlySummary['totals']['sales_amount']);
+        $this->assertSame(20_000, $monthlySummary['totals']['house_consumption_amount']);
+        $this->assertSame(5_000, $monthlySummary['totals']['misc_income_amount']);
+        $this->assertSame(40_000, $monthlySummary['totals']['purchases_amount']);
+    }
+
     /**
      * 「青色申告決算書（一般用）の書き方」（kokuzei/037.pdf）の記載例（国税太郎）による検算。
      * 貸倒引当金は初版未対応のため、引当金（㉞・㊴）を除いた調整後期待値を使う:
@@ -395,7 +635,8 @@ class BlueReturnStatementCalculatorTest extends TestCase
             ]);
         }
 
-        $summary = $fiscalYear->calculateBlueReturnStatement(650_000)['profit_and_loss'];
+        $statement = $fiscalYear->calculateBlueReturnStatement(650_000);
+        $summary = $statement['profit_and_loss'];
 
         $this->assertSame(39_280_000, $summary['sales_amount']);
         $this->assertSame(3_705_000, $summary['beginning_inventory']);
@@ -434,6 +675,14 @@ class BlueReturnStatementCalculatorTest extends TestCase
         // テスト方針2: ㊸ と FiscalYearSummaryCalculator の actual profit の恒等
         $fiscalYearSummary = app(FiscalYearSummaryCalculator::class)->calculate($fiscalYear)['actual'];
         $this->assertSame($fiscalYearSummary['profit'], $summary['income_before_blue_return_deduction']);
+
+        // 様式の不変条件: 月別表の計（売上・家事消費等・雑収入）の合計は①と、仕入金額の計は③と一致する
+        $monthlyTotals = $statement['monthly_sales_and_purchases']['totals'];
+        $this->assertSame(
+            $summary['sales_amount'],
+            $monthlyTotals['sales_amount'] + $monthlyTotals['house_consumption_amount'] + $monthlyTotals['misc_income_amount']
+        );
+        $this->assertSame($summary['purchases_amount'], $monthlyTotals['purchases_amount']);
     }
 
     #[Test]

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Account;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
 class BlueReturnStatementCalculator
@@ -13,6 +14,7 @@ class BlueReturnStatementCalculator
     {
         return [
             'profit_and_loss' => $this->calculateProfitAndLoss($fiscalYear, $blueReturnDeduction),
+            'monthly_sales_and_purchases' => $this->calculateMonthlySalesAndPurchases($fiscalYear),
         ];
     }
 
@@ -196,6 +198,85 @@ class BlueReturnStatementCalculator
     }
 
     /**
+     * @return array{
+     *     months: array<int, array{
+     *         year_month: string,
+     *         label: string,
+     *         sales_amount: int,
+     *         house_consumption_amount: int,
+     *         misc_income_amount: int,
+     *         purchases_amount: int
+     *     }>,
+     *     totals: array{
+     *         sales_amount: int,
+     *         house_consumption_amount: int,
+     *         misc_income_amount: int,
+     *         purchases_amount: int
+     *     }
+     * }
+     */
+    private function calculateMonthlySalesAndPurchases(FiscalYear $fiscalYear): array
+    {
+        $months = $this->initializeMonthlySalesAndPurchasesMonths($fiscalYear);
+        $monthIndexByYearMonth = [];
+
+        foreach ($months as $index => $month) {
+            $monthIndexByYearMonth[$month['year_month']] = $index;
+        }
+
+        $monthlyFieldMap = self::monthlyAccountFieldMap();
+
+        $rows = JournalEntry::query()
+            ->join('transactions', 'journal_entries.transaction_id', '=', 'transactions.id')
+            ->join('sub_accounts', 'journal_entries.sub_account_id', '=', 'sub_accounts.id')
+            ->join('accounts', 'sub_accounts.account_id', '=', 'accounts.id')
+            ->where('transactions.fiscal_year_id', $fiscalYear->id)
+            ->where('transactions.is_active', true)
+            ->where('transactions.is_planned', false)
+            ->whereBetween('transactions.date', [$fiscalYear->start_date, $fiscalYear->end_date])
+            ->whereIn('accounts.name', array_keys($monthlyFieldMap))
+            ->groupBy('transactions.date', 'accounts.name')
+            ->selectRaw('transactions.date as transaction_date')
+            ->selectRaw('accounts.name as account_name')
+            ->selectRaw(
+                self::signedGrossAmountSumSql('signed_gross_amount'),
+                self::signedGrossAmountSumBindings()
+            )
+            ->get();
+
+        foreach ($rows as $row) {
+            $yearMonth = CarbonImmutable::parse((string) $row->transaction_date)->format('Y-m');
+            $monthIndex = $monthIndexByYearMonth[$yearMonth] ?? null;
+
+            if ($monthIndex === null) {
+                continue;
+            }
+
+            $field = $monthlyFieldMap[(string) $row->account_name];
+
+            $months[$monthIndex][$field] += (int) $row->signed_gross_amount;
+        }
+
+        $totals = [
+            'sales_amount' => 0,
+            'house_consumption_amount' => 0,
+            'misc_income_amount' => 0,
+            'purchases_amount' => 0,
+        ];
+
+        foreach ($months as $month) {
+            foreach ($totals as $key => $value) {
+                $totals[$key] += $month[$key];
+            }
+        }
+
+        return [
+            'months' => $months,
+            'totals' => $totals,
+        ];
+    }
+
+    /**
      * @param  array<int, string>  $accountNames
      * @return array<string, int>
      */
@@ -211,6 +292,10 @@ class BlueReturnStatementCalculator
             ->whereHas('transaction', function (Builder $query) use ($fiscalYear): void {
                 $query
                     ->whereBelongsTo($fiscalYear)
+                    ->whereBetween('date', [
+                        $fiscalYear->start_date,
+                        $fiscalYear->end_date,
+                    ])
                     ->where('is_active', true)
                     ->where('is_planned', false);
             })
@@ -218,18 +303,8 @@ class BlueReturnStatementCalculator
             ->groupBy('accounts.name')
             ->select('accounts.name as account_name')
             ->selectRaw(
-                'COALESCE(SUM(CASE'
-                .' WHEN (accounts.type = ? AND journal_entries.type = ?)'
-                .' OR (accounts.type != ? AND journal_entries.type = ?)'
-                .' THEN journal_entries.net_amount + COALESCE(journal_entries.tax_amount, 0)'
-                .' ELSE -(journal_entries.net_amount + COALESCE(journal_entries.tax_amount, 0))'
-                .' END), 0) as summary_signed_gross_amount',
-                [
-                    Account::TYPE_REVENUE,
-                    JournalEntry::TYPE_CREDIT,
-                    Account::TYPE_REVENUE,
-                    JournalEntry::TYPE_DEBIT,
-                ]
+                self::signedGrossAmountSumSql('summary_signed_gross_amount'),
+                self::signedGrossAmountSumBindings()
             )
             ->get();
 
@@ -260,6 +335,71 @@ class BlueReturnStatementCalculator
     private function amountForAccount(array $totalsByAccountName, string $accountName): int
     {
         return $totalsByAccountName[$accountName] ?? 0;
+    }
+
+    /**
+     * 収益科目は貸方、それ以外の科目は借方を正とする税込金額合計の select 式。
+     * バインディングは signedGrossAmountSumBindings() とペアで使う。
+     */
+    private static function signedGrossAmountSumSql(string $alias): string
+    {
+        return 'COALESCE(SUM(CASE'
+            .' WHEN (accounts.type = ? AND journal_entries.type = ?)'
+            .' OR (accounts.type != ? AND journal_entries.type = ?)'
+            .' THEN journal_entries.net_amount + COALESCE(journal_entries.tax_amount, 0)'
+            .' ELSE -(journal_entries.net_amount + COALESCE(journal_entries.tax_amount, 0))'
+            .' END), 0) as '.$alias;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function signedGrossAmountSumBindings(): array
+    {
+        return [
+            Account::TYPE_REVENUE,
+            JournalEntry::TYPE_CREDIT,
+            Account::TYPE_REVENUE,
+            JournalEntry::TYPE_DEBIT,
+        ];
+    }
+
+    /**
+     * @return array<int, array{year_month: string, label: string, sales_amount: int, house_consumption_amount: int, misc_income_amount: int, purchases_amount: int}>
+     */
+    private function initializeMonthlySalesAndPurchasesMonths(FiscalYear $fiscalYear): array
+    {
+        $months = [];
+        $cursor = CarbonImmutable::parse($fiscalYear->start_date->toDateString())->startOfMonth();
+        $endMonth = CarbonImmutable::parse($fiscalYear->end_date->toDateString())->startOfMonth();
+
+        while ($cursor->lessThanOrEqualTo($endMonth)) {
+            $months[] = [
+                'year_month' => $cursor->format('Y-m'),
+                'label' => $cursor->format('n').'月',
+                'sales_amount' => 0,
+                'house_consumption_amount' => 0,
+                'misc_income_amount' => 0,
+                'purchases_amount' => 0,
+            ];
+
+            $cursor = $cursor->addMonth();
+        }
+
+        return $months;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function monthlyAccountFieldMap(): array
+    {
+        return [
+            '売上高' => 'sales_amount',
+            '家事消費等' => 'house_consumption_amount',
+            '雑収入' => 'misc_income_amount',
+            '仕入金額' => 'purchases_amount',
+        ];
     }
 
     /**

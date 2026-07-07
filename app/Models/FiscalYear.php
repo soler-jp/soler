@@ -75,7 +75,25 @@ class FiscalYear extends Model
     }
 
     /**
-     * @return array{profit_and_loss: array<string, int>}
+     * @return array{
+     *     profit_and_loss: array<string, int>,
+     *     monthly_sales_and_purchases: array{
+     *         months: array<int, array{
+     *             year_month: string,
+     *             label: string,
+     *             sales_amount: int,
+     *             house_consumption_amount: int,
+     *             misc_income_amount: int,
+     *             purchases_amount: int
+     *         }>,
+     *         totals: array{
+     *             sales_amount: int,
+     *             house_consumption_amount: int,
+     *             misc_income_amount: int,
+     *             purchases_amount: int
+     *         }
+     *     }
+     * }
      */
     public function calculateBlueReturnStatement(int $blueReturnDeduction): array
     {
