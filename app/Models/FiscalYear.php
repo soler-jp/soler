@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\BlueReturnStatementCalculator;
 use App\Services\FiscalYearBalanceCalculator;
 use App\Services\FiscalYearCloser;
 use App\Services\FiscalYearRolloverDataCalculator;
@@ -71,6 +72,14 @@ class FiscalYear extends Model
     public function calculateSummary(): array
     {
         return app(FiscalYearSummaryCalculator::class)->calculate($this);
+    }
+
+    /**
+     * @return array{profit_and_loss: array<string, int>}
+     */
+    public function calculateBlueReturnStatement(int $blueReturnDeduction): array
+    {
+        return app(BlueReturnStatementCalculator::class)->calculate($this, $blueReturnDeduction);
     }
 
     public function calculateAmountSummary(): array

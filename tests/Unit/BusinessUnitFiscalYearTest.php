@@ -7,6 +7,7 @@ use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\BlueReturnStatementCalculator;
 use App\Services\FiscalYearRollover;
 use App\Services\TransactionRegistrar;
 use App\Validators\FiscalYearValidator;
@@ -124,6 +125,38 @@ class BusinessUnitFiscalYearTest extends TestCase
             'is_active' => false,
             'closed_by' => $user->id,
         ]);
+    }
+
+    #[Test]
+    public function blue_return_statementの集計はサービスに委譲される()
+    {
+        $user = User::factory()->create();
+        $businessUnit = BusinessUnit::factory()->create(['user_id' => $user->id]);
+
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $calculator = new class
+        {
+            public ?FiscalYear $receivedFiscalYear = null;
+
+            public ?int $receivedBlueReturnDeduction = null;
+
+            public function calculate(FiscalYear $fiscalYear, int $blueReturnDeduction): array
+            {
+                $this->receivedFiscalYear = $fiscalYear;
+                $this->receivedBlueReturnDeduction = $blueReturnDeduction;
+
+                return ['called' => true];
+            }
+        };
+
+        app()->instance(BlueReturnStatementCalculator::class, $calculator);
+
+        $result = app(BlueReturnStatementCalculator::class)->calculate($fiscalYear, 650000);
+
+        $this->assertSame(['called' => true], $result);
+        $this->assertSame($fiscalYear->id, $calculator->receivedFiscalYear?->id);
+        $this->assertSame(650000, $calculator->receivedBlueReturnDeduction);
     }
 
     #[Test]
