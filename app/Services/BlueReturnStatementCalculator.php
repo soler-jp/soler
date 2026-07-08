@@ -12,7 +12,8 @@ use Illuminate\Database\Eloquent\Builder;
 class BlueReturnStatementCalculator
 {
     public function __construct(
-        private readonly DepreciationService $depreciationService
+        private readonly DepreciationService $depreciationService,
+        private readonly FiscalYearBalanceCalculator $balanceCalculator
     ) {}
 
     /**
@@ -102,6 +103,77 @@ class BlueReturnStatementCalculator
      *             ledger_depreciation_expense: int,
      *             difference: int
      *         }
+     *     },
+     *     balance_sheet: array{
+     *         income_before_blue_return_deduction: int,
+     *         sections: array{
+     *             asset: array{
+     *                 type: string,
+     *                 label: string,
+     *                 opening_total_balance: int,
+     *                 ending_total_balance: int,
+     *                 rows: array<int, array{
+     *                     account_id: int,
+     *                     account_name: string,
+     *                     opening_balance: int,
+     *                     ending_balance: int,
+     *                     rows: array<int, array{
+     *                         sub_account_id: int,
+     *                         sub_account_name: string,
+     *                         opening_balance: int,
+     *                         ending_balance: int
+     *                     }>
+     *                 }>
+     *             },
+     *             liability: array{
+     *                 type: string,
+     *                 label: string,
+     *                 opening_total_balance: int,
+     *                 ending_total_balance: int,
+     *                 rows: array<int, array{
+     *                     account_id: int,
+     *                     account_name: string,
+     *                     opening_balance: int,
+     *                     ending_balance: int,
+     *                     rows: array<int, array{
+     *                         sub_account_id: int,
+     *                         sub_account_name: string,
+     *                         opening_balance: int,
+     *                         ending_balance: int
+     *                     }>
+     *                 }>
+     *             },
+     *             equity: array{
+     *                 type: string,
+     *                 label: string,
+     *                 opening_total_balance: int,
+     *                 ending_total_balance: int,
+     *                 rows: array<int, array{
+     *                     account_id: int,
+     *                     account_name: string,
+     *                     opening_balance: int,
+     *                     ending_balance: int,
+     *                     rows: array<int, array{
+     *                         sub_account_id: int,
+     *                         sub_account_name: string,
+     *                         opening_balance: int,
+     *                         ending_balance: int
+     *                     }>
+     *                 }>
+     *             }
+     *         },
+     *         totals: array{
+     *             opening: array{
+     *                 asset: int,
+     *                 liability: int,
+     *                 equity: int
+     *             },
+     *             ending: array{
+     *                 asset: int,
+     *                 liability: int,
+     *                 equity: int
+     *             }
+     *         }
      *     }
      * }
      */
@@ -116,10 +188,15 @@ class BlueReturnStatementCalculator
             )
         );
 
+        $profitAndLoss = $this->calculateProfitAndLoss($totalsByAccountName, $blueReturnDeduction);
+        $openingBalanceSummary = $this->balanceCalculator->calculateOpening($fiscalYear);
+        $endingBalanceSummary = $this->balanceCalculator->calculate($fiscalYear);
+
         return [
-            'profit_and_loss' => $this->calculateProfitAndLoss($totalsByAccountName, $blueReturnDeduction),
+            'profit_and_loss' => $profitAndLoss,
             'monthly_sales_and_purchases' => $this->calculateMonthlySalesAndPurchases($fiscalYear),
             'depreciation_calculation' => $this->calculateDepreciationCalculation($fiscalYear, $totalsByAccountName),
+            'balance_sheet' => $this->calculateBalanceSheet($profitAndLoss, $openingBalanceSummary, $endingBalanceSummary),
         ];
     }
 
@@ -378,6 +455,245 @@ class BlueReturnStatementCalculator
                 'difference' => $deductibleAmountTotal - $ledgerDepreciationExpense,
             ],
         ];
+    }
+
+    /**
+     * @param  array<string, int>  $profitAndLoss
+     * @return array{
+     *     income_before_blue_return_deduction: int,
+     *     sections: array{
+     *         asset: array{
+     *             type: string,
+     *             label: string,
+     *             opening_total_balance: int,
+     *             ending_total_balance: int,
+     *             rows: array<int, array{
+     *                 account_id: int,
+     *                 account_name: string,
+     *                 opening_balance: int,
+     *                 ending_balance: int,
+     *                 rows: array<int, array{
+     *                     sub_account_id: int,
+     *                     sub_account_name: string,
+     *                     opening_balance: int,
+     *                     ending_balance: int
+     *                 }>
+     *             }>
+     *         },
+     *         liability: array{
+     *             type: string,
+     *             label: string,
+     *             opening_total_balance: int,
+     *             ending_total_balance: int,
+     *             rows: array<int, array{
+     *                 account_id: int,
+     *                 account_name: string,
+     *                 opening_balance: int,
+     *                 ending_balance: int,
+     *                 rows: array<int, array{
+     *                     sub_account_id: int,
+     *                     sub_account_name: string,
+     *                     opening_balance: int,
+     *                     ending_balance: int
+     *                 }>
+     *             }>
+     *         },
+     *         equity: array{
+     *             type: string,
+     *             label: string,
+     *             opening_total_balance: int,
+     *             ending_total_balance: int,
+     *             rows: array<int, array{
+     *                 account_id: int,
+     *                 account_name: string,
+     *                 opening_balance: int,
+     *                 ending_balance: int,
+     *                 rows: array<int, array{
+     *                     sub_account_id: int,
+     *                     sub_account_name: string,
+     *                     opening_balance: int,
+     *                     ending_balance: int
+     *                 }>
+     *             }>
+     *         }
+     *     },
+     *     totals: array{
+     *         opening: array{
+     *             asset: int,
+     *             liability: int,
+     *             equity: int
+     *         },
+     *         ending: array{
+     *             asset: int,
+     *             liability: int,
+     *             equity: int
+     *         }
+     *     }
+     * }
+     */
+    private function calculateBalanceSheet(
+        array $profitAndLoss,
+        array $openingBalanceSummary,
+        array $endingBalanceSummary
+    ): array {
+        return [
+            'income_before_blue_return_deduction' => $profitAndLoss['income_before_blue_return_deduction'],
+            'sections' => [
+                Account::TYPE_ASSET => $this->mapBalanceSection(
+                    $openingBalanceSummary[Account::TYPE_ASSET],
+                    $endingBalanceSummary[Account::TYPE_ASSET],
+                    '資産の部',
+                    Account::TYPE_ASSET
+                ),
+                Account::TYPE_LIABILITY => $this->mapBalanceSection(
+                    $openingBalanceSummary[Account::TYPE_LIABILITY],
+                    $endingBalanceSummary[Account::TYPE_LIABILITY],
+                    '負債の部',
+                    Account::TYPE_LIABILITY
+                ),
+                Account::TYPE_EQUITY => $this->mapBalanceSection(
+                    $openingBalanceSummary[Account::TYPE_EQUITY],
+                    $endingBalanceSummary[Account::TYPE_EQUITY],
+                    '純資産の部',
+                    Account::TYPE_EQUITY
+                ),
+            ],
+            'totals' => [
+                'opening' => [
+                    Account::TYPE_ASSET => $openingBalanceSummary[Account::TYPE_ASSET]['total_balance'],
+                    Account::TYPE_LIABILITY => $openingBalanceSummary[Account::TYPE_LIABILITY]['total_balance'],
+                    Account::TYPE_EQUITY => $openingBalanceSummary[Account::TYPE_EQUITY]['total_balance'],
+                ],
+                'ending' => [
+                    Account::TYPE_ASSET => $endingBalanceSummary[Account::TYPE_ASSET]['total_balance'],
+                    Account::TYPE_LIABILITY => $endingBalanceSummary[Account::TYPE_LIABILITY]['total_balance'],
+                    Account::TYPE_EQUITY => $endingBalanceSummary[Account::TYPE_EQUITY]['total_balance'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param  array{total_balance: int, accounts: array<int, array{account_id: int, account_name: string, balance: int, sub_accounts: array<int, array{sub_account_id: int, sub_account_name: string, balance: int}>}>}  $openingTypeSummary
+     * @param  array{total_balance: int, accounts: array<int, array{account_id: int, account_name: string, balance: int, sub_accounts: array<int, array{sub_account_id: int, sub_account_name: string, balance: int}>}>}  $endingTypeSummary
+     * @return array{
+     *     type: string,
+     *     label: string,
+     *     opening_total_balance: int,
+     *     ending_total_balance: int,
+     *     rows: array<int, array{
+     *         account_id: int,
+     *         account_name: string,
+     *         opening_balance: int,
+     *         ending_balance: int,
+     *         rows: array<int, array{
+     *             sub_account_id: int,
+     *             sub_account_name: string,
+     *             opening_balance: int,
+     *             ending_balance: int
+     *         }>
+     *     }>
+     * }
+     */
+    private function mapBalanceSection(array $openingTypeSummary, array $endingTypeSummary, string $label, string $type): array
+    {
+        $openingAccounts = $this->indexAccounts($openingTypeSummary['accounts']);
+        $endingAccounts = $this->indexAccounts($endingTypeSummary['accounts']);
+        $accountIds = array_values(array_unique(array_merge(array_keys($openingAccounts), array_keys($endingAccounts))));
+        $rows = [];
+
+        foreach ($accountIds as $accountId) {
+            $openingAccount = $openingAccounts[$accountId] ?? null;
+            $endingAccount = $endingAccounts[$accountId] ?? null;
+            $openingSubAccounts = $this->indexSubAccounts($openingAccount['sub_accounts'] ?? []);
+            $endingSubAccounts = $this->indexSubAccounts($endingAccount['sub_accounts'] ?? []);
+            $subAccountIds = array_values(array_unique(array_merge(array_keys($openingSubAccounts), array_keys($endingSubAccounts))));
+
+            $rows[] = [
+                'account_id' => $accountId,
+                'account_name' => (string) ($endingAccount['account_name'] ?? $openingAccount['account_name'] ?? ''),
+                'opening_balance' => (int) ($openingAccount['balance'] ?? 0),
+                'ending_balance' => (int) ($endingAccount['balance'] ?? 0),
+                'rows' => array_map(
+                    static function (int $subAccountId) use ($openingSubAccounts, $endingSubAccounts): array {
+                        $openingSubAccount = $openingSubAccounts[$subAccountId] ?? null;
+                        $endingSubAccount = $endingSubAccounts[$subAccountId] ?? null;
+
+                        return [
+                            'sub_account_id' => $subAccountId,
+                            'sub_account_name' => (string) ($endingSubAccount['sub_account_name'] ?? $openingSubAccount['sub_account_name'] ?? ''),
+                            'opening_balance' => (int) ($openingSubAccount['balance'] ?? 0),
+                            'ending_balance' => (int) ($endingSubAccount['balance'] ?? 0),
+                        ];
+                    },
+                    $subAccountIds
+                ),
+            ];
+        }
+
+        return [
+            'type' => $type,
+            'label' => $label,
+            'opening_total_balance' => $openingTypeSummary['total_balance'],
+            'ending_total_balance' => $endingTypeSummary['total_balance'],
+            'rows' => $rows,
+        ];
+    }
+
+    /**
+     * @param  array<int, array{
+     *     account_id: int,
+     *     account_name: string,
+     *     balance: int,
+     *     sub_accounts: array<int, array{
+     *         sub_account_id: int,
+     *         sub_account_name: string,
+     *         balance: int
+     *     }>
+     * }>  $accounts
+     * @return array<int, array{
+     *     account_id: int,
+     *     account_name: string,
+     *     balance: int,
+     *     sub_accounts: array<int, array{
+     *         sub_account_id: int,
+     *         sub_account_name: string,
+     *         balance: int
+     *     }>
+     * }>
+     */
+    private function indexAccounts(array $accounts): array
+    {
+        $indexed = [];
+
+        foreach ($accounts as $account) {
+            $indexed[$account['account_id']] = $account;
+        }
+
+        return $indexed;
+    }
+
+    /**
+     * @param  array<int, array{
+     *     sub_account_id: int,
+     *     sub_account_name: string,
+     *     balance: int
+     * }>  $subAccounts
+     * @return array<int, array{
+     *     sub_account_id: int,
+     *     sub_account_name: string,
+     *     balance: int
+     * }>
+     */
+    private function indexSubAccounts(array $subAccounts): array
+    {
+        $indexed = [];
+
+        foreach ($subAccounts as $subAccount) {
+            $indexed[$subAccount['sub_account_id']] = $subAccount;
+        }
+
+        return $indexed;
     }
 
     /**

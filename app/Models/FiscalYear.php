@@ -115,6 +115,39 @@ class FiscalYear extends Model
      *             ledger_depreciation_expense: int,
      *             difference: int
      *         }
+     *     },
+     *     balance_sheet: array{
+     *         income_before_blue_return_deduction: int,
+     *         sections: array<string, array{
+     *             type: string,
+     *             label: string,
+     *             opening_total_balance: int,
+     *             ending_total_balance: int,
+     *             rows: array<int, array{
+     *                 account_id: int,
+     *                 account_name: string,
+     *                 opening_balance: int,
+     *                 ending_balance: int,
+     *                 rows: array<int, array{
+     *                     sub_account_id: int,
+     *                     sub_account_name: string,
+     *                     opening_balance: int,
+     *                     ending_balance: int
+     *                 }>
+     *             }>
+     *         }>,
+     *         totals: array{
+     *             opening: array{
+     *                 asset: int,
+     *                 liability: int,
+     *                 equity: int
+     *             },
+     *             ending: array{
+     *                 asset: int,
+     *                 liability: int,
+     *                 equity: int
+     *             }
+     *         }
      *     }
      * }
      */

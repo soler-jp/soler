@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\BlueReturnStatementCalculator;
 use App\Services\DepreciationService;
 use App\Services\FiscalYearSummaryCalculator;
+use App\Services\OpeningEntryRegistrar;
 use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Group;
@@ -737,6 +738,143 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $this->assertSame(144_000, $depreciation['totals']['deductible_amount']);
         $this->assertSame(144_000, $depreciation['totals']['ledger_depreciation_expense']);
         $this->assertSame(0, $depreciation['totals']['difference']);
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function 貸借対照表ページが残高集計を決算書形式へ変換する(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '貸借対照表変換テスト',
+        ]);
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $deposit = $businessUnit->getAccountByName('その他の預金')->subAccounts()->firstOrFail();
+        $ownerLoan = $businessUnit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+        $ownerDraw = $businessUnit->getAccountByName('事業主貸')->subAccounts()->firstOrFail();
+
+        app(OpeningEntryRegistrar::class)->registerForRollover($fiscalYear, [
+            [
+                'account_name' => '現金',
+                'sub_account_name' => '現金',
+                'type' => 'debit',
+                'amount' => 100_000,
+            ],
+            [
+                'account_name' => '借入金',
+                'sub_account_name' => '借入金',
+                'type' => 'credit',
+                'amount' => 30_000,
+            ],
+        ], [
+            'account_name' => '元入金',
+            'sub_account_name' => '元入金',
+            'type' => 'credit',
+            'amount' => 70_000,
+        ]);
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '貸借対照表変換テスト',
+        ], [
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'gross_amount' => 1100,
+            ],
+            [
+                'sub_account_id' => $ownerLoan->id,
+                'type' => 'credit',
+                'gross_amount' => 1100,
+            ],
+        ]);
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-04-02',
+            'description' => '貸借対照表変換テスト',
+        ], [
+            [
+                'sub_account_id' => $deposit->id,
+                'type' => 'debit',
+                'gross_amount' => 2200,
+            ],
+            [
+                'sub_account_id' => $ownerLoan->id,
+                'type' => 'credit',
+                'gross_amount' => 2200,
+            ],
+        ]);
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-04-03',
+            'description' => '貸借対照表変換テスト',
+        ], [
+            [
+                'sub_account_id' => $ownerDraw->id,
+                'type' => 'debit',
+                'gross_amount' => 500,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'credit',
+                'gross_amount' => 500,
+            ],
+        ]);
+
+        $statement = app(BlueReturnStatementCalculator::class)->calculate($fiscalYear, 0);
+        $balanceSheet = $statement['balance_sheet'];
+
+        $this->assertSame($statement['profit_and_loss']['income_before_blue_return_deduction'], $balanceSheet['income_before_blue_return_deduction']);
+        $this->assertSame('資産の部', $balanceSheet['sections']['asset']['label']);
+        $this->assertSame('負債の部', $balanceSheet['sections']['liability']['label']);
+        $this->assertSame('純資産の部', $balanceSheet['sections']['equity']['label']);
+
+        $assetRows = collect($balanceSheet['sections']['asset']['rows'])->keyBy('account_name');
+        $liabilityRows = collect($balanceSheet['sections']['liability']['rows'])->keyBy('account_name');
+        $equityRows = collect($balanceSheet['sections']['equity']['rows'])->keyBy('account_name');
+
+        $this->assertSame(100_000, $balanceSheet['sections']['asset']['opening_total_balance']);
+        $this->assertSame(102_800, $balanceSheet['sections']['asset']['ending_total_balance']);
+        $this->assertSame(30_000, $balanceSheet['sections']['liability']['opening_total_balance']);
+        $this->assertSame(30_000, $balanceSheet['sections']['liability']['ending_total_balance']);
+        $this->assertSame(70_000, $balanceSheet['sections']['equity']['opening_total_balance']);
+        $this->assertSame(72_800, $balanceSheet['sections']['equity']['ending_total_balance']);
+        $this->assertSame(2, $assetRows->count());
+
+        $this->assertSame(100_000, $assetRows['現金']['opening_balance']);
+        $this->assertSame(100_600, $assetRows['現金']['ending_balance']);
+        $this->assertSame(100_000, $assetRows['現金']['rows'][0]['opening_balance']);
+        $this->assertSame(100_600, $assetRows['現金']['rows'][0]['ending_balance']);
+        $this->assertSame(0, $assetRows['その他の預金']['opening_balance']);
+        $this->assertSame(2_200, $assetRows['その他の預金']['ending_balance']);
+        $this->assertSame(0, $assetRows['その他の預金']['rows'][0]['opening_balance']);
+        $this->assertSame(2_200, $assetRows['その他の預金']['rows'][0]['ending_balance']);
+        $this->assertSame(30_000, $liabilityRows['借入金']['opening_balance']);
+        $this->assertSame(30_000, $liabilityRows['借入金']['ending_balance']);
+        $this->assertSame(30_000, $liabilityRows['借入金']['rows'][0]['opening_balance']);
+        $this->assertSame(30_000, $liabilityRows['借入金']['rows'][0]['ending_balance']);
+
+        $this->assertSame(70_000, $equityRows['元入金']['opening_balance']);
+        $this->assertSame(70_000, $equityRows['元入金']['ending_balance']);
+        $this->assertSame(0, $equityRows['事業主借']['opening_balance']);
+        $this->assertSame(3_300, $equityRows['事業主借']['ending_balance']);
+        $this->assertSame(0, $equityRows['事業主貸']['opening_balance']);
+        $this->assertSame(-500, $equityRows['事業主貸']['ending_balance']);
+
+        $this->assertSame([
+            'opening' => [
+                'asset' => 100_000,
+                'liability' => 30_000,
+                'equity' => 70_000,
+            ],
+            'ending' => [
+                'asset' => 102_800,
+                'liability' => 30_000,
+                'equity' => 72_800,
+            ],
+        ], $balanceSheet['totals']);
     }
 
     /**
