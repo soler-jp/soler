@@ -470,7 +470,7 @@ class JournalSourceRenderer
                 continue;
             }
 
-            $name = $this->subAccountNameFromCall($call);
+            $name = $this->subAccountNameFromExpr($call);
 
             if ($name !== null) {
                 $names[$assign->var->name] = $name;
@@ -483,10 +483,23 @@ class JournalSourceRenderer
     /**
      * 補助科目取得の呼び出しから表示用の科目名を求める
      */
-    private function subAccountNameFromCall(Node\Expr\MethodCall $call): ?string
+    private function subAccountNameFromExpr(Node\Expr $expr): ?string
     {
+        if (! $expr instanceof Node\Expr\MethodCall) {
+            return null;
+        }
+
+        $call = $expr;
         $callName = (string) $call->name;
         $args = $call->getArgs();
+
+        if (in_array($callName, ['first', 'firstOrFail'], true)) {
+            return $this->subAccountNameFromExpr($call->var);
+        }
+
+        if ($callName === 'subAccounts') {
+            return $this->subAccountNameFromExpr($call->var);
+        }
 
         if ($callName === 'getSubAccountByName'
             && count($args) >= 2
@@ -498,6 +511,12 @@ class JournalSourceRenderer
             return $accountName === $subAccountName
                 ? $accountName
                 : "{$accountName}/{$subAccountName}";
+        }
+
+        if ($callName === 'getAccountByName'
+            && count($args) >= 1
+            && $args[0]->value instanceof Node\Scalar\String_) {
+            return $args[0]->value->value;
         }
 
         if ($callName === 'subAccountByName'

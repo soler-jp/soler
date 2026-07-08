@@ -346,6 +346,48 @@ class JournalSourceRendererTest extends TestCase
     }
 
     #[Test]
+    public function get_account_by_nameとsub_accountsチェーン経由の変数も科目名に解決できる(): void
+    {
+        $source = <<<'PHP'
+        <?php
+
+        class SampleTest
+        {
+            public function 残高を集計できる(): void
+            {
+                $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
+                $ownerLoan = $businessUnit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+
+                $registrar->register($fiscalYear, [
+                    'date' => '2025-04-01',
+                    'description' => '現金の増加',
+                ], [
+                    ['sub_account_id' => $cash->id, 'type' => 'debit', 'gross_amount' => 1100],
+                    ['sub_account_id' => $ownerLoan->id, 'type' => 'credit', 'gross_amount' => 1100],
+                ]);
+            }
+        }
+        PHP;
+
+        $expected = <<<'PHP'
+        <?php
+
+        class SampleTest
+        {
+            public function 残高を集計できる(): void
+            {
+                $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
+                $ownerLoan = $businessUnit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+
+                ▶ 2025-04-01 | 現金 税込1,100 / 事業主借 税込1,100 | 現金の増加
+            }
+        }
+        PHP;
+
+        $this->assertSame($expected, (new JournalSourceRenderer)->renderSource($source));
+    }
+
+    #[Test]
     public function 仕訳登録がないソースは空文字を返す(): void
     {
         $source = <<<'PHP'
