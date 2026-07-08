@@ -258,6 +258,13 @@ class DepreciationService
         return ! $this->isFullyDepreciated($asset, $fiscalYear);
     }
 
+    public function calculateEndingUndepreciatedBalance(FixedAsset $asset, FiscalYear $fiscalYear): int
+    {
+        $schedule = $this->calculateDepreciationScheduleUntilFullyDepreciated($asset);
+
+        return (int) ($schedule[$fiscalYear->year]['ending_balance'] ?? 0);
+    }
+
     private function calculateDepreciationRate(FixedAsset $asset): ?float
     {
         $usefulLife = (int) $asset->useful_life;

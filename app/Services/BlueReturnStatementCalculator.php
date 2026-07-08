@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Account;
+use App\Models\DepreciationEntry;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use Carbon\CarbonImmutable;
@@ -10,11 +11,115 @@ use Illuminate\Database\Eloquent\Builder;
 
 class BlueReturnStatementCalculator
 {
+    public function __construct(
+        private readonly DepreciationService $depreciationService
+    ) {}
+
+    /**
+     * @return array{
+     *     profit_and_loss: array{
+     *         sales_amount: int,
+     *         beginning_inventory: int,
+     *         purchases_amount: int,
+     *         purchases_subtotal: int,
+     *         ending_inventory: int,
+     *         cost_of_goods_sold: int,
+     *         gross_profit: int,
+     *         taxes_and_dues: int,
+     *         packing_and_freight: int,
+     *         utilities: int,
+     *         travel_expenses: int,
+     *         communication_expenses: int,
+     *         advertising_expenses: int,
+     *         entertainment_expenses: int,
+     *         casualty_insurance: int,
+     *         repair_expenses: int,
+     *         supplies_expenses: int,
+     *         depreciation_expense: int,
+     *         welfare_expenses: int,
+     *         wages: int,
+     *         outsourcing_costs: int,
+     *         interest_and_discounts: int,
+     *         rent_expenses: int,
+     *         bad_debts: int,
+     *         custom_expense_1: int,
+     *         custom_expense_2: int,
+     *         custom_expense_3: int,
+     *         custom_expense_4: int,
+     *         custom_expense_5: int,
+     *         custom_expense_6: int,
+     *         miscellaneous_expenses: int,
+     *         total_expenses: int,
+     *         profit_before_reserves: int,
+     *         bad_debt_reserve_reversal: int,
+     *         reserve_reversal_1: int,
+     *         reserve_reversal_2: int,
+     *         total_reserve_reversals: int,
+     *         family_employee_salaries: int,
+     *         bad_debt_reserve_provision: int,
+     *         reserve_provision_1: int,
+     *         reserve_provision_2: int,
+     *         total_reserve_provisions: int,
+     *         income_before_blue_return_deduction: int,
+     *         blue_return_deduction: int,
+     *         business_income: int
+     *     },
+     *     monthly_sales_and_purchases: array{
+     *         months: array<int, array{
+     *             year_month: string,
+     *             label: string,
+     *             sales_amount: int,
+     *             house_consumption_amount: int,
+     *             misc_income_amount: int,
+     *             purchases_amount: int
+     *         }>,
+     *         totals: array{
+     *             sales_amount: int,
+     *             house_consumption_amount: int,
+     *             misc_income_amount: int,
+     *             purchases_amount: int
+     *         }
+     *     },
+     *     depreciation_calculation: array{
+     *         entries: array<int, array{
+     *             fixed_asset_name: string,
+     *             quantity: int,
+     *             acquisition_year_month: ?string,
+     *             depreciation_base_amount: ?int,
+     *             useful_life: ?int,
+     *             depreciation_rate: ?string,
+     *             months: int,
+     *             ordinary_amount: int,
+     *             total_amount: int,
+     *             business_usage_ratio: string|int|float,
+     *             deductible_amount: int,
+     *             ending_undepreciated_balance: ?int
+     *         }>,
+     *         totals: array{
+     *             ordinary_amount: int,
+     *             total_amount: int,
+     *             deductible_amount: int,
+     *             ledger_depreciation_expense: int,
+     *             difference: int
+     *         }
+     *     }
+     * }
+     */
     public function calculate(FiscalYear $fiscalYear, int $blueReturnDeduction): array
     {
+        $totalsByAccountName = $this->summarizeSignedGrossAmounts(
+            $fiscalYear,
+            array_merge(
+                self::revenueAccountNames(),
+                self::inventoryAccountNames(),
+                self::expenseAccountNames()
+            )
+        );
+
         return [
-            'profit_and_loss' => $this->calculateProfitAndLoss($fiscalYear, $blueReturnDeduction),
+            'profit_and_loss' => $this->calculateProfitAndLoss($totalsByAccountName, $blueReturnDeduction),
             'monthly_sales_and_purchases' => $this->calculateMonthlySalesAndPurchases($fiscalYear),
+            'depreciation_calculation' => $this->calculateDepreciationCalculation($fiscalYear, $totalsByAccountName),
         ];
     }
 
@@ -67,20 +172,11 @@ class BlueReturnStatementCalculator
      *     business_income: int
      * }
      */
-    private function calculateProfitAndLoss(FiscalYear $fiscalYear, int $blueReturnDeduction): array
+    private function calculateProfitAndLoss(array $totalsByAccountName, int $blueReturnDeduction): array
     {
         if ($blueReturnDeduction < 0) {
             throw new \InvalidArgumentException("青色申告特別控除額が不正です: {$blueReturnDeduction}");
         }
-
-        $totalsByAccountName = $this->summarizeSignedGrossAmounts(
-            $fiscalYear,
-            array_merge(
-                self::revenueAccountNames(),
-                self::inventoryAccountNames(),
-                self::expenseAccountNames()
-            )
-        );
 
         $salesAmount = $this->sumAccountNames($totalsByAccountName, self::revenueAccountNames());
         $beginningInventory = $this->amountForAccount($totalsByAccountName, '期首商品（棚卸高）');
@@ -194,6 +290,93 @@ class BlueReturnStatementCalculator
             'income_before_blue_return_deduction' => $incomeBeforeBlueReturnDeduction,
             'blue_return_deduction' => $blueReturnDeduction,
             'business_income' => $businessIncome,
+        ];
+    }
+
+    /**
+     * @param  array<string, int>  $totalsByAccountName
+     * @return array{
+     *     entries: array<int, array{
+     *         fixed_asset_name: string,
+     *         quantity: int,
+     *         acquisition_year_month: ?string,
+     *         depreciation_base_amount: ?int,
+     *         useful_life: ?int,
+     *         depreciation_rate: ?string,
+     *         months: int,
+     *         ordinary_amount: int,
+     *         total_amount: int,
+     *         business_usage_ratio: string|int|float,
+     *         deductible_amount: int,
+     *         ending_undepreciated_balance: ?int
+     *     }>,
+     *     totals: array{
+     *         ordinary_amount: int,
+     *         total_amount: int,
+     *         deductible_amount: int,
+     *         ledger_depreciation_expense: int,
+     *         difference: int
+     *     }
+     * }
+     */
+    private function calculateDepreciationCalculation(FiscalYear $fiscalYear, array $totalsByAccountName): array
+    {
+        $entries = DepreciationEntry::query()
+            ->with(['fixedAsset'])
+            ->whereHas('fiscalYear', function (Builder $query) use ($fiscalYear): void {
+                $query
+                    ->where('business_unit_id', $fiscalYear->business_unit_id)
+                    ->where('year', '<=', $fiscalYear->year);
+            })
+            ->orderBy('fixed_asset_id')
+            ->orderBy('fiscal_year_id')
+            ->get();
+
+        $currentYearEntries = $entries
+            ->groupBy('fixed_asset_id')
+            ->map(function ($assetEntries) use ($fiscalYear): ?array {
+                $currentEntry = $assetEntries->firstWhere('fiscal_year_id', $fiscalYear->id);
+
+                if ($currentEntry === null) {
+                    return null;
+                }
+
+                return [
+                    'fixed_asset_name' => (string) ($currentEntry->fixedAsset?->name ?? ''),
+                    'quantity' => 1,
+                    'acquisition_year_month' => $currentEntry->acquisition_year_month,
+                    'depreciation_base_amount' => $currentEntry->depreciation_base_amount,
+                    'useful_life' => $currentEntry->useful_life,
+                    'depreciation_rate' => $currentEntry->depreciation_rate,
+                    'months' => (int) $currentEntry->months,
+                    'ordinary_amount' => (int) $currentEntry->ordinary_amount,
+                    'total_amount' => (int) $currentEntry->total_amount,
+                    'business_usage_ratio' => $currentEntry->business_usage_ratio,
+                    'deductible_amount' => (int) $currentEntry->deductible_amount,
+                    'ending_undepreciated_balance' => $this->depreciationService->calculateEndingUndepreciatedBalance(
+                        $currentEntry->fixedAsset,
+                        $fiscalYear
+                    ),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        $ordinaryAmountTotal = array_sum(array_column($currentYearEntries, 'ordinary_amount'));
+        $totalAmountTotal = array_sum(array_column($currentYearEntries, 'total_amount'));
+        $deductibleAmountTotal = array_sum(array_column($currentYearEntries, 'deductible_amount'));
+        $ledgerDepreciationExpense = $this->amountForAccount($totalsByAccountName, '減価償却費');
+
+        return [
+            'entries' => $currentYearEntries,
+            'totals' => [
+                'ordinary_amount' => $ordinaryAmountTotal,
+                'total_amount' => $totalAmountTotal,
+                'deductible_amount' => $deductibleAmountTotal,
+                'ledger_depreciation_expense' => $ledgerDepreciationExpense,
+                'difference' => $deductibleAmountTotal - $ledgerDepreciationExpense,
+            ],
         ];
     }
 

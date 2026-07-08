@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\DepreciationEntry;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\BlueReturnStatementCalculator;
+use App\Services\DepreciationService;
 use App\Services\FiscalYearSummaryCalculator;
 use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -546,6 +548,195 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $this->assertSame(20_000, $monthlySummary['totals']['house_consumption_amount']);
         $this->assertSame(5_000, $monthlySummary['totals']['misc_income_amount']);
         $this->assertSame(40_000, $monthlySummary['totals']['purchases_amount']);
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function 減価償却明細が固定資産と記帳済み償却仕訳から導出される(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '減価償却明細テスト',
+        ]);
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $assetSubAccount = $businessUnit->subAccounts()
+            ->whereHas('account', function ($query): void {
+                $query->where('name', '機械装置');
+            })
+            ->firstOrFail();
+
+        $paymentSubAccount = $businessUnit->subAccounts()
+            ->whereHas('account', function ($query): void {
+                $query->where('name', 'その他の預金');
+            })
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
+            fiscalYear: $fiscalYear,
+            assetSubAccount: $assetSubAccount,
+            paymentSubAccount: $paymentSubAccount,
+            fixedAssetData: [
+                'name' => '減価償却明細テスト資産',
+                'asset_category' => 'machinery',
+                'acquisition_date' => '2025-10-01',
+                'taxable_amount' => 480_000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 48,
+                'business_usage_ratio' => 0.80,
+            ],
+            transactionData: [
+                'date' => '2025-10-01',
+                'description' => '減価償却明細テスト資産を購入',
+            ],
+        );
+
+        $entry = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->firstOrFail();
+        app(DepreciationService::class)->registerTransactionFor($entry);
+
+        $statement = app(BlueReturnStatementCalculator::class)->calculate($fiscalYear, 0);
+        $depreciation = $statement['depreciation_calculation'];
+        $row = $depreciation['entries'][0];
+
+        $this->assertCount(1, $depreciation['entries']);
+        $this->assertSame('減価償却明細テスト資産', $row['fixed_asset_name']);
+        $this->assertSame(1, $row['quantity']);
+        $this->assertSame('2025-10', $row['acquisition_year_month']);
+        $this->assertSame(480_000, $row['depreciation_base_amount']);
+        $this->assertSame(4, $row['useful_life']);
+        $this->assertSame('0.250', $row['depreciation_rate']);
+        $this->assertSame(3, $row['months']);
+        $this->assertSame(30_000, $row['ordinary_amount']);
+        $this->assertSame(30_000, $row['total_amount']);
+        $this->assertSame('0.80', $row['business_usage_ratio']);
+        $this->assertSame(24_000, $row['deductible_amount']);
+        $this->assertSame(450_000, $row['ending_undepreciated_balance']);
+
+        $this->assertSame(30_000, $depreciation['totals']['ordinary_amount']);
+        $this->assertSame(30_000, $depreciation['totals']['total_amount']);
+        $this->assertSame(24_000, $depreciation['totals']['deductible_amount']);
+        $this->assertSame(24_000, $depreciation['totals']['ledger_depreciation_expense']);
+        $this->assertSame(0, $depreciation['totals']['difference']);
+        $this->assertSame($depreciation['totals']['ledger_depreciation_expense'], $statement['profit_and_loss']['depreciation_expense']);
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function 減価償却明細は代表的な_fixed_assetパターンを網羅して表示される(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '減価償却明細パターンテスト',
+        ]);
+        $fiscalYear2023 = $businessUnit->createFiscalYear(2023);
+        $fiscalYear2024 = $businessUnit->createFiscalYear(2024);
+
+        $assetSubAccount = $businessUnit->subAccounts()
+            ->whereHas('account', function ($query): void {
+                $query->where('name', '機械装置');
+            })
+            ->firstOrFail();
+
+        $paymentSubAccount = $businessUnit->subAccounts()
+            ->whereHas('account', function ($query): void {
+                $query->where('name', 'その他の預金');
+            })
+            ->firstOrFail();
+
+        $currentYearAsset = app(DepreciationService::class)->registerFixedAsset(
+            fiscalYear: $fiscalYear2024,
+            assetSubAccount: $assetSubAccount,
+            paymentSubAccount: $paymentSubAccount,
+            fixedAssetData: [
+                'name' => '当年度取得の資産',
+                'asset_category' => 'machinery',
+                'acquisition_date' => '2024-10-01',
+                'taxable_amount' => 480_000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 48,
+                'business_usage_ratio' => 0.80,
+            ],
+            transactionData: [
+                'date' => '2024-10-01',
+                'description' => '当年度取得の資産を購入',
+            ],
+        );
+
+        $pastYearAsset = app(DepreciationService::class)->registerFixedAsset(
+            fiscalYear: $fiscalYear2024,
+            assetSubAccount: $assetSubAccount,
+            paymentSubAccount: $paymentSubAccount,
+            fixedAssetData: [
+                'name' => '前年度取得の資産',
+                'asset_category' => 'machinery',
+                'acquisition_date' => '2023-10-01',
+                'taxable_amount' => 480_000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 48,
+            ],
+            transactionData: [
+                'date' => '2024-10-01',
+                'description' => '前年度取得の資産を購入',
+            ],
+            allowRegistration: true,
+        );
+
+        $completedAsset = app(DepreciationService::class)->registerFixedAsset(
+            fiscalYear: $fiscalYear2024,
+            assetSubAccount: $assetSubAccount,
+            paymentSubAccount: $paymentSubAccount,
+            fixedAssetData: [
+                'name' => '償却完了の資産',
+                'asset_category' => 'machinery',
+                'acquisition_date' => '2021-01-01',
+                'taxable_amount' => 240_000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 24,
+            ],
+            transactionData: [
+                'date' => '2024-10-01',
+                'description' => '償却完了の資産を登録',
+            ],
+            allowRegistration: true,
+        );
+
+        $currentYearEntry = DepreciationEntry::where('fixed_asset_id', $currentYearAsset->id)->firstOrFail();
+        $pastYearEntry = DepreciationEntry::where('fixed_asset_id', $pastYearAsset->id)
+            ->where('fiscal_year_id', $fiscalYear2024->id)
+            ->firstOrFail();
+
+        app(DepreciationService::class)->registerTransactionFor($currentYearEntry);
+        app(DepreciationService::class)->registerTransactionFor($pastYearEntry);
+
+        $statement = app(BlueReturnStatementCalculator::class)->calculate($fiscalYear2024, 0);
+        $depreciation = $statement['depreciation_calculation'];
+        $rows = collect($depreciation['entries'])->keyBy('fixed_asset_name');
+
+        $this->assertCount(2, $depreciation['entries']);
+        $this->assertArrayHasKey('当年度取得の資産', $rows);
+        $this->assertArrayHasKey('前年度取得の資産', $rows);
+        $this->assertArrayNotHasKey('償却完了の資産', $rows);
+
+        $this->assertSame(1, $rows['当年度取得の資産']['quantity']);
+        $this->assertSame(3, $rows['当年度取得の資産']['months']);
+        $this->assertSame(30_000, $rows['当年度取得の資産']['ordinary_amount']);
+        $this->assertSame(30_000, $rows['当年度取得の資産']['total_amount']);
+        $this->assertSame('0.80', $rows['当年度取得の資産']['business_usage_ratio']);
+        $this->assertSame(24_000, $rows['当年度取得の資産']['deductible_amount']);
+        $this->assertSame(450_000, $rows['当年度取得の資産']['ending_undepreciated_balance']);
+
+        $this->assertSame(12, $rows['前年度取得の資産']['months']);
+        $this->assertSame(120_000, $rows['前年度取得の資産']['ordinary_amount']);
+        $this->assertSame(120_000, $rows['前年度取得の資産']['deductible_amount']);
+        $this->assertSame(330_000, $rows['前年度取得の資産']['ending_undepreciated_balance']);
+
+        $this->assertSame(144_000, $depreciation['totals']['deductible_amount']);
+        $this->assertSame(144_000, $depreciation['totals']['ledger_depreciation_expense']);
+        $this->assertSame(0, $depreciation['totals']['difference']);
     }
 
     /**

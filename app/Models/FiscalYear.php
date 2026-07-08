@@ -92,6 +92,29 @@ class FiscalYear extends Model
      *             misc_income_amount: int,
      *             purchases_amount: int
      *         }
+     *     },
+     *     depreciation_calculation: array{
+     *         entries: array<int, array{
+     *             fixed_asset_name: string,
+     *             quantity: int,
+     *             acquisition_year_month: ?string,
+     *             depreciation_base_amount: ?int,
+     *             useful_life: ?int,
+     *             depreciation_rate: ?string,
+     *             months: int,
+     *             ordinary_amount: int,
+     *             total_amount: int,
+     *             business_usage_ratio: string|int|float,
+     *             deductible_amount: int,
+     *             ending_undepreciated_balance: ?int
+     *         }>,
+     *         totals: array{
+     *             ordinary_amount: int,
+     *             total_amount: int,
+     *             deductible_amount: int,
+     *             ledger_depreciation_expense: int,
+     *             difference: int
+     *         }
      *     }
      * }
      */

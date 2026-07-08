@@ -178,4 +178,58 @@ class DepreciationEntryScenarioTest extends TestCase
         $this->assertSame($expectedOrdinaryAmount, $entry->deductible_amount);
         $this->assertSame($expectedEndingUndepreciatedBalance, $entry->ending_undepreciated_balance);
     }
+
+    #[Test]
+    public function 過年度取得で中間年度の_entryがなくても期末残高は正しく計算される(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+        $fiscalYear2023 = $unit->createFiscalYear(2023);
+        $fiscalYear2025 = $unit->createFiscalYear(2025);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query): void {
+                $query->where('name', 'その他の預金');
+            })
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerNewLightCar(
+            $fiscalYear2025,
+            $paymentSubAccount,
+            [
+                'name' => '中間年度未作成の軽自動車',
+                'acquisition_date' => '2023-10-01',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 120_000,
+            ],
+            [
+                'date' => '2025-01-01',
+                'description' => '中間年度未作成の軽自動車を登録',
+            ],
+            true,
+        );
+
+        $entries = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)
+            ->orderBy('fiscal_year_id')
+            ->get()
+            ->keyBy('fiscal_year_id');
+
+        $this->assertSame(2, $entries->count());
+        $this->assertArrayHasKey($fiscalYear2023->id, $entries->all());
+        $this->assertArrayHasKey($fiscalYear2025->id, $entries->all());
+
+        $this->assertSame(3, $entries[$fiscalYear2023->id]->months);
+        $this->assertSame(82_500, $entries[$fiscalYear2023->id]->ordinary_amount);
+        $this->assertSame(82_500, $entries[$fiscalYear2023->id]->total_amount);
+        $this->assertSame(82_500, $entries[$fiscalYear2023->id]->deductible_amount);
+        $this->assertSame(1_237_500, $entries[$fiscalYear2023->id]->ending_undepreciated_balance);
+
+        $this->assertSame(12, $entries[$fiscalYear2025->id]->months);
+        $this->assertSame(330_000, $entries[$fiscalYear2025->id]->ordinary_amount);
+        $this->assertSame(330_000, $entries[$fiscalYear2025->id]->total_amount);
+        $this->assertSame(330_000, $entries[$fiscalYear2025->id]->deductible_amount);
+        $this->assertSame(577_500, $entries[$fiscalYear2025->id]->ending_undepreciated_balance);
+    }
 }

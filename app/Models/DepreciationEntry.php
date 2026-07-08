@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\DepreciationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -80,17 +81,14 @@ class DepreciationEntry extends Model
 
     public function getEndingUndepreciatedBalanceAttribute(): ?int
     {
-        if ($this->fixedAsset === null) {
+        if ($this->fixedAsset === null || $this->fiscalYear === null) {
             return null;
         }
 
-        $depreciatedAmount = $this->fixedAsset->depreciationEntries()
-            ->whereHas('fiscalYear', function ($query): void {
-                $query->where('year', '<=', $this->fiscalYear->year);
-            })
-            ->sum('total_amount');
-
-        return max(0, $this->fixedAsset->acquisition_cost - (int) $depreciatedAmount);
+        return app(DepreciationService::class)->calculateEndingUndepreciatedBalance(
+            $this->fixedAsset,
+            $this->fiscalYear
+        );
     }
 
     // 未記帳かどうかを判定（便利メソッド）
