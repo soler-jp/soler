@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\BlueReturnInputRegistrar;
 use App\Services\BlueReturnStatementCalculator;
 use App\Services\FiscalYearBalanceCalculator;
 use App\Services\FiscalYearCloser;
@@ -11,6 +12,8 @@ use App\Services\OpeningEntryRegistrar;
 use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class FiscalYear extends Model
 {
@@ -49,6 +52,14 @@ class FiscalYear extends Model
     public function transactions()
     {
         return $this->hasMany(Transaction::class);
+    }
+
+    /**
+     * @return HasMany<BlueReturnInput, $this>
+     */
+    public function blueReturnInputs(): HasMany
+    {
+        return $this->hasMany(BlueReturnInput::class);
     }
 
     public function journalEntries()
@@ -154,6 +165,28 @@ class FiscalYear extends Model
     public function calculateBlueReturnStatement(int $blueReturnDeduction): array
     {
         return app(BlueReturnStatementCalculator::class)->calculate($this, $blueReturnDeduction);
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $inputs
+     * @return Collection<int, BlueReturnInput>
+     */
+    public function saveBlueReturnInputs(array $inputs): Collection
+    {
+        return app(BlueReturnInputRegistrar::class)->saveMany($this, $inputs);
+    }
+
+    /**
+     * @param  array<string, mixed>  $value
+     */
+    public function saveBlueReturnInput(string $key, array $value): BlueReturnInput
+    {
+        return app(BlueReturnInputRegistrar::class)->save($this, $key, $value);
+    }
+
+    public function blueReturnInput(string $key): ?BlueReturnInput
+    {
+        return $this->blueReturnInputs()->where('key', $key)->first();
     }
 
     public function calculateAmountSummary(): array
