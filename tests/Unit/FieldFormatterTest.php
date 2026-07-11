@@ -174,6 +174,156 @@ class FieldFormatterTest extends TestCase
         );
     }
 
+    #[Test]
+    public function page3の欄キーへ整形される(): void
+    {
+        $formatter = new FieldFormatter;
+
+        $formatted = $formatter->formatPage3(
+            salesAmount: 3400000,
+            purchasesAmount: 550000,
+            depreciationCalculation: [
+                'entries' => [
+                    [
+                        'fixed_asset_name' => '軽トラック',
+                        'quantity' => 1,
+                        'acquisition_year_month' => '2025-10',
+                        'depreciation_base_amount' => 1500000,
+                        'depreciation_method' => 'straight_line',
+                        'useful_life' => 4,
+                        'depreciation_rate' => '0.250',
+                        'months' => 3,
+                        'ordinary_amount' => 93750,
+                        'total_amount' => 93750,
+                        'business_usage_ratio' => '0.80',
+                        'deductible_amount' => 75000,
+                        'ending_undepreciated_balance' => 1406250,
+                    ],
+                    [
+                        'fixed_asset_name' => '一括償却資産',
+                        'quantity' => 1,
+                        'acquisition_year_month' => null,
+                        'depreciation_base_amount' => null,
+                        'depreciation_method' => null,
+                        'useful_life' => null,
+                        'depreciation_rate' => null,
+                        'months' => 12,
+                        'ordinary_amount' => 60000,
+                        'total_amount' => 60000,
+                        'business_usage_ratio' => 1,
+                        'deductible_amount' => 60000,
+                        'ending_undepreciated_balance' => null,
+                    ],
+                ],
+                'totals' => [
+                    'ordinary_amount' => 153750,
+                    'total_amount' => 153750,
+                    'deductible_amount' => 135000,
+                ],
+            ],
+            filingNumber: '12345678',
+        );
+
+        $this->assertSame('12345678', $formatted['filing_number']);
+
+        // 売上・仕入の明細: 「上記以外の計」と「計」に同じ金額
+        $this->assertSame('3,400,000', $formatted['sales_amount_other_total']);
+        $this->assertSame('3,400,000', $formatted['sales_amount_total']);
+        $this->assertSame('550,000', $formatted['purchases_amount_other_total']);
+        $this->assertSame('550,000', $formatted['purchases_amount_total']);
+
+        // 減価償却費の計算: 明細行
+        $this->assertSame('軽トラック', $formatted['depreciation_1_asset_name']);
+        $this->assertSame('1', $formatted['depreciation_1_quantity']);
+        $this->assertSame('R7・10', $formatted['depreciation_1_acquisition_year_month']);
+        $this->assertSame('1,500,000', $formatted['depreciation_1_base_amount']);
+        $this->assertSame('定額', $formatted['depreciation_1_method']);
+        $this->assertSame('4', $formatted['depreciation_1_useful_life']);
+        $this->assertSame('0.250', $formatted['depreciation_1_depreciation_rate']);
+        $this->assertSame('3', $formatted['depreciation_1_months']);
+        $this->assertSame('93,750', $formatted['depreciation_1_ordinary_amount']);
+        $this->assertSame('93,750', $formatted['depreciation_1_total_amount']);
+        $this->assertSame('80', $formatted['depreciation_1_business_usage_ratio']);
+        $this->assertSame('75,000', $formatted['depreciation_1_deductible_amount']);
+        $this->assertSame('1,406,250', $formatted['depreciation_1_ending_undepreciated_balance']);
+
+        // null許容の欄は空欄になる
+        $this->assertSame('', $formatted['depreciation_2_acquisition_year_month']);
+        $this->assertSame('', $formatted['depreciation_2_base_amount']);
+        $this->assertSame('', $formatted['depreciation_2_method']);
+        $this->assertSame('', $formatted['depreciation_2_useful_life']);
+        $this->assertSame('', $formatted['depreciation_2_depreciation_rate']);
+        $this->assertSame('', $formatted['depreciation_2_ending_undepreciated_balance']);
+        $this->assertSame('100', $formatted['depreciation_2_business_usage_ratio']);
+
+        // 計
+        $this->assertSame('153,750', $formatted['depreciation_total_ordinary_amount']);
+        $this->assertSame('153,750', $formatted['depreciation_total_amount']);
+        $this->assertSame('135,000', $formatted['depreciation_total_deductible_amount']);
+        $this->assertArrayNotHasKey('depreciation_3_asset_name', $formatted);
+    }
+
+    #[Test]
+    public function page3の減価償却がなければ計も印字されない(): void
+    {
+        $formatter = new FieldFormatter;
+
+        $formatted = $formatter->formatPage3(
+            salesAmount: 3400000,
+            purchasesAmount: 0,
+            depreciationCalculation: [
+                'entries' => [],
+                'totals' => [
+                    'ordinary_amount' => 0,
+                    'total_amount' => 0,
+                    'deductible_amount' => 0,
+                ],
+            ],
+        );
+
+        $this->assertSame('', $formatted['filing_number']);
+        $this->assertSame('3,400,000', $formatted['sales_amount_total']);
+        $this->assertSame('', $formatted['purchases_amount_other_total']);
+        $this->assertSame('', $formatted['purchases_amount_total']);
+        $this->assertArrayNotHasKey('depreciation_total_amount', $formatted);
+        $this->assertArrayNotHasKey('depreciation_1_asset_name', $formatted);
+    }
+
+    #[Test]
+    public function page3の減価償却が様式の行数を超えると例外になる(): void
+    {
+        $formatter = new FieldFormatter;
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('減価償却費の計算が様式の行数(7行)を超えています');
+
+        $formatter->formatPage3(
+            salesAmount: 0,
+            purchasesAmount: 0,
+            depreciationCalculation: [
+                'entries' => array_fill(0, 8, [
+                    'fixed_asset_name' => '資産',
+                    'quantity' => 1,
+                    'acquisition_year_month' => '2025-01',
+                    'depreciation_base_amount' => 1,
+                    'useful_life' => 4,
+                    'depreciation_rate' => '0.250',
+                    'months' => 12,
+                    'ordinary_amount' => 1,
+                    'total_amount' => 1,
+                    'business_usage_ratio' => 1,
+                    'deductible_amount' => 1,
+                    'ending_undepreciated_balance' => 1,
+                ]),
+                'totals' => [
+                    'ordinary_amount' => 8,
+                    'total_amount' => 8,
+                    'deductible_amount' => 8,
+                ],
+            ],
+        );
+    }
+
     /**
      * @return array{months: array<int, array<string, mixed>>, totals: array<string, int>}
      */

@@ -152,6 +152,58 @@ Artisan::command('blue-return:proof-all {--template=from2023} {--output-dir=} {-
         $failed[] = 'page2_all_fields ('.$exception->getMessage().')';
     }
 
+    // 3ページ(売上・仕入金額の明細、減価償却費の計算)も全欄をテスト値で埋めた1枚のPDFで確認する
+    try {
+        $page3Values = $fieldFormatter->formatPage3(
+            salesAmount: 12_345_678,
+            purchasesAmount: 87_654_321,
+            depreciationCalculation: [
+                'entries' => collect(range(1, 7))->map(fn (int $row): array => [
+                    'fixed_asset_name' => '減価償却資産'.$row,
+                    'quantity' => 1,
+                    'acquisition_year_month' => sprintf('202%d-%02d', $row % 6, $row + 3),
+                    'depreciation_base_amount' => $row * 1_000_000 + 111_111,
+                    'depreciation_method' => 'straight_line',
+                    'useful_life' => $row + 3,
+                    'depreciation_rate' => '0.'.str_repeat((string) $row, 3),
+                    'months' => 12,
+                    'ordinary_amount' => $row * 100_000 + 11_111,
+                    'total_amount' => $row * 100_000 + 11_111,
+                    'business_usage_ratio' => $row % 2 === 0 ? '1.00' : '0.875',
+                    'deductible_amount' => $row * 100_000,
+                    'ending_undepreciated_balance' => $row * 500_000 + 55_555,
+                ])->all(),
+                'totals' => [
+                    'ordinary_amount' => 2_877_777,
+                    'total_amount' => 2_877_777,
+                    'deductible_amount' => 2_800_000,
+                ],
+            ],
+            filingNumber: '12345678',
+        );
+
+        $pdf = $generator->createDocument();
+        $pdf->AddPage();
+
+        if (! $overlayOnly) {
+            $overlayRenderer->renderBackground(
+                $pdf,
+                resource_path("blue-return/templates/{$templateVersion}/background/page3.png")
+            );
+        }
+
+        $overlayRenderer->renderOverlay(
+            $pdf,
+            require app_path("Services/BlueReturnPdf/Templates/{$overlayDirectory}/Page3Overlay.php"),
+            $page3Values
+        );
+
+        file_put_contents($outputDir.DIRECTORY_SEPARATOR.'page3_all_fields.pdf', $pdf->Output('', 'S'));
+        $generated[] = 'page3_all_fields.pdf 3ページ(全欄テスト値)';
+    } catch (Throwable $exception) {
+        $failed[] = 'page3_all_fields ('.$exception->getMessage().')';
+    }
+
     file_put_contents(
         $outputDir.DIRECTORY_SEPARATOR.'_manifest.txt',
         implode(PHP_EOL, $generated).PHP_EOL
@@ -165,4 +217,4 @@ Artisan::command('blue-return:proof-all {--template=from2023} {--output-dir=} {-
     }
 
     $this->info($outputDir);
-})->purpose('Page1/Page2 Overlay の妥当性を目視確認するため、勘定科目ごとの校正PDFと2ページの全欄校正PDFを出力する');
+})->purpose('Page1〜Page3 Overlay の妥当性を目視確認するため、勘定科目ごとの校正PDFと2・3ページの全欄校正PDFを出力する');

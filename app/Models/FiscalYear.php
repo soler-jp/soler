@@ -111,6 +111,7 @@ class FiscalYear extends Model
      *             quantity: int,
      *             acquisition_year_month: ?string,
      *             depreciation_base_amount: ?int,
+     *             depreciation_method: ?string,
      *             useful_life: ?int,
      *             depreciation_rate: ?string,
      *             months: int,

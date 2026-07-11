@@ -49,6 +49,14 @@ class BlueReturnStatementPdfGenerator
                     $this->formatPage2Values($fiscalYear, $calculation)
                 );
             }
+
+            if ($page === 3) {
+                $this->overlayRenderer->renderOverlay(
+                    $pdf,
+                    $this->pageOverlay($templateVersion, 3),
+                    $this->formatPage3Values($calculation)
+                );
+            }
         }
 
         return $pdf->Output('', 'S');
@@ -66,6 +74,19 @@ class BlueReturnStatementPdfGenerator
             incomeBeforeBlueReturnDeduction: $calculation['profit_and_loss']['income_before_blue_return_deduction'],
             familyEmployeeSalaryRows: $this->blueReturnInputRows($fiscalYear, BlueReturnInput::KEY_FAMILY_EMPLOYEE_SALARIES),
             rentExpenseRows: $this->blueReturnInputRows($fiscalYear, BlueReturnInput::KEY_RENT_EXPENSES),
+        );
+    }
+
+    /**
+     * @param  array{profit_and_loss: array<string, int>, depreciation_calculation: array<string, mixed>}  $calculation
+     * @return array<string, string>
+     */
+    private function formatPage3Values(array $calculation): array
+    {
+        return $this->fieldFormatter->formatPage3(
+            salesAmount: $calculation['profit_and_loss']['sales_amount'],
+            purchasesAmount: $calculation['profit_and_loss']['purchases_amount'],
+            depreciationCalculation: $calculation['depreciation_calculation'],
         );
     }
 

@@ -30,8 +30,8 @@ class BlueReturnProofCommandTest extends TestCase
 
         $this->assertSame(0, $exitCode);
 
-        // 1ページの勘定科目ごとのPDF + 2ページの全欄PDF
-        $expectedCount = count(FieldCatalog::profitAndLossFields()) + 1;
+        // 1ページの勘定科目ごとのPDF + 2ページ・3ページの全欄PDF
+        $expectedCount = count(FieldCatalog::profitAndLossFields()) + 2;
         $pdfFiles = glob($outputDir.DIRECTORY_SEPARATOR.'*.pdf') ?: [];
 
         $this->assertCount($expectedCount, $pdfFiles);
@@ -39,6 +39,7 @@ class BlueReturnProofCommandTest extends TestCase
         $this->assertFileDoesNotExist($outputDir.DIRECTORY_SEPARATOR.'_failed.txt');
         $this->assertFileExists($outputDir.DIRECTORY_SEPARATOR.'14_entertainment_expenses.pdf');
         $this->assertFileExists($outputDir.DIRECTORY_SEPARATOR.'page2_all_fields.pdf');
+        $this->assertFileExists($outputDir.DIRECTORY_SEPARATOR.'page3_all_fields.pdf');
 
         foreach ($pdfFiles as $path) {
             $this->assertGreaterThan(0, filesize($path));

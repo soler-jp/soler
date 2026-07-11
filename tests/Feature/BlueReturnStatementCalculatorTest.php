@@ -605,6 +605,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $this->assertSame(1, $row['quantity']);
         $this->assertSame('2025-10', $row['acquisition_year_month']);
         $this->assertSame(480_000, $row['depreciation_base_amount']);
+        $this->assertSame('straight_line', $row['depreciation_method']);
         $this->assertSame(4, $row['useful_life']);
         $this->assertSame('0.250', $row['depreciation_rate']);
         $this->assertSame(3, $row['months']);
