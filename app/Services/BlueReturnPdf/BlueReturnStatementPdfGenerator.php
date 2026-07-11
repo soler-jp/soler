@@ -57,6 +57,14 @@ class BlueReturnStatementPdfGenerator
                     $this->formatPage3Values($calculation)
                 );
             }
+
+            if ($page === 4) {
+                $this->overlayRenderer->renderOverlay(
+                    $pdf,
+                    $this->pageOverlay($templateVersion, 4),
+                    $this->formatPage4Values($fiscalYear, $calculation)
+                );
+            }
         }
 
         return $pdf->Output('', 'S');
@@ -87,6 +95,21 @@ class BlueReturnStatementPdfGenerator
             salesAmount: $calculation['profit_and_loss']['sales_amount'],
             purchasesAmount: $calculation['profit_and_loss']['purchases_amount'],
             depreciationCalculation: $calculation['depreciation_calculation'],
+        );
+    }
+
+    /**
+     * @param  array{balance_sheet: array<string, mixed>}  $calculation
+     * @return array<string, string>
+     */
+    private function formatPage4Values(FiscalYear $fiscalYear, array $calculation): array
+    {
+        return $this->fieldFormatter->formatPage4(
+            balanceSheet: $calculation['balance_sheet'],
+            openingMonth: (int) $fiscalYear->start_date->month,
+            openingDay: (int) $fiscalYear->start_date->day,
+            endingMonth: (int) $fiscalYear->end_date->month,
+            endingDay: (int) $fiscalYear->end_date->day,
         );
     }
 

@@ -324,6 +324,201 @@ class FieldFormatterTest extends TestCase
         );
     }
 
+    #[Test]
+    public function page4の欄キーへ整形される(): void
+    {
+        $formatter = new FieldFormatter;
+
+        $formatted = $formatter->formatPage4(
+            balanceSheet: $this->balanceSheet(),
+            openingMonth: 1,
+            openingDay: 1,
+            endingMonth: 12,
+            endingDay: 31,
+            filingNumber: '12345678',
+        );
+
+        $this->assertSame('12345678', $formatted['filing_number']);
+
+        // 期首・期末の日付は資産の部・負債の部の両方の列見出しに載る
+        $this->assertSame('1', $formatted['opening_month_asset']);
+        $this->assertSame('1', $formatted['opening_day_asset']);
+        $this->assertSame('12', $formatted['ending_month_asset']);
+        $this->assertSame('31', $formatted['ending_day_asset']);
+        $this->assertSame('1', $formatted['opening_month_liability']);
+        $this->assertSame('31', $formatted['ending_day_liability']);
+
+        // 資産の部・負債の部は勘定科目名で固定行に割り当てる(0は空欄)
+        $this->assertSame('1,000,000', $formatted['balance_asset_cash_opening']);
+        $this->assertSame('1,200,000', $formatted['balance_asset_cash_ending']);
+        $this->assertSame('500,000', $formatted['balance_asset_accounts_receivable_opening']);
+        $this->assertSame('900,000', $formatted['balance_asset_accounts_receivable_ending']);
+        $this->assertSame('700,000', $formatted['balance_liability_borrowings_opening']);
+        $this->assertSame('500,000', $formatted['balance_liability_borrowings_ending']);
+        $this->assertSame('', $formatted['balance_liability_accounts_payable_opening']);
+        $this->assertSame('', $formatted['balance_liability_accounts_payable_ending']);
+
+        // 事業主貸は equity(貸方正)の残高を符号反転して資産側に印字する
+        $this->assertSame('300,000', $formatted['balance_asset_owner_drawings_ending']);
+        $this->assertSame('700,000', $formatted['balance_liability_owner_borrowings_ending']);
+        $this->assertSame('800,000', $formatted['balance_liability_capital_opening']);
+        $this->assertSame('800,000', $formatted['balance_liability_capital_ending']);
+        $this->assertSame('400,000', $formatted['balance_liability_income_before_blue_return_deduction_ending']);
+
+        // 様式が斜線の期首欄には印字しない
+        $this->assertArrayNotHasKey('balance_asset_owner_drawings_opening', $formatted);
+        $this->assertArrayNotHasKey('balance_liability_owner_borrowings_opening', $formatted);
+        $this->assertArrayNotHasKey('balance_liability_income_before_blue_return_deduction_opening', $formatted);
+
+        // 合計は事業主貸を資産側に振り替えたうえで両側が一致する
+        $this->assertSame('1,500,000', $formatted['balance_asset_total_opening']);
+        $this->assertSame('2,400,000', $formatted['balance_asset_total_ending']);
+        $this->assertSame('1,500,000', $formatted['balance_liability_total_opening']);
+        $this->assertSame('2,400,000', $formatted['balance_liability_total_ending']);
+    }
+
+    #[Test]
+    public function page4の固定行にない勘定科目は空欄行にラベル付きで印字される(): void
+    {
+        $formatter = new FieldFormatter;
+
+        $balanceSheet = $this->balanceSheet();
+        $balanceSheet['sections']['asset']['rows'][] = [
+            'account_id' => 99,
+            'account_name' => '敷金',
+            'opening_balance' => 100000,
+            'ending_balance' => 150000,
+            'rows' => [],
+        ];
+        $balanceSheet['sections']['liability']['rows'][] = [
+            'account_id' => 98,
+            'account_name' => '未払費用',
+            'opening_balance' => 0,
+            'ending_balance' => 50000,
+            'rows' => [],
+        ];
+        $formatted = $formatter->formatPage4(
+            balanceSheet: $balanceSheet,
+            openingMonth: 1,
+            openingDay: 1,
+            endingMonth: 12,
+            endingDay: 31,
+        );
+
+        $this->assertSame('敷金', $formatted['balance_asset_blank_1_label']);
+        $this->assertSame('100,000', $formatted['balance_asset_blank_1_opening']);
+        $this->assertSame('150,000', $formatted['balance_asset_blank_1_ending']);
+
+        $this->assertSame('未払費用', $formatted['balance_liability_blank_1_label']);
+        $this->assertSame('', $formatted['balance_liability_blank_1_opening']);
+        $this->assertSame('50,000', $formatted['balance_liability_blank_1_ending']);
+    }
+
+    #[Test]
+    public function page4の固定行にない資本の勘定科目は例外になる(): void
+    {
+        $formatter = new FieldFormatter;
+
+        $balanceSheet = $this->balanceSheet();
+        $balanceSheet['sections']['equity']['rows'][] = [
+            'account_id' => 97,
+            'account_name' => '開業資金',
+            'opening_balance' => 10000,
+            'ending_balance' => 10000,
+            'rows' => [],
+        ];
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('貸借対照表(資本の部)に対応する行がない勘定科目です: 開業資金');
+
+        $formatter->formatPage4(
+            balanceSheet: $balanceSheet,
+            openingMonth: 1,
+            openingDay: 1,
+            endingMonth: 12,
+            endingDay: 31,
+        );
+    }
+
+    #[Test]
+    public function page4の空欄行を超える勘定科目は例外になる(): void
+    {
+        $formatter = new FieldFormatter;
+
+        $balanceSheet = $this->balanceSheet();
+
+        for ($i = 1; $i <= 8; $i++) {
+            $balanceSheet['sections']['asset']['rows'][] = [
+                'account_id' => 100 + $i,
+                'account_name' => "追加資産{$i}",
+                'opening_balance' => 1,
+                'ending_balance' => 1,
+                'rows' => [],
+            ];
+        }
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('貸借対照表(資産の部)の空欄行(7行)を超えています: 追加資産8');
+
+        $formatter->formatPage4(
+            balanceSheet: $balanceSheet,
+            openingMonth: 1,
+            openingDay: 1,
+            endingMonth: 12,
+            endingDay: 31,
+        );
+    }
+
+    /**
+     * 期首: 資産150万(現金100万+売掛金50万) = 借入金70万 + 元入金80万。
+     * 期末: 資産210万 + 事業主貸30万 = 借入金50万 + 事業主借70万 + 元入金80万 + 所得40万。
+     *
+     * @return array<string, mixed>
+     */
+    private function balanceSheet(): array
+    {
+        return [
+            'income_before_blue_return_deduction' => 400000,
+            'sections' => [
+                'asset' => [
+                    'type' => 'asset',
+                    'label' => '資産の部',
+                    'opening_total_balance' => 1500000,
+                    'ending_total_balance' => 2100000,
+                    'rows' => [
+                        ['account_id' => 1, 'account_name' => '現金', 'opening_balance' => 1000000, 'ending_balance' => 1200000, 'rows' => []],
+                        ['account_id' => 2, 'account_name' => '売掛金', 'opening_balance' => 500000, 'ending_balance' => 900000, 'rows' => []],
+                    ],
+                ],
+                'liability' => [
+                    'type' => 'liability',
+                    'label' => '負債の部',
+                    'opening_total_balance' => 700000,
+                    'ending_total_balance' => 500000,
+                    'rows' => [
+                        ['account_id' => 3, 'account_name' => '借入金', 'opening_balance' => 700000, 'ending_balance' => 500000, 'rows' => []],
+                        ['account_id' => 4, 'account_name' => '買掛金', 'opening_balance' => 0, 'ending_balance' => 0, 'rows' => []],
+                    ],
+                ],
+                'equity' => [
+                    'type' => 'equity',
+                    'label' => '純資産の部',
+                    'opening_total_balance' => 800000,
+                    'ending_total_balance' => 1200000,
+                    'rows' => [
+                        ['account_id' => 5, 'account_name' => '事業主貸', 'opening_balance' => 0, 'ending_balance' => -300000, 'rows' => []],
+                        ['account_id' => 6, 'account_name' => '事業主借', 'opening_balance' => 0, 'ending_balance' => 700000, 'rows' => []],
+                        ['account_id' => 7, 'account_name' => '元入金', 'opening_balance' => 800000, 'ending_balance' => 800000, 'rows' => []],
+                    ],
+                ],
+            ],
+            'totals' => [
+                'opening' => ['asset' => 1500000, 'liability' => 700000, 'equity' => 800000],
+                'ending' => ['asset' => 2100000, 'liability' => 500000, 'equity' => 1200000],
+            ],
+        ];
+    }
+
     /**
      * @return array{months: array<int, array<string, mixed>>, totals: array<string, int>}
      */

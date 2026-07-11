@@ -13,6 +13,44 @@ class FieldFormatter
     private const DEPRECIATION_ROW_COUNT = 7;
 
     /**
+     * 貸借対照表(資産の部)の勘定科目名 → 様式の固定行キー。
+     * キーは帳簿の科目名(例: 建物附属設備は「附」)で、様式ラベルの表記とは一部異なる。
+     */
+    private const BALANCE_SHEET_ASSET_ROWS = [
+        '現金' => 'cash',
+        '当座預金' => 'checking_deposits',
+        '定期預金' => 'time_deposits',
+        'その他の預金' => 'other_deposits',
+        '受取手形' => 'notes_receivable',
+        '売掛金' => 'accounts_receivable',
+        '有価証券' => 'securities',
+        '棚卸資産' => 'inventory',
+        '前払金' => 'advance_payments',
+        '貸付金' => 'loans_receivable',
+        '建物' => 'buildings',
+        '建物附属設備' => 'building_improvements',
+        '機械装置' => 'machinery',
+        '車両運搬具' => 'vehicles',
+        '工具器具備品' => 'tools_and_equipment',
+        '土地' => 'land',
+    ];
+
+    /**
+     * 貸借対照表(負債の部)の勘定科目名 → 様式の固定行キー。
+     */
+    private const BALANCE_SHEET_LIABILITY_ROWS = [
+        '支払手形' => 'notes_payable',
+        '買掛金' => 'accounts_payable',
+        '借入金' => 'borrowings',
+        '未払金' => 'accrued_payables',
+        '前受金' => 'advances_received',
+        '預り金' => 'deposits_received',
+        '貸倒引当金' => 'bad_debt_reserve',
+    ];
+
+    private const BALANCE_SHEET_BLANK_ROW_COUNT = 7;
+
+    /**
      * @param  array<string, int>  $profitAndLoss
      * @return array<string, string>
      */
@@ -105,6 +143,136 @@ class FieldFormatter
         ];
 
         return array_merge($formatted, $this->formatDepreciationCalculation($depreciationCalculation));
+    }
+
+    /**
+     * 4ページ(貸借対照表)の欄キー → 印字文字列を作る。
+     *
+     * 帳簿の勘定科目名で様式の固定行に割り当てる。固定行にない資産・負債の科目は空欄行(各7行)へ
+     * 科目名(ラベル)付きで印字し、空欄行を超えたら例外。資本の科目は事業主貸・事業主借・元入金のみ
+     * 対応し、それ以外は例外(個人事業主で資本の科目を追加することはほぼないため空欄行に割り当てない)。
+     * 事業主貸は帳簿上 equity(貸方が正)だが様式では資産の部の行のため、符号を反転して資産側に印字する。
+     * 事業主貸・事業主借・青色申告特別控除前の所得金額の期首欄は様式が斜線のため印字しない。
+     *
+     * @param  array{
+     *     income_before_blue_return_deduction: int,
+     *     sections: array<string, array{
+     *         type: string,
+     *         label: string,
+     *         opening_total_balance: int,
+     *         ending_total_balance: int,
+     *         rows: array<int, array{account_id: int, account_name: string, opening_balance: int, ending_balance: int, rows: array<int, array<string, mixed>>}>
+     *     }>,
+     *     totals: array{
+     *         opening: array{asset: int, liability: int, equity: int},
+     *         ending: array{asset: int, liability: int, equity: int}
+     *     }
+     * }  $balanceSheet
+     * @return array<string, string>
+     */
+    public function formatPage4(
+        array $balanceSheet,
+        int $openingMonth,
+        int $openingDay,
+        int $endingMonth,
+        int $endingDay,
+        string $filingNumber = ''
+    ): array {
+        $formatted = [
+            'filing_number' => $filingNumber,
+            'opening_month_asset' => (string) $openingMonth,
+            'opening_day_asset' => (string) $openingDay,
+            'ending_month_asset' => (string) $endingMonth,
+            'ending_day_asset' => (string) $endingDay,
+            'opening_month_liability' => (string) $openingMonth,
+            'opening_day_liability' => (string) $openingDay,
+            'ending_month_liability' => (string) $endingMonth,
+            'ending_day_liability' => (string) $endingDay,
+        ];
+
+        $assetBlankRowCount = 0;
+
+        foreach ($balanceSheet['sections']['asset']['rows'] as $row) {
+            $rowKey = self::BALANCE_SHEET_ASSET_ROWS[$row['account_name']] ?? null;
+
+            if ($rowKey === null) {
+                $rowKey = $this->balanceSheetBlankRowKey('資産の部', ++$assetBlankRowCount, (string) $row['account_name']);
+                $formatted["balance_asset_{$rowKey}_label"] = (string) $row['account_name'];
+            }
+
+            $formatted["balance_asset_{$rowKey}_opening"] = $this->formatOptionalAmount((int) $row['opening_balance']);
+            $formatted["balance_asset_{$rowKey}_ending"] = $this->formatOptionalAmount((int) $row['ending_balance']);
+        }
+
+        $liabilityBlankRowCount = 0;
+
+        foreach ($balanceSheet['sections']['liability']['rows'] as $row) {
+            $rowKey = self::BALANCE_SHEET_LIABILITY_ROWS[$row['account_name']] ?? null;
+
+            if ($rowKey === null) {
+                $rowKey = $this->balanceSheetBlankRowKey('負債の部', ++$liabilityBlankRowCount, (string) $row['account_name']);
+                $formatted["balance_liability_{$rowKey}_label"] = (string) $row['account_name'];
+            }
+
+            $formatted["balance_liability_{$rowKey}_opening"] = $this->formatOptionalAmount((int) $row['opening_balance']);
+            $formatted["balance_liability_{$rowKey}_ending"] = $this->formatOptionalAmount((int) $row['ending_balance']);
+        }
+
+        $ownerDrawingsOpening = 0;
+        $ownerDrawingsEnding = 0;
+
+        foreach ($balanceSheet['sections']['equity']['rows'] as $row) {
+            switch ($row['account_name']) {
+                case '事業主貸':
+                    $ownerDrawingsOpening = (int) $row['opening_balance'];
+                    $ownerDrawingsEnding = (int) $row['ending_balance'];
+                    $formatted['balance_asset_owner_drawings_ending'] = $this->formatOptionalAmount(-$ownerDrawingsEnding);
+                    break;
+                case '事業主借':
+                    $formatted['balance_liability_owner_borrowings_ending'] = $this->formatOptionalAmount((int) $row['ending_balance']);
+                    break;
+                case '元入金':
+                    $formatted['balance_liability_capital_opening'] = $this->formatOptionalAmount((int) $row['opening_balance']);
+                    $formatted['balance_liability_capital_ending'] = $this->formatOptionalAmount((int) $row['ending_balance']);
+                    break;
+                default:
+                    throw new RuntimeException("貸借対照表(資本の部)に対応する行がない勘定科目です: {$row['account_name']}");
+            }
+        }
+
+        $income = $balanceSheet['income_before_blue_return_deduction'];
+        $formatted['balance_liability_income_before_blue_return_deduction_ending'] = $this->formatAmount($income);
+
+        // 事業主貸(equity・貸方正)を資産側に移すため、両側の合計から equity 残高ぶんを振り替える
+        $totals = $balanceSheet['totals'];
+        $formatted['balance_asset_total_opening'] = $this->formatAmount($totals['opening']['asset'] - $ownerDrawingsOpening);
+        $formatted['balance_asset_total_ending'] = $this->formatAmount($totals['ending']['asset'] - $ownerDrawingsEnding);
+        $formatted['balance_liability_total_opening'] = $this->formatAmount(
+            $totals['opening']['liability'] + $totals['opening']['equity'] - $ownerDrawingsOpening
+        );
+        $formatted['balance_liability_total_ending'] = $this->formatAmount(
+            $totals['ending']['liability'] + $totals['ending']['equity'] - $ownerDrawingsEnding + $income
+        );
+
+        return $formatted;
+    }
+
+    /**
+     * 貸借対照表の固定行にない勘定科目を載せる空欄行のキー(blank_N)を返す。
+     * 空欄行(7行)を使い切ったら例外にする。
+     */
+    private function balanceSheetBlankRowKey(string $sectionLabel, int $blankRowNumber, string $accountName): string
+    {
+        if ($blankRowNumber > self::BALANCE_SHEET_BLANK_ROW_COUNT) {
+            throw new RuntimeException(sprintf(
+                '貸借対照表(%s)の空欄行(%d行)を超えています: %s',
+                $sectionLabel,
+                self::BALANCE_SHEET_BLANK_ROW_COUNT,
+                $accountName
+            ));
+        }
+
+        return 'blank_'.$blankRowNumber;
     }
 
     /**

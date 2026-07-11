@@ -204,6 +204,90 @@ Artisan::command('blue-return:proof-all {--template=from2023} {--output-dir=} {-
         $failed[] = 'page3_all_fields ('.$exception->getMessage().')';
     }
 
+    // 4ページ(貸借対照表)も全欄をテスト値で埋めた1枚のPDFで確認する
+    try {
+        $balanceSheetRows = static fn (array $accountNames): array => collect($accountNames)
+            ->values()
+            ->map(fn (string $accountName, int $index): array => [
+                'account_id' => $index + 1,
+                'account_name' => $accountName,
+                'opening_balance' => ($index + 1) * 1_000_000 + 111_111,
+                'ending_balance' => ($index + 1) * 1_000_000 + 999_999,
+                'rows' => [],
+            ])->all();
+
+        $page4Values = $fieldFormatter->formatPage4(
+            balanceSheet: [
+                'income_before_blue_return_deduction' => 12_345_678,
+                'sections' => [
+                    // 固定行にない科目名(追加◯◯)は空欄行にラベル付きで載る
+                    'asset' => [
+                        'type' => 'asset',
+                        'label' => '資産の部',
+                        'opening_total_balance' => 88_888_888,
+                        'ending_total_balance' => 88_888_888,
+                        'rows' => $balanceSheetRows([
+                            '現金', '当座預金', '定期預金', 'その他の預金', '受取手形', '売掛金', '有価証券', '棚卸資産',
+                            '前払金', '貸付金', '建物', '建物附属設備', '機械装置', '車両運搬具', '工具器具備品', '土地',
+                            '追加資産科目1', '追加資産科目2', '追加資産科目3', '追加資産科目4', '追加資産科目5', '追加資産科目6', '追加資産科目7',
+                        ]),
+                    ],
+                    'liability' => [
+                        'type' => 'liability',
+                        'label' => '負債の部',
+                        'opening_total_balance' => 77_777_777,
+                        'ending_total_balance' => 77_777_777,
+                        'rows' => $balanceSheetRows([
+                            '支払手形', '買掛金', '借入金', '未払金', '前受金', '預り金', '貸倒引当金',
+                            '追加負債科目1', '追加負債科目2', '追加負債科目3', '追加負債科目4', '追加負債科目5', '追加負債科目6', '追加負債科目7',
+                        ]),
+                    ],
+                    'equity' => [
+                        'type' => 'equity',
+                        'label' => '純資産の部',
+                        'opening_total_balance' => 66_666_666,
+                        'ending_total_balance' => 66_666_666,
+                        'rows' => [
+                            ['account_id' => 91, 'account_name' => '事業主貸', 'opening_balance' => 0, 'ending_balance' => -33_333_333, 'rows' => []],
+                            ['account_id' => 92, 'account_name' => '事業主借', 'opening_balance' => 0, 'ending_balance' => 44_444_444, 'rows' => []],
+                            ['account_id' => 93, 'account_name' => '元入金', 'opening_balance' => 55_555_555, 'ending_balance' => 55_555_555, 'rows' => []],
+                        ],
+                    ],
+                ],
+                'totals' => [
+                    'opening' => ['asset' => 88_888_888, 'liability' => 77_777_777, 'equity' => 66_666_666],
+                    'ending' => ['asset' => 88_888_888, 'liability' => 77_777_777, 'equity' => 66_666_666],
+                ],
+            ],
+            openingMonth: 1,
+            openingDay: 1,
+            endingMonth: 12,
+            endingDay: 31,
+            filingNumber: '12345678',
+        );
+
+        $pdf = $generator->createDocument();
+        $pdf->AddPage();
+
+        if (! $overlayOnly) {
+            $overlayRenderer->renderBackground(
+                $pdf,
+                resource_path("blue-return/templates/{$templateVersion}/background/page4.png")
+            );
+        }
+
+        $overlayRenderer->renderOverlay(
+            $pdf,
+            require app_path("Services/BlueReturnPdf/Templates/{$overlayDirectory}/Page4Overlay.php"),
+            $page4Values
+        );
+
+        file_put_contents($outputDir.DIRECTORY_SEPARATOR.'page4_all_fields.pdf', $pdf->Output('', 'S'));
+        $generated[] = 'page4_all_fields.pdf 4ページ(全欄テスト値)';
+    } catch (Throwable $exception) {
+        $failed[] = 'page4_all_fields ('.$exception->getMessage().')';
+    }
+
     file_put_contents(
         $outputDir.DIRECTORY_SEPARATOR.'_manifest.txt',
         implode(PHP_EOL, $generated).PHP_EOL
@@ -217,4 +301,4 @@ Artisan::command('blue-return:proof-all {--template=from2023} {--output-dir=} {-
     }
 
     $this->info($outputDir);
-})->purpose('Page1〜Page3 Overlay の妥当性を目視確認するため、勘定科目ごとの校正PDFと2・3ページの全欄校正PDFを出力する');
+})->purpose('Page1〜Page4 Overlay の妥当性を目視確認するため、勘定科目ごとの校正PDFと2〜4ページの全欄校正PDFを出力する');
