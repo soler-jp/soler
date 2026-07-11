@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\BlueReturnInputRegistrar;
+use App\Services\BlueReturnPdf\BlueReturnStatementPdfGenerator;
 use App\Services\BlueReturnStatementCalculator;
 use App\Services\FiscalYearBalanceCalculator;
 use App\Services\FiscalYearCloser;
@@ -165,6 +166,14 @@ class FiscalYear extends Model
     public function calculateBlueReturnStatement(int $blueReturnDeduction): array
     {
         return app(BlueReturnStatementCalculator::class)->calculate($this, $blueReturnDeduction);
+    }
+
+    /**
+     * 青色申告決算書のPDF（バイナリ文字列）を生成する。
+     */
+    public function generateBlueReturnStatementPdf(int $blueReturnDeduction): string
+    {
+        return app(BlueReturnStatementPdfGenerator::class)->generate($this, $blueReturnDeduction);
     }
 
     /**
