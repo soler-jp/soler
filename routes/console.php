@@ -90,6 +90,68 @@ Artisan::command('blue-return:proof-all {--template=from2023} {--output-dir=} {-
         }
     }
 
+    // 2ページ(月別売上・専従者給与・地代家賃ほか)は全欄をテスト値で埋めた1枚のPDFで確認する
+    try {
+        $page2Values = $fieldFormatter->formatPage2(
+            eraYear: 7,
+            monthlySalesAndPurchases: [
+                'months' => collect(range(1, 12))->map(fn (int $month): array => [
+                    'year_month' => sprintf('2025-%02d', $month),
+                    'label' => $month.'月',
+                    'sales_amount' => $month * 1_000_000 + 111_111,
+                    'house_consumption_amount' => 0,
+                    'misc_income_amount' => 0,
+                    'purchases_amount' => $month * 1_000_000,
+                ])->all(),
+                'totals' => [
+                    'sales_amount' => 79_333_332,
+                    'house_consumption_amount' => 4_444_444,
+                    'misc_income_amount' => 555_555,
+                    'purchases_amount' => 78_000_000,
+                ],
+            ],
+            incomeBeforeBlueReturnDeduction: 12_345_678,
+            familyEmployeeSalaryRows: collect(range(1, 4))->map(fn (int $row): array => [
+                'name' => '専従者氏名'.$row,
+                'age' => 45,
+                'months' => 12,
+                'salary' => 2_222_222,
+                'bonus' => 333_333,
+                'withheld_tax_amount' => 111_111,
+            ])->all(),
+            rentExpenseRows: collect(range(1, 2))->map(fn (int $row): array => [
+                'address' => '東京都千代田区霞が関1-2-'.$row.' テストビル405',
+                'name' => '賃貸太郎'.$row,
+                'rent_amount' => 1_234_567,
+                'deductible_amount' => 987_654,
+            ])->all(),
+            name: '最長氏名確認用の名前',
+            nameKana: 'サイチョウシメイカクニンヨウノナマエ',
+            filingNumber: '12345678',
+        );
+
+        $pdf = $generator->createDocument();
+        $pdf->AddPage();
+
+        if (! $overlayOnly) {
+            $overlayRenderer->renderBackground(
+                $pdf,
+                resource_path("blue-return/templates/{$templateVersion}/background/page2.png")
+            );
+        }
+
+        $overlayRenderer->renderOverlay(
+            $pdf,
+            require app_path("Services/BlueReturnPdf/Templates/{$overlayDirectory}/Page2Overlay.php"),
+            $page2Values
+        );
+
+        file_put_contents($outputDir.DIRECTORY_SEPARATOR.'page2_all_fields.pdf', $pdf->Output('', 'S'));
+        $generated[] = 'page2_all_fields.pdf 2ページ(全欄テスト値)';
+    } catch (Throwable $exception) {
+        $failed[] = 'page2_all_fields ('.$exception->getMessage().')';
+    }
+
     file_put_contents(
         $outputDir.DIRECTORY_SEPARATOR.'_manifest.txt',
         implode(PHP_EOL, $generated).PHP_EOL
@@ -103,4 +165,4 @@ Artisan::command('blue-return:proof-all {--template=from2023} {--output-dir=} {-
     }
 
     $this->info($outputDir);
-})->purpose('Page1Overlay の妥当性を目視確認するため、勘定科目ごとの校正PDFを出力する');
+})->purpose('Page1/Page2 Overlay の妥当性を目視確認するため、勘定科目ごとの校正PDFと2ページの全欄校正PDFを出力する');

@@ -2,6 +2,7 @@
 
 namespace App\Services\BlueReturnPdf;
 
+use App\Models\BlueReturnInput;
 use App\Models\FiscalYear;
 use RuntimeException;
 use TCPDF;
@@ -40,9 +41,48 @@ class BlueReturnStatementPdfGenerator
             if ($page === 1) {
                 $this->overlayRenderer->renderOverlay($pdf, $this->pageOverlay($templateVersion, 1), $formattedProfitAndLoss);
             }
+
+            if ($page === 2) {
+                $this->overlayRenderer->renderOverlay(
+                    $pdf,
+                    $this->pageOverlay($templateVersion, 2),
+                    $this->formatPage2Values($fiscalYear, $calculation)
+                );
+            }
         }
 
         return $pdf->Output('', 'S');
+    }
+
+    /**
+     * @param  array{profit_and_loss: array<string, int>, monthly_sales_and_purchases: array<string, mixed>}  $calculation
+     * @return array<string, string>
+     */
+    private function formatPage2Values(FiscalYear $fiscalYear, array $calculation): array
+    {
+        return $this->fieldFormatter->formatPage2(
+            eraYear: $this->eraYear((int) $fiscalYear->year),
+            monthlySalesAndPurchases: $calculation['monthly_sales_and_purchases'],
+            incomeBeforeBlueReturnDeduction: $calculation['profit_and_loss']['income_before_blue_return_deduction'],
+            familyEmployeeSalaryRows: $this->blueReturnInputRows($fiscalYear, BlueReturnInput::KEY_FAMILY_EMPLOYEE_SALARIES),
+            rentExpenseRows: $this->blueReturnInputRows($fiscalYear, BlueReturnInput::KEY_RENT_EXPENSES),
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function blueReturnInputRows(FiscalYear $fiscalYear, string $key): array
+    {
+        return $fiscalYear->blueReturnInput($key)?->value['rows'] ?? [];
+    }
+
+    /**
+     * 西暦年 → 令和の年数(令和5年 = 2023年)。
+     */
+    private function eraYear(int $year): int
+    {
+        return $year - 2018;
     }
 
     public function createDocument(): TCPDF

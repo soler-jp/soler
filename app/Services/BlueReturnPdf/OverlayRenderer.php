@@ -78,9 +78,9 @@ class OverlayRenderer
                 $placement['height'],
                 $placement['text'],
                 0,
+                0,
                 $placement['align'],
                 false,
-                0,
                 '',
                 0,
                 false,
@@ -99,10 +99,13 @@ class OverlayRenderer
      */
     private function renderText(TCPDF $pdf, array $definition, string $value): void
     {
+        // maxh が1行の高さ(フォントサイズ × cell_height_ratio)を下回ると1行も描画されないため、余裕を持たせる
+        $lineHeight = (float) $definition['size'] * 1.5;
+
         $pdf->SetFontSize((float) $definition['size']);
         $pdf->MultiCell(
             (float) $definition['x1'] - (float) $definition['x0'],
-            (float) $definition['size'] + 2,
+            $lineHeight,
             $value,
             0,
             (string) $definition['align'],
@@ -114,7 +117,7 @@ class OverlayRenderer
             0,
             false,
             true,
-            (float) $definition['size'] + 2,
+            $lineHeight,
             'M'
         );
     }
