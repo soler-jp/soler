@@ -42,6 +42,95 @@ class FieldFormatterTest extends TestCase
     }
 
     #[Test]
+    public function page1の欄キーへ整形される(): void
+    {
+        $formatter = new FieldFormatter;
+
+        $formatted = $formatter->formatPage1(
+            eraYear: 7,
+            profitAndLoss: ['sales_amount' => 1234567],
+            openingMonth: 1,
+            openingDay: 1,
+            endingMonth: 12,
+            endingDay: 31,
+            header: [
+                'filing_number' => '12345678',
+                'address' => '東京都千代田区霞が関1-2-3',
+                'name_kana' => 'ヤマダ タロウ',
+                'name' => '山田 太郎',
+                'business_address' => '東京都千代田区丸の内9-8-7',
+                'home_phone_number' => '03-1234-5678',
+                'business_phone_number' => '090-1234-5678',
+                'business_type' => 'ソフトウェア開発業',
+                'trade_name' => 'ソレル商店',
+                'association_name' => '東京青色申告会',
+                'tax_accountant_office_address' => '東京都新宿区西新宿1-2-3',
+                'tax_accountant_name' => '税理 士郎',
+                'tax_accountant_phone_number' => '03-9876-5432',
+            ],
+        );
+
+        $this->assertSame('7', $formatted['era_year']);
+        $this->assertSame('1', $formatted['opening_month']);
+        $this->assertSame('1', $formatted['opening_day']);
+        $this->assertSame('12', $formatted['ending_month']);
+        $this->assertSame('31', $formatted['ending_day']);
+        $this->assertSame('12345678', $formatted['filing_number']);
+        $this->assertSame('東京都千代田区霞が関1-2-3', $formatted['address']);
+        $this->assertSame('ヤマダ タロウ', $formatted['name_kana']);
+        $this->assertSame('山田 太郎', $formatted['name']);
+        $this->assertSame('東京都千代田区丸の内9-8-7', $formatted['business_address']);
+        $this->assertSame('03-1234-5678', $formatted['home_phone_number']);
+        $this->assertSame('090-1234-5678', $formatted['business_phone_number']);
+        $this->assertSame('ソフトウェア開発業', $formatted['business_type']);
+        $this->assertSame('ソレル商店', $formatted['trade_name']);
+        $this->assertSame('東京青色申告会', $formatted['association_name']);
+        $this->assertSame('東京都新宿区西新宿1-2-3', $formatted['tax_accountant_office_address']);
+        $this->assertSame('税理 士郎', $formatted['tax_accountant_name']);
+        $this->assertSame('03-9876-5432', $formatted['tax_accountant_phone_number']);
+        $this->assertSame('1,234,567', $formatted['sales_amount']);
+    }
+
+    #[Test]
+    public function page1の未指定のヘッダー欄は空欄になる(): void
+    {
+        $formatter = new FieldFormatter;
+
+        $formatted = $formatter->formatPage1(
+            eraYear: 7,
+            profitAndLoss: [],
+            openingMonth: 1,
+            openingDay: 1,
+            endingMonth: 12,
+            endingDay: 31,
+        );
+
+        $this->assertSame('', $formatted['address']);
+        $this->assertSame('', $formatted['name']);
+        $this->assertSame('', $formatted['filing_number']);
+        $this->assertSame('', $formatted['tax_accountant_phone_number']);
+    }
+
+    #[Test]
+    public function page1のヘッダー欄にないキーは例外になる(): void
+    {
+        $formatter = new FieldFormatter;
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('1ページのヘッダー欄にないキーです: unknown_key');
+
+        $formatter->formatPage1(
+            eraYear: 7,
+            profitAndLoss: [],
+            openingMonth: 1,
+            openingDay: 1,
+            endingMonth: 12,
+            endingDay: 31,
+            header: ['unknown_key' => 'x'],
+        );
+    }
+
+    #[Test]
     public function page2の欄キーへ整形される(): void
     {
         $formatter = new FieldFormatter;

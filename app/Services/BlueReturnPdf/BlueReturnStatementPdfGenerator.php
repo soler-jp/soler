@@ -26,27 +26,33 @@ class BlueReturnStatementPdfGenerator
 
     private ?string $japaneseFontFamily = null;
 
-    public function generate(FiscalYear $fiscalYear, int $blueReturnDeduction): string
+    /**
+     * @param  array<string, string>  $header  住所・氏名などヘッダー欄の帳簿外情報(1ページの全ヘッダー欄と2〜4ページの氏名・フリガナ・整理番号に印字する)
+     */
+    public function generate(FiscalYear $fiscalYear, int $blueReturnDeduction, array $header = []): string
     {
         $templateVersion = $this->templateResolver->resolve($fiscalYear);
 
         $pdf = $this->createDocument();
         $calculation = $fiscalYear->calculateBlueReturnStatement($blueReturnDeduction);
-        $formattedProfitAndLoss = $this->fieldFormatter->formatProfitAndLoss($calculation['profit_and_loss']);
 
         for ($page = 1; $page <= self::PAGE_COUNT; $page++) {
             $pdf->AddPage();
             $this->overlayRenderer->renderBackground($pdf, $this->backgroundPath($templateVersion, $page));
 
             if ($page === 1) {
-                $this->overlayRenderer->renderOverlay($pdf, $this->pageOverlay($templateVersion, 1), $formattedProfitAndLoss);
+                $this->overlayRenderer->renderOverlay(
+                    $pdf,
+                    $this->pageOverlay($templateVersion, 1),
+                    $this->formatPage1Values($fiscalYear, $calculation, $header)
+                );
             }
 
             if ($page === 2) {
                 $this->overlayRenderer->renderOverlay(
                     $pdf,
                     $this->pageOverlay($templateVersion, 2),
-                    $this->formatPage2Values($fiscalYear, $calculation)
+                    $this->formatPage2Values($fiscalYear, $calculation, $header)
                 );
             }
 
@@ -54,7 +60,7 @@ class BlueReturnStatementPdfGenerator
                 $this->overlayRenderer->renderOverlay(
                     $pdf,
                     $this->pageOverlay($templateVersion, 3),
-                    $this->formatPage3Values($calculation)
+                    $this->formatPage3Values($calculation, $header)
                 );
             }
 
@@ -62,7 +68,7 @@ class BlueReturnStatementPdfGenerator
                 $this->overlayRenderer->renderOverlay(
                     $pdf,
                     $this->pageOverlay($templateVersion, 4),
-                    $this->formatPage4Values($fiscalYear, $calculation)
+                    $this->formatPage4Values($fiscalYear, $calculation, $header)
                 );
             }
         }
@@ -71,10 +77,29 @@ class BlueReturnStatementPdfGenerator
     }
 
     /**
-     * @param  array{profit_and_loss: array<string, int>, monthly_sales_and_purchases: array<string, mixed>}  $calculation
+     * @param  array{profit_and_loss: array<string, int>}  $calculation
+     * @param  array<string, string>  $header
      * @return array<string, string>
      */
-    private function formatPage2Values(FiscalYear $fiscalYear, array $calculation): array
+    private function formatPage1Values(FiscalYear $fiscalYear, array $calculation, array $header): array
+    {
+        return $this->fieldFormatter->formatPage1(
+            eraYear: $this->eraYear((int) $fiscalYear->year),
+            profitAndLoss: $calculation['profit_and_loss'],
+            openingMonth: (int) $fiscalYear->start_date->month,
+            openingDay: (int) $fiscalYear->start_date->day,
+            endingMonth: (int) $fiscalYear->end_date->month,
+            endingDay: (int) $fiscalYear->end_date->day,
+            header: $header,
+        );
+    }
+
+    /**
+     * @param  array{profit_and_loss: array<string, int>, monthly_sales_and_purchases: array<string, mixed>}  $calculation
+     * @param  array<string, string>  $header
+     * @return array<string, string>
+     */
+    private function formatPage2Values(FiscalYear $fiscalYear, array $calculation, array $header): array
     {
         return $this->fieldFormatter->formatPage2(
             eraYear: $this->eraYear((int) $fiscalYear->year),
@@ -82,27 +107,33 @@ class BlueReturnStatementPdfGenerator
             incomeBeforeBlueReturnDeduction: $calculation['profit_and_loss']['income_before_blue_return_deduction'],
             familyEmployeeSalaryRows: $this->blueReturnInputRows($fiscalYear, BlueReturnInput::KEY_FAMILY_EMPLOYEE_SALARIES),
             rentExpenseRows: $this->blueReturnInputRows($fiscalYear, BlueReturnInput::KEY_RENT_EXPENSES),
+            name: $header['name'] ?? '',
+            nameKana: $header['name_kana'] ?? '',
+            filingNumber: $header['filing_number'] ?? '',
         );
     }
 
     /**
      * @param  array{profit_and_loss: array<string, int>, depreciation_calculation: array<string, mixed>}  $calculation
+     * @param  array<string, string>  $header
      * @return array<string, string>
      */
-    private function formatPage3Values(array $calculation): array
+    private function formatPage3Values(array $calculation, array $header): array
     {
         return $this->fieldFormatter->formatPage3(
             salesAmount: $calculation['profit_and_loss']['sales_amount'],
             purchasesAmount: $calculation['profit_and_loss']['purchases_amount'],
             depreciationCalculation: $calculation['depreciation_calculation'],
+            filingNumber: $header['filing_number'] ?? '',
         );
     }
 
     /**
      * @param  array{balance_sheet: array<string, mixed>}  $calculation
+     * @param  array<string, string>  $header
      * @return array<string, string>
      */
-    private function formatPage4Values(FiscalYear $fiscalYear, array $calculation): array
+    private function formatPage4Values(FiscalYear $fiscalYear, array $calculation, array $header): array
     {
         return $this->fieldFormatter->formatPage4(
             balanceSheet: $calculation['balance_sheet'],
@@ -110,6 +141,7 @@ class BlueReturnStatementPdfGenerator
             openingDay: (int) $fiscalYear->start_date->day,
             endingMonth: (int) $fiscalYear->end_date->month,
             endingDay: (int) $fiscalYear->end_date->day,
+            filingNumber: $header['filing_number'] ?? '',
         );
     }
 

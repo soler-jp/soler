@@ -90,6 +90,50 @@ Artisan::command('blue-return:proof-all {--template=from2023} {--output-dir=} {-
         }
     }
 
+    // 1ページのヘッダー欄(年分・住所・氏名・電話番号・期首期末月日ほか)は全欄をテスト値で埋めた1枚のPDFで確認する
+    try {
+        $page1HeaderValues = $fieldFormatter->formatPage1(
+            eraYear: 7,
+            profitAndLoss: [],
+            openingMonth: 10,
+            openingDay: 21,
+            endingMonth: 12,
+            endingDay: 31,
+            header: [
+                'filing_number' => '12345678',
+                'address' => '東京都千代田区霞が関1-2-3 テストマンション405号室',
+                'name_kana' => 'サイチョウシメイカクニンヨウノナマエ',
+                'name' => '最長氏名確認用の名前',
+                'business_address' => '東京都千代田区丸の内9-8-7 テストビル10階',
+                'home_phone_number' => '03-1234-5678',
+                'business_phone_number' => '090-1234-5678',
+                'business_type' => 'ソフトウェア開発業',
+                'trade_name' => '最長屋号確認用の屋号',
+                'association_name' => '東京青色申告会連合会',
+                'tax_accountant_office_address' => '東京都新宿区西新宿1-2-3 税理士ビル501',
+                'tax_accountant_name' => '税理士氏名確認用',
+                'tax_accountant_phone_number' => '03-9876-5432',
+            ],
+        );
+
+        $pdf = $generator->createDocument();
+        $pdf->AddPage();
+
+        if (! $overlayOnly) {
+            $overlayRenderer->renderBackground(
+                $pdf,
+                resource_path("blue-return/templates/{$templateVersion}/background/page1.png")
+            );
+        }
+
+        $overlayRenderer->renderOverlay($pdf, $overlay, $page1HeaderValues);
+
+        file_put_contents($outputDir.DIRECTORY_SEPARATOR.'page1_header_fields.pdf', $pdf->Output('', 'S'));
+        $generated[] = 'page1_header_fields.pdf 1ページ(ヘッダー欄テスト値)';
+    } catch (Throwable $exception) {
+        $failed[] = 'page1_header_fields ('.$exception->getMessage().')';
+    }
+
     // 2ページ(月別売上・専従者給与・地代家賃ほか)は全欄をテスト値で埋めた1枚のPDFで確認する
     try {
         $page2Values = $fieldFormatter->formatPage2(

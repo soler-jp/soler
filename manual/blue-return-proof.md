@@ -1,6 +1,6 @@
 # 決算書オーバーレイの校正PDF
 
-`Page1Overlay.php` が返す座標定義が正しいか（欄の取り違え・位置ズレがないか）を目視確認するための artisan コマンドがあります。
+`Page1Overlay.php` / `Page2Overlay.php` が返す座標定義が正しいか（欄の取り違え・位置ズレがないか）を目視確認するための artisan コマンドがあります。
 
 ## 使い方
 
@@ -8,7 +8,7 @@
 vendor/bin/sail artisan blue-return:proof-all
 ```
 
-損益計算書の勘定科目（①〜㊺の45欄）ごとに、校正PDFを1枚ずつ出力します。
+1ページ目は損益計算書の勘定科目（①〜㊺の45欄）ごとに校正PDFを1枚ずつ、1ページ目のヘッダー欄（年分・住所・氏名・電話番号・整理番号・期首期末月日ほか）と2〜4ページ目は全欄をテスト値で埋めた校正PDFを各1枚出力します。
 
 ```
 storage/app/blue-return/proof-fields/
@@ -16,6 +16,8 @@ storage/app/blue-return/proof-fields/
 ├── 02_beginning_inventory.pdf
 ├── ...
 ├── 45_business_income.pdf
+├── page1_header_fields.pdf # 1ページのヘッダー欄（年分・住所・氏名・電話番号・整理番号・期首期末月日ほか）
+├── page2_all_fields.pdf # 2ページ（月別売上・専従者給与・地代家賃ほか）の全欄
 └── _manifest.txt        # 出力された科目の一覧
 ```
 
@@ -52,11 +54,12 @@ vendor/bin/sail artisan blue-return:proof-all --template=from2023
 ## 注意点
 
 - 背景PNG（`resources/blue-return/templates/*/background/`）はリポジトリにコミットされていません。無い環境では `--overlay-only` を使ってください
-- 現在対応しているのは1ページ目（損益計算書）のみです
+- 1ページ目（損益計算書・ヘッダー欄）〜4ページ目（貸借対照表）に対応しています。2〜3ページ目の box / text 型の座標は暫定値です（桁マス欄と1ページ目のヘッダー欄は geometry JSON 由来）
 
 ## 参考
 
 - `routes/console.php`（`blue-return:proof-all` コマンド）
 - `app/Services/BlueReturnPdf/Proof/FieldCatalog.php`
 - `app/Services/BlueReturnPdf/Templates/From2023/Page1Overlay.php`
+- `app/Services/BlueReturnPdf/Templates/From2023/Page2Overlay.php`
 - `manual/blue-return-pdf.md`（PDF生成APIの使い方）

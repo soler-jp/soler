@@ -171,10 +171,12 @@ class FiscalYear extends Model
 
     /**
      * 青色申告決算書のPDF（バイナリ文字列）を生成する。
+     *
+     * @param  array<string, string>  $header  住所・氏名などヘッダー欄の帳簿外情報
      */
-    public function generateBlueReturnStatementPdf(int $blueReturnDeduction): string
+    public function generateBlueReturnStatementPdf(int $blueReturnDeduction, array $header = []): string
     {
-        return app(BlueReturnStatementPdfGenerator::class)->generate($this, $blueReturnDeduction);
+        return app(BlueReturnStatementPdfGenerator::class)->generate($this, $blueReturnDeduction, $header);
     }
 
     /**

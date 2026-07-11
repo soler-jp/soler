@@ -51,6 +51,78 @@ class FieldFormatter
     private const BALANCE_SHEET_BLANK_ROW_COUNT = 7;
 
     /**
+     * 1ページのヘッダー欄(帳簿外情報)のキー。全項目任意入力で、未指定は空欄で印字する。
+     */
+    private const PAGE1_HEADER_KEYS = [
+        'filing_number',
+        'address',
+        'name_kana',
+        'name',
+        'business_address',
+        'home_phone_number',
+        'business_phone_number',
+        'business_type',
+        'trade_name',
+        'association_name',
+        'tax_accountant_office_address',
+        'tax_accountant_name',
+        'tax_accountant_phone_number',
+    ];
+
+    /**
+     * 1ページ(損益計算書)の欄キー → 印字文字列を作る。
+     *
+     * 年度(和暦)と期首・期末月日は FiscalYear 由来の値を、住所・氏名などのヘッダー欄は
+     * 帳簿外情報のため $header 配列で受け取る。
+     *
+     * @param  array<string, int>  $profitAndLoss
+     * @param  array<string, string>  $header
+     * @return array<string, string>
+     */
+    public function formatPage1(
+        int $eraYear,
+        array $profitAndLoss,
+        int $openingMonth,
+        int $openingDay,
+        int $endingMonth,
+        int $endingDay,
+        array $header = []
+    ): array {
+        return array_merge(
+            [
+                'era_year' => (string) $eraYear,
+                'opening_month' => (string) $openingMonth,
+                'opening_day' => (string) $openingDay,
+                'ending_month' => (string) $endingMonth,
+                'ending_day' => (string) $endingDay,
+            ],
+            $this->formatPage1Header($header),
+            $this->formatProfitAndLoss($profitAndLoss)
+        );
+    }
+
+    /**
+     * @param  array<string, string>  $header
+     * @return array<string, string>
+     */
+    private function formatPage1Header(array $header): array
+    {
+        $unknownKeys = array_diff(array_keys($header), self::PAGE1_HEADER_KEYS);
+
+        if ($unknownKeys !== []) {
+            throw new RuntimeException('1ページのヘッダー欄にないキーです: '.implode(', ', $unknownKeys));
+        }
+
+        $formatted = [];
+
+        foreach (self::PAGE1_HEADER_KEYS as $key) {
+            $formatted[$key] = (string) ($header[$key] ?? '');
+        }
+
+        return $formatted;
+    }
+
+    /**
      * @param  array<string, int>  $profitAndLoss
      * @return array<string, string>
      */
