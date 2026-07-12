@@ -175,10 +175,13 @@ class FieldFormatter
     }
 
     /**
-     * 3ページ(売上・仕入金額の明細、減価償却費の計算)の欄キー → 印字文字列を作る。
+     * 3ページ(売上・仕入金額の明細、減価償却費の計算ほか)の欄キー → 印字文字列を作る。
      *
      * 売上・仕入の明細は取引先別の内訳を持たないため、
      * 「上記以外の計」と「計」の2行に同じ金額を印字する。
+     *
+     * 地代家賃の内訳は様式版で載るページが違う(令和五年分以降用は2ページ・令和二年分以降用は3ページ)ため、
+     * 2ページと3ページの両方の値に含める。欄のないページでは印字されない。
      *
      * @param  array{
      *     entries: array<int, array{
@@ -198,12 +201,14 @@ class FieldFormatter
      *     }>,
      *     totals: array{ordinary_amount: int, total_amount: int, deductible_amount: int}
      * }  $depreciationCalculation
+     * @param  array<int, array{address: string, name: string, rent_amount: int, deductible_amount: int}>  $rentExpenseRows
      * @return array<string, string>
      */
     public function formatPage3(
         int $salesAmount,
         int $purchasesAmount,
         array $depreciationCalculation,
+        array $rentExpenseRows = [],
         string $filingNumber = ''
     ): array {
         $formatted = [
@@ -214,7 +219,11 @@ class FieldFormatter
             'purchases_amount_total' => $this->formatOptionalAmount($purchasesAmount),
         ];
 
-        return array_merge($formatted, $this->formatDepreciationCalculation($depreciationCalculation));
+        return array_merge(
+            $formatted,
+            $this->formatDepreciationCalculation($depreciationCalculation),
+            $this->formatRentExpenses($rentExpenseRows)
+        );
     }
 
     /**

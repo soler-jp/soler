@@ -19,12 +19,22 @@ class BlueReturnPdfTemplateResolverTest extends TestCase
     }
 
     #[Test]
-    public function 西暦2022年分以前は例外になる(): void
+    public function 西暦2020年分から2022年分は令和二年分以降用テンプレートになる(): void
+    {
+        $resolver = new TemplateResolver;
+
+        $this->assertSame(TemplateResolver::FROM_2020, $resolver->resolveForYear(2020));
+        $this->assertSame(TemplateResolver::FROM_2020, $resolver->resolveForYear(2021));
+        $this->assertSame(TemplateResolver::FROM_2020, $resolver->resolveForYear(2022));
+    }
+
+    #[Test]
+    public function 西暦2019年分以前は例外になる(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('2022年分の青色申告決算書テンプレートは未対応です。');
+        $this->expectExceptionMessage('2019年分の青色申告決算書テンプレートは未対応です。');
 
-        (new TemplateResolver)->resolveForYear(2022);
+        (new TemplateResolver)->resolveForYear(2019);
     }
 
     #[Test]
@@ -32,6 +42,7 @@ class BlueReturnPdfTemplateResolverTest extends TestCase
     {
         $resolver = new TemplateResolver;
 
+        $this->assertSame('From2020', $resolver->overlayDirectory(TemplateResolver::FROM_2020));
         $this->assertSame('From2023', $resolver->overlayDirectory(TemplateResolver::FROM_2023));
     }
 

@@ -310,10 +310,25 @@ class FieldFormatterTest extends TestCase
                     'deductible_amount' => 135000,
                 ],
             ],
+            rentExpenseRows: [
+                [
+                    'address' => '東京都千代田区霞が関1-2-3',
+                    'name' => '賃貸太郎',
+                    'rent_amount' => 1200000,
+                    'deductible_amount' => 960000,
+                ],
+            ],
             filingNumber: '12345678',
         );
 
         $this->assertSame('12345678', $formatted['filing_number']);
+
+        // 地代家賃の内訳(令和二年分以降用は3ページに欄がある)
+        $this->assertSame('東京都千代田区霞が関1-2-3', $formatted['rent_expense_1_address']);
+        $this->assertSame('賃貸太郎', $formatted['rent_expense_1_name']);
+        $this->assertSame('1,200,000', $formatted['rent_expense_1_rent_amount']);
+        $this->assertSame('960,000', $formatted['rent_expense_1_deductible_amount']);
+        $this->assertArrayNotHasKey('rent_expense_2_address', $formatted);
 
         // 売上・仕入の明細: 「上記以外の計」と「計」に同じ金額
         $this->assertSame('3,400,000', $formatted['sales_amount_other_total']);

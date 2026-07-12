@@ -223,6 +223,13 @@ Artisan::command('blue-return:proof-all {--template=from2023} {--output-dir=} {-
                     'deductible_amount' => 2_800_000,
                 ],
             ],
+            // 地代家賃の内訳は令和二年分以降用(from2020)では3ページにある(令和五年分以降用の3ページには欄がなく印字されない)
+            rentExpenseRows: collect(range(1, 2))->map(fn (int $row): array => [
+                'address' => '東京都千代田区霞が関1-2-'.$row.' テストビル405',
+                'name' => '賃貸太郎'.$row,
+                'rent_amount' => 1_234_567,
+                'deductible_amount' => 987_654,
+            ])->all(),
             filingNumber: '12345678',
         );
 

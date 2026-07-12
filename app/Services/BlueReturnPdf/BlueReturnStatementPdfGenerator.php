@@ -60,7 +60,7 @@ class BlueReturnStatementPdfGenerator
                 $this->overlayRenderer->renderOverlay(
                     $pdf,
                     $this->pageOverlay($templateVersion, 3),
-                    $this->formatPage3Values($calculation, $header)
+                    $this->formatPage3Values($fiscalYear, $calculation, $header)
                 );
             }
 
@@ -114,16 +114,20 @@ class BlueReturnStatementPdfGenerator
     }
 
     /**
+     * 地代家賃の内訳は様式版で載るページが違う(令和五年分以降用は2ページ・令和二年分以降用は3ページ)ため、
+     * 2ページと3ページの両方の値に渡し、オーバーレイ定義に欄があるページだけで印字される。
+     *
      * @param  array{profit_and_loss: array<string, int>, depreciation_calculation: array<string, mixed>}  $calculation
      * @param  array<string, string>  $header
      * @return array<string, string>
      */
-    private function formatPage3Values(array $calculation, array $header): array
+    private function formatPage3Values(FiscalYear $fiscalYear, array $calculation, array $header): array
     {
         return $this->fieldFormatter->formatPage3(
             salesAmount: $calculation['profit_and_loss']['sales_amount'],
             purchasesAmount: $calculation['profit_and_loss']['purchases_amount'],
             depreciationCalculation: $calculation['depreciation_calculation'],
+            rentExpenseRows: $this->blueReturnInputRows($fiscalYear, BlueReturnInput::KEY_RENT_EXPENSES),
             filingNumber: $header['filing_number'] ?? '',
         );
     }

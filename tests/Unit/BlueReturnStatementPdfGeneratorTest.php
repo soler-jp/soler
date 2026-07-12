@@ -76,7 +76,7 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
     }
 
     #[Test]
-    public function test_unsupported_year_throws_exception(): void
+    public function test_from2020_template_generates_pdf(): void
     {
         $generator = app(BlueReturnStatementPdfGenerator::class);
         $user = User::factory()->create();
@@ -84,6 +84,23 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
             'name' => 'PDF基盤テスト',
         ]);
         $fiscalYear = $businessUnit->createFiscalYear(2022);
+
+        $pdf = $generator->generate($fiscalYear, 650000);
+
+        $this->assertNotSame('', $pdf);
+        $this->assertSame(4, preg_match_all('/\/Type\s*\/Page\b/', $pdf));
+        $this->assertStringContainsString('/Subtype /Image', $pdf);
+    }
+
+    #[Test]
+    public function test_unsupported_year_throws_exception(): void
+    {
+        $generator = app(BlueReturnStatementPdfGenerator::class);
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'PDF基盤テスト',
+        ]);
+        $fiscalYear = $businessUnit->createFiscalYear(2019);
 
         $this->expectException(InvalidArgumentException::class);
 

@@ -7,6 +7,8 @@ use InvalidArgumentException;
 
 class TemplateResolver
 {
+    public const FROM_2020 = 'from2020';
+
     public const FROM_2023 = 'from2023';
 
     public function resolve(FiscalYear $fiscalYear): string
@@ -16,8 +18,12 @@ class TemplateResolver
 
     public function resolveForYear(int $year): string
     {
-        if ($year < 2023) {
+        if ($year < 2020) {
             throw new InvalidArgumentException("{$year}年分の青色申告決算書テンプレートは未対応です。");
+        }
+
+        if ($year < 2023) {
+            return self::FROM_2020;
         }
 
         return self::FROM_2023;
@@ -29,6 +35,7 @@ class TemplateResolver
     public function overlayDirectory(string $templateVersion): string
     {
         return match ($templateVersion) {
+            self::FROM_2020 => 'From2020',
             self::FROM_2023 => 'From2023',
             default => throw new InvalidArgumentException("未対応のテンプレート版です: {$templateVersion}"),
         };
