@@ -301,7 +301,7 @@ class DepreciationService
             return 0;
         }
 
-        return $depreciationStart->diffInMonths($fiscalEnd) + 1;
+        return $this->countMonthsIncluded($depreciationStart, $fiscalEnd);
     }
 
     private function calculateDepreciationMonthsForCalendarYear(
@@ -321,7 +321,17 @@ class DepreciationService
             return 0;
         }
 
-        return min($depreciationStart->diffInMonths($fiscalEnd) + 1, $remainingMonths);
+        return min($this->countMonthsIncluded($depreciationStart, $fiscalEnd), $remainingMonths);
+    }
+
+    /**
+     * 開始月から終了月までの月数を両端を含めて数える。
+     * Carbon の diffInMonths() は float を返し、端数の暗黙の int 変換で
+     * 精度が落ちるため、年・月の整数演算のみで算出する。
+     */
+    private function countMonthsIncluded(Carbon $start, Carbon $end): int
+    {
+        return ($end->year - $start->year) * 12 + ($end->month - $start->month) + 1;
     }
 
     public function prepareEntriesFor(FiscalYear $fiscalYear): void

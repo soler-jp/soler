@@ -916,6 +916,60 @@ class DepreciationServiceTest extends TestCase
     }
 
     #[Test]
+    public function 年度途中取得の償却スケジュールは月数を整数で計算する()
+    {
+        $fixedAsset = FixedAsset::factory()->create([
+            'acquisition_date' => '2025-03-15',
+            'taxable_amount' => 600_000,
+            'tax_amount' => 0,
+            'useful_life' => 60,
+            'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
+        ]);
+
+        $schedule = app(DepreciationService::class)
+            ->calculateDepreciationScheduleUntilFullyDepreciated($fixedAsset);
+
+        $this->assertSame([2025, 2026, 2027, 2028, 2029, 2030], array_keys($schedule));
+        $this->assertSame(10, $schedule[2025]['months']);
+        $this->assertSame(100_000, $schedule[2025]['ordinary_amount']);
+        $this->assertSame(12, $schedule[2026]['months']);
+        $this->assertSame(120_000, $schedule[2026]['ordinary_amount']);
+        $this->assertSame(2, $schedule[2030]['months']);
+        $this->assertSame(20_000, $schedule[2030]['ordinary_amount']);
+        $this->assertSame(0, $schedule[2030]['ending_balance']);
+    }
+
+    #[Test]
+    public function 取得日が月初でも月末でも初年度の月数は取得月から年末までの月数になる()
+    {
+        $expectedMonthsByAcquisitionDate = [
+            '2025-01-01' => 12,
+            '2025-03-01' => 10,
+            '2025-03-31' => 10,
+            '2025-12-31' => 1,
+        ];
+
+        foreach ($expectedMonthsByAcquisitionDate as $acquisitionDate => $expectedMonths) {
+            $fixedAsset = FixedAsset::factory()->create([
+                'acquisition_date' => $acquisitionDate,
+                'taxable_amount' => 600_000,
+                'tax_amount' => 0,
+                'useful_life' => 60,
+                'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
+            ]);
+
+            $schedule = app(DepreciationService::class)
+                ->calculateDepreciationScheduleUntilFullyDepreciated($fixedAsset);
+
+            $this->assertSame(
+                $expectedMonths,
+                $schedule[2025]['months'],
+                "acquisition_date: {$acquisitionDate}",
+            );
+        }
+    }
+
+    #[Test]
     public function register_transaction_forは未記帳entryから減価償却仕訳を作成する()
     {
         $user = User::factory()->create();
