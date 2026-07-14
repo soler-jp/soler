@@ -73,6 +73,7 @@ class DashboardExpenseInput extends Component
                 ],
             ]);
 
+            $this->dispatch('dashboard-transaction-created');
             // 初期化 & 確認メッセージ
             $this->reset(['description', 'amount', 'debit_sub_account_id', 'credit_sub_account_id']);
             session()->flash('message', '経費を登録しました');

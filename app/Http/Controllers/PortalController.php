@@ -40,4 +40,17 @@ class PortalController extends Controller
             'fiscalYear' => $fiscalYear,
         ]);
     }
+
+    public function transactionIndex(Request $request, string $kind)
+    {
+        $user = $request->user();
+
+        if (! $user->selectedBusinessUnit?->currentFiscalYear) {
+            return redirect()->route('initialize');
+        }
+
+        return view('transactions.index', [
+            'kind' => $kind,
+        ]);
+    }
 }

@@ -22,6 +22,16 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/fixed-expenses', [PortalController::class, 'fixedExpenses'])
         ->name('fixed-expenses');
+
+    Route::get('/transactions/revenues', [PortalController::class, 'transactionIndex'])
+        ->defaults('kind', 'revenue')
+        ->name('transactions.revenues');
+    Route::get('/transactions/expenses', [PortalController::class, 'transactionIndex'])
+        ->defaults('kind', 'expense')
+        ->name('transactions.expenses');
+    Route::get('/transactions/purchases', [PortalController::class, 'transactionIndex'])
+        ->defaults('kind', 'purchase')
+        ->name('transactions.purchases');
 });
 
 Route::middleware(['auth', 'admin'])

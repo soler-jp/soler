@@ -82,6 +82,7 @@ class DashboardRevenueInput extends Component
                 $journalEntries
             );
 
+            $this->dispatch('dashboard-transaction-created');
             session()->flash('message', '売上を登録しました');
 
             $this->reset([

@@ -92,6 +92,24 @@ class FiscalYear extends Model
     /**
      * @param  array<int, string>  $accountNames
      * @param  array<int, string>  $excludedAccountNames
+     * @return array{months: array<int, array{year_month: string, label: string, amount: int}>, total_amount: int}
+     */
+    public function monthlyAccountTypeSummaryData(
+        string $accountType,
+        array $accountNames = [],
+        array $excludedAccountNames = [],
+    ): array {
+        $months = $this->monthlyAccountTypeSummaries($accountType, $accountNames, $excludedAccountNames);
+
+        return [
+            'months' => $months,
+            'total_amount' => collect($months)->sum('amount'),
+        ];
+    }
+
+    /**
+     * @param  array<int, string>  $accountNames
+     * @param  array<int, string>  $excludedAccountNames
      * @return array<int, array{year_month: string, label: string, amount: int}>
      */
     public function monthlyAccountTypeSummaries(

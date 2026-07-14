@@ -15,6 +15,15 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('transactions.revenues')" :active="request()->routeIs('transactions.revenues')">
+                        売上一覧
+                    </x-nav-link>
+                    <x-nav-link :href="route('transactions.expenses')" :active="request()->routeIs('transactions.expenses')">
+                        経費一覧
+                    </x-nav-link>
+                    <x-nav-link :href="route('transactions.purchases')" :active="request()->routeIs('transactions.purchases')">
+                        仕入れ一覧
+                    </x-nav-link>
                     <x-nav-link :href="route('fixed-expenses')" :active="request()->routeIs('fixed-expenses')">
                         固定費
                     </x-nav-link>
@@ -80,6 +89,18 @@
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('transactions.revenues')" :active="request()->routeIs('transactions.revenues')">
+                売上一覧
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('transactions.expenses')" :active="request()->routeIs('transactions.expenses')">
+                経費一覧
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('transactions.purchases')" :active="request()->routeIs('transactions.purchases')">
+                仕入れ一覧
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('fixed-expenses')" :active="request()->routeIs('fixed-expenses')">
+                固定費
             </x-responsive-nav-link>
         </div>
 

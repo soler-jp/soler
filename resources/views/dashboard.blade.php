@@ -6,21 +6,11 @@
                 <h1 class="text-2xl font-bold mb-6">経営サマリー（実績）</h1>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    <!-- 売上カード -->
-                    <div class="bg-white shadow rounded-2xl p-6">
-                        <h2 class="text-gray-500 text-sm mb-2">売上</h2>
-                        <p class="text-2xl font-bold text-blue-600">
-                            {{ number_format($summary['actual']['total_income']) }} 円
-                        </p>
-                    </div>
+                    <livewire:dashboard.monthly-account-type-panel account-type="revenue" title="売上"
+                        variant="revenue" />
 
-                    <!-- 経費カード -->
-                    <div class="bg-white shadow rounded-2xl p-6">
-                        <h2 class="text-gray-500 text-sm mb-2">経費</h2>
-                        <p class="text-2xl font-bold text-red-600">
-                            {{ number_format($summary['actual']['total_expense']) }} 円
-                        </p>
-                    </div>
+                    <livewire:dashboard.monthly-account-type-panel account-type="expense" title="経費"
+                        variant="expense" />
 
                     <!-- 利益カード -->
                     <div class="bg-white shadow rounded-2xl p-6">
