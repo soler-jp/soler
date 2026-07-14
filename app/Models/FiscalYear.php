@@ -400,6 +400,143 @@ class FiscalYear extends Model
             ->all();
     }
 
+    /**
+     * @param  array<int, string>  $accountNames
+     * @param  array<int, string>  $excludedAccountNames
+     * @return array<int, array{
+     *     id: int,
+     *     date: string,
+     *     amount: int,
+     *     payment_amount: int,
+     *     description: string,
+     *     allocation_note: string,
+     *     debit_label: string,
+     *     debit_badge_class: string,
+     *     credit_label: string,
+     *     credit_badge_class: string,
+     *     tax_type_label: string,
+     *     tax_type_badge_class: string,
+     *     counterparty_name: string
+     * }>
+     */
+    public function accountTypeTransactions(
+        string $accountType,
+        array $accountNames = [],
+        array $excludedAccountNames = [],
+    ): array {
+        $normalizedAccountType = $this->normalizeMonthlyAccountType($accountType);
+        [$primaryType, $reverseType] = $this->monthlyEntryTypesFor($normalizedAccountType);
+
+        return Transaction::query()
+            ->with([
+                'counterparty:id,name',
+                'journalEntries.subAccount.account:id,name,type',
+            ])
+            ->whereBelongsTo($this)
+            ->where('is_active', true)
+            ->where('is_planned', false)
+            ->whereHas('journalEntries.subAccount.account', fn (Builder $query) => $this->applyMonthlyAccountTypeFilters(
+                $query,
+                $normalizedAccountType,
+                $accountNames,
+                $excludedAccountNames,
+            ))
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get()
+            ->map(function (Transaction $transaction) use (
+                $normalizedAccountType,
+                $primaryType,
+                $reverseType,
+                $accountNames
+            ): array {
+                $relevantPositiveEntries = $transaction->journalEntries->filter(
+                    fn (JournalEntry $entry): bool => $entry->type === $primaryType
+                        && $entry->subAccount->account->type === $normalizedAccountType
+                        && $this->matchesMonthlyAccountNames($entry->subAccount->account->name, $accountNames)
+                );
+                $relevantNegativeEntries = $transaction->journalEntries->filter(
+                    fn (JournalEntry $entry): bool => $entry->type === $reverseType
+                        && $entry->subAccount->account->type === $normalizedAccountType
+                        && $this->matchesMonthlyAccountNames($entry->subAccount->account->name, $accountNames)
+                );
+                $representativeEntries = $relevantPositiveEntries->isNotEmpty()
+                    ? $relevantPositiveEntries
+                    : $relevantNegativeEntries;
+                $paymentAmount = (int) $transaction->journalEntries
+                    ->where('type', JournalEntry::TYPE_CREDIT)
+                    ->sum(fn (JournalEntry $entry): int => $entry->gross_amount);
+                $displayAmount = $this->monthlyDisplayAmount($transaction, $normalizedAccountType);
+                $debitLabel = $this->monthlyDebitLabel($transaction, $normalizedAccountType);
+                $creditLabel = $this->monthlyEntryLabels($transaction->journalEntries->where('type', JournalEntry::TYPE_CREDIT));
+
+                return [
+                    'id' => $transaction->id,
+                    'date' => $transaction->date->format('Y-m-d'),
+                    'amount' => $displayAmount,
+                    'payment_amount' => $paymentAmount,
+                    'description' => $this->monthlyTransactionDescription($transaction),
+                    'allocation_note' => $this->monthlyAllocationNote(
+                        $normalizedAccountType,
+                        $paymentAmount,
+                        $transaction->business_ratio,
+                    ),
+                    'debit_label' => $debitLabel,
+                    'debit_badge_class' => $this->monthlyBadgeClassForAccount($debitLabel),
+                    'credit_label' => $creditLabel,
+                    'credit_badge_class' => $this->monthlyBadgeClassForAccount($creditLabel),
+                    'tax_type_label' => $this->monthlyTaxTypeLabel($representativeEntries),
+                    'tax_type_badge_class' => $this->monthlyTaxTypeBadgeClass($representativeEntries),
+                    'counterparty_name' => $transaction->counterparty?->name ?? '',
+                ];
+            })
+            ->filter(fn (array $transaction): bool => $transaction['amount'] !== 0)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int, string>  $accountNames
+     * @return array<string, int>
+     */
+    public function transactionCountByAccountNames(
+        string $accountType,
+        array $accountNames,
+    ): array {
+        if ($accountNames === []) {
+            return [];
+        }
+
+        $normalizedAccountType = $this->normalizeMonthlyAccountType($accountType);
+        [$primaryType] = $this->monthlyEntryTypesFor($normalizedAccountType);
+
+        return Transaction::query()
+            ->with(['journalEntries.subAccount.account:id,name,type'])
+            ->whereBelongsTo($this)
+            ->where('is_active', true)
+            ->where('is_planned', false)
+            ->whereHas('journalEntries.subAccount.account', fn (Builder $query) => $this->applyMonthlyAccountTypeFilters(
+                $query,
+                $normalizedAccountType,
+                $accountNames,
+            ))
+            ->get()
+            ->flatMap(function (Transaction $transaction) use ($normalizedAccountType, $primaryType, $accountNames): Collection {
+                return $transaction->journalEntries
+                    ->filter(
+                        fn (JournalEntry $entry): bool => $entry->type === $primaryType
+                            && $entry->subAccount->account->type === $normalizedAccountType
+                            && in_array($entry->subAccount->account->name, $accountNames, true)
+                    )
+                    ->map(fn (JournalEntry $entry): string => $entry->subAccount->account->name)
+                    ->unique()
+                    ->values();
+            })
+            ->countBy()
+            ->map(fn (int $count): int => $count)
+            ->all();
+    }
+
     private function monthlyDisplayAmount(Transaction $transaction, string $accountType): int
     {
         [$primaryType, $reverseType] = $this->monthlyEntryTypesFor($accountType);

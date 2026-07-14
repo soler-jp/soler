@@ -8,6 +8,8 @@ use Livewire\Component;
 
 class AccountTypeTransactionIndex extends Component
 {
+    private const PURCHASE_ACCOUNT_NAMES = ['仕入金額'];
+
     public string $kind;
 
     public string $title;
@@ -20,6 +22,8 @@ class AccountTypeTransactionIndex extends Component
 
     public bool $showTaxTypeColumn = true;
 
+    public bool $groupByMonth = true;
+
     /**
      * @var array<int, string>
      */
@@ -29,6 +33,35 @@ class AccountTypeTransactionIndex extends Component
      * @var array<int, string>
      */
     public array $excludedAccountNames = [];
+
+    /**
+     * @var array<int, string>
+     */
+    public array $availableAccountNames = [];
+
+    /**
+     * @var array<string, int>
+     */
+    public array $availableAccountCounts = [];
+
+    /**
+     * @var array<int, array{
+     *     id: int,
+     *     date: string,
+     *     amount: int,
+     *     payment_amount: int,
+     *     description: string,
+     *     allocation_note: string,
+     *     debit_label: string,
+     *     debit_badge_class: string,
+     *     credit_label: string,
+     *     credit_badge_class: string,
+     *     tax_type_label: string,
+     *     tax_type_badge_class: string,
+     *     counterparty_name: string
+     * }>
+     */
+    public array $transactions = [];
 
     /**
      * @var array<int, array{
@@ -59,17 +92,20 @@ class AccountTypeTransactionIndex extends Component
         $this->description = $config['description'];
         $this->accountType = $config['account_type'];
         $this->variant = $config['variant'];
+        $this->groupByMonth = $config['group_by_month'];
         $this->accountNames = $config['account_names'];
         $this->excludedAccountNames = $config['excluded_account_names'];
 
         $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
         $this->showTaxTypeColumn = (bool) $fiscalYear?->is_taxable;
+        $this->availableAccountCounts = $this->resolveAvailableAccountCounts();
+        $this->availableAccountNames = array_keys($this->availableAccountCounts);
 
-        $this->months = $fiscalYear?->monthlyAccountTypeTransactionGroups(
-            $this->accountType,
-            $this->accountNames,
-            $this->excludedAccountNames,
-        ) ?? [];
+        if (! $this->groupByMonth) {
+            $this->accountNames = $this->availableAccountNames;
+        }
+
+        $this->reloadTransactions();
     }
 
     /**
@@ -78,7 +114,8 @@ class AccountTypeTransactionIndex extends Component
      *     description: string,
      *     account_type: string,
      *     variant: string,
-     *     account_names: array<int, string>
+     *     group_by_month: bool,
+     *     account_names: array<int, string>,
      *     excluded_account_names: array<int, string>
      * }
      */
@@ -90,22 +127,34 @@ class AccountTypeTransactionIndex extends Component
                 'description' => '売上を月ごとにまとめて確認できます。',
                 'account_type' => Account::TYPE_REVENUE,
                 'variant' => Account::TYPE_REVENUE,
+                'group_by_month' => true,
                 'account_names' => [],
                 'excluded_account_names' => [],
             ],
             'expense' => [
-                'title' => '経費一覧',
+                'title' => '経費の月別一覧',
                 'description' => '経費を月ごとにまとめて確認できます。',
                 'account_type' => Account::TYPE_EXPENSE,
                 'variant' => Account::TYPE_EXPENSE,
+                'group_by_month' => true,
                 'account_names' => [],
-                'excluded_account_names' => ['仕入金額'],
+                'excluded_account_names' => self::PURCHASE_ACCOUNT_NAMES,
+            ],
+            'expense_type' => [
+                'title' => '経費の種類別一覧',
+                'description' => '表示する経費の種類を選んで、日付順に確認できます。',
+                'account_type' => Account::TYPE_EXPENSE,
+                'variant' => Account::TYPE_EXPENSE,
+                'group_by_month' => false,
+                'account_names' => [],
+                'excluded_account_names' => self::PURCHASE_ACCOUNT_NAMES,
             ],
             'purchase' => [
                 'title' => '仕入れ一覧',
                 'description' => '仕入金額の取引だけを月ごとに確認できます。',
                 'account_type' => Account::TYPE_EXPENSE,
                 'variant' => Account::TYPE_EXPENSE,
+                'group_by_month' => true,
                 'account_names' => ['仕入金額'],
                 'excluded_account_names' => [],
             ],
@@ -145,6 +194,103 @@ class AccountTypeTransactionIndex extends Component
         return ($this->accountType === Account::TYPE_EXPENSE ? 4 : 3)
             + ($this->showTaxTypeColumn ? 1 : 0)
             + 2;
+    }
+
+    public function updatedAccountNames(): void
+    {
+        if ($this->groupByMonth) {
+            return;
+        }
+
+        $this->reloadTransactions();
+    }
+
+    public function selectedTotalAmount(): int
+    {
+        return collect($this->transactions)->sum('amount');
+    }
+
+    public function selectAllAccountNames(): void
+    {
+        if ($this->groupByMonth) {
+            return;
+        }
+
+        $this->accountNames = $this->availableAccountNames;
+        $this->reloadTransactions();
+    }
+
+    public function clearAccountNames(): void
+    {
+        if ($this->groupByMonth) {
+            return;
+        }
+
+        $this->accountNames = [];
+        $this->reloadTransactions();
+    }
+
+    private function reloadTransactions(): void
+    {
+        $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
+
+        if ($this->groupByMonth) {
+            $this->months = $fiscalYear?->monthlyAccountTypeTransactionGroups(
+                $this->accountType,
+                $this->accountNames,
+                $this->excludedAccountNames,
+            ) ?? [];
+            $this->transactions = [];
+
+            return;
+        }
+
+        if ($this->accountNames === []) {
+            $this->transactions = [];
+            $this->months = [];
+
+            return;
+        }
+
+        $this->transactions = $fiscalYear?->accountTypeTransactions(
+            $this->accountType,
+            $this->accountNames,
+            $this->excludedAccountNames,
+        ) ?? [];
+        $this->months = [];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function resolveAvailableAccountNames(): array
+    {
+        return array_keys($this->resolveAvailableAccountCounts());
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function resolveAvailableAccountCounts(): array
+    {
+        if ($this->accountType !== Account::TYPE_EXPENSE || $this->groupByMonth) {
+            return [];
+        }
+
+        $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
+        $candidateAccountNames = auth()->user()
+            ->selectedBusinessUnit
+            ->accounts()
+            ->where('type', Account::TYPE_EXPENSE)
+            ->whereNotIn('name', $this->excludedAccountNames)
+            ->orderBy('id')
+            ->pluck('name')
+            ->all();
+
+        return $fiscalYear?->transactionCountByAccountNames(
+            $this->accountType,
+            $candidateAccountNames,
+        ) ?? [];
     }
 
     public function render()

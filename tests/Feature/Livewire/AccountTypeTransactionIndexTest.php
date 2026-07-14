@@ -32,6 +32,20 @@ class AccountTypeTransactionIndexTest extends TestCase
     }
 
     #[Test]
+    public function 経費の種類別一覧ページを表示できる(): void
+    {
+        [$user] = $this->createInitializedUser();
+
+        $this->actingAs($user);
+
+        $response = $this->get(route('transactions.expense-types'));
+
+        $response->assertOk();
+        $response->assertSee('経費の種類別一覧');
+        $response->assertSeeLivewire(AccountTypeTransactionIndex::class);
+    }
+
+    #[Test]
     public function 仕入れ一覧は仕入金額だけを表示する(): void
     {
         [$user, $unit] = $this->createInitializedUser();
@@ -207,6 +221,97 @@ class AccountTypeTransactionIndexTest extends TestCase
 
         $this->assertSame('2025-01', $months[0]['year_month']);
         $this->assertSame('2025-02', $months[1]['year_month']);
+    }
+
+    #[Test]
+    public function 経費の種類別一覧は複数選択した科目を日付順に表示する(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $supplies = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+        $travel = $unit->getAccountByName('旅費交通費')->subAccounts()->firstOrFail();
+        $purchase = $unit->getAccountByName('仕入金額')->subAccounts()->firstOrFail();
+
+        $registrar = new TransactionRegistrar;
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-03-10',
+            'description' => '消耗品',
+        ], [
+            [
+                'sub_account_id' => $supplies->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-01-20',
+            'description' => '交通費',
+        ], [
+            [
+                'sub_account_id' => $travel->id,
+                'type' => 'debit',
+                'net_amount' => 2000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'credit',
+                'net_amount' => 2000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-02-05',
+            'description' => '仕入れ',
+        ], [
+            [
+                'sub_account_id' => $purchase->id,
+                'type' => 'debit',
+                'net_amount' => 3000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'credit',
+                'net_amount' => 3000,
+                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            ],
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(AccountTypeTransactionIndex::class, ['kind' => 'expense_type'])
+            ->assertSet('groupByMonth', false)
+            ->assertSee('消耗品費')
+            ->assertSee('1件')
+            ->assertSee('旅費交通費')
+            ->assertDontSee('仕入金額')
+            ->call('clearAccountNames')
+            ->assertSet('accountNames', [])
+            ->assertSee('表示する経費の種類を選ぶと、対象取引がここに表示されます。')
+            ->call('selectAllAccountNames')
+            ->set('accountNames', ['旅費交通費', '消耗品費'])
+            ->assertSee('交通費')
+            ->assertSee('消耗品')
+            ->assertDontSee('仕入れ');
+
+        $transactions = $component->get('transactions');
+
+        $this->assertCount(2, $transactions);
+        $this->assertSame('2025-01-20', $transactions[0]['date']);
+        $this->assertSame('旅費交通費', $transactions[0]['debit_label']);
+        $this->assertSame('2025-03-10', $transactions[1]['date']);
+        $this->assertSame('消耗品費', $transactions[1]['debit_label']);
     }
 
     /**

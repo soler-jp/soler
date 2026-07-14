@@ -19,7 +19,10 @@
                         売上一覧
                     </x-nav-link>
                     <x-nav-link :href="route('transactions.expenses')" :active="request()->routeIs('transactions.expenses')">
-                        経費一覧
+                        経費の月別一覧
+                    </x-nav-link>
+                    <x-nav-link :href="route('transactions.expense-types')" :active="request()->routeIs('transactions.expense-types')">
+                        経費の種類別一覧
                     </x-nav-link>
                     <x-nav-link :href="route('transactions.purchases')" :active="request()->routeIs('transactions.purchases')">
                         仕入れ一覧
@@ -94,7 +97,10 @@
                 売上一覧
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('transactions.expenses')" :active="request()->routeIs('transactions.expenses')">
-                経費一覧
+                経費の月別一覧
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('transactions.expense-types')" :active="request()->routeIs('transactions.expense-types')">
+                経費の種類別一覧
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('transactions.purchases')" :active="request()->routeIs('transactions.purchases')">
                 仕入れ一覧

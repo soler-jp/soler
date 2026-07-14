@@ -29,6 +29,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/transactions/expenses', [PortalController::class, 'transactionIndex'])
         ->defaults('kind', 'expense')
         ->name('transactions.expenses');
+    Route::get('/transactions/expense-types', [PortalController::class, 'transactionIndex'])
+        ->defaults('kind', 'expense_type')
+        ->name('transactions.expense-types');
     Route::get('/transactions/purchases', [PortalController::class, 'transactionIndex'])
         ->defaults('kind', 'purchase')
         ->name('transactions.purchases');
