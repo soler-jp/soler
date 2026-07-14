@@ -16,6 +16,16 @@ class MonthlyTransactionTable extends Component
     public bool $showTaxTypeColumn = true;
 
     /**
+     * @var array<int, string>
+     */
+    public array $accountNames = [];
+
+    /**
+     * @var array<int, string>
+     */
+    public array $excludedAccountNames = [];
+
+    /**
      * @var array<int, array{
      *     id: int,
      *     date: string,
@@ -28,15 +38,27 @@ class MonthlyTransactionTable extends Component
      */
     public array $transactions = [];
 
-    public function mount(string $accountType, string $yearMonth, ?string $variant = null): void
-    {
+    public function mount(
+        string $accountType,
+        string $yearMonth,
+        ?string $variant = null,
+        array $accountNames = [],
+        array $excludedAccountNames = [],
+    ): void {
         $this->accountType = $accountType;
         $this->yearMonth = $yearMonth;
         $this->variant = $variant ?? $accountType;
+        $this->accountNames = $accountNames;
+        $this->excludedAccountNames = $excludedAccountNames;
         $this->showTaxTypeColumn = (bool) auth()->user()->selectedBusinessUnit->currentFiscalYear?->is_taxable;
 
         $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
-        $this->transactions = $fiscalYear?->monthlyAccountTypeTransactions($this->accountType, $this->yearMonth) ?? [];
+        $this->transactions = $fiscalYear?->monthlyAccountTypeTransactions(
+            $this->accountType,
+            $this->yearMonth,
+            $this->accountNames,
+            $this->excludedAccountNames,
+        ) ?? [];
     }
 
     /**

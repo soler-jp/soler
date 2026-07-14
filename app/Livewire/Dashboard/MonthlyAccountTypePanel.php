@@ -16,6 +16,16 @@ class MonthlyAccountTypePanel extends Component
 
     public int $totalAmount = 0;
 
+    /**
+     * @var array<int, string>
+     */
+    public array $accountNames = [];
+
+    /**
+     * @var array<int, string>
+     */
+    public array $excludedAccountNames = [];
+
     public bool $showMonthsModal = false;
 
     public bool $showTransactionsModal = false;
@@ -27,11 +37,18 @@ class MonthlyAccountTypePanel extends Component
 
     public ?string $selectedMonth = null;
 
-    public function mount(string $accountType, string $title, ?string $variant = null): void
-    {
+    public function mount(
+        string $accountType,
+        string $title,
+        ?string $variant = null,
+        array $accountNames = [],
+        array $excludedAccountNames = [],
+    ): void {
         $this->accountType = $accountType;
         $this->title = $title;
         $this->variant = $variant ?? $accountType;
+        $this->accountNames = $accountNames;
+        $this->excludedAccountNames = $excludedAccountNames;
 
         $this->reload();
     }
@@ -40,8 +57,13 @@ class MonthlyAccountTypePanel extends Component
     public function reload(): void
     {
         $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
-        $this->months = $fiscalYear?->monthlyAccountTypeSummaries($this->accountType) ?? [];
-        $this->totalAmount = collect($this->months)->sum('amount');
+        $summary = $fiscalYear?->monthlyAccountTypeSummaryData(
+            $this->accountType,
+            $this->accountNames,
+            $this->excludedAccountNames,
+        ) ?? ['months' => [], 'total_amount' => 0];
+        $this->months = $summary['months'];
+        $this->totalAmount = $summary['total_amount'];
 
         $availableMonths = collect($this->months)->pluck('year_month');
 

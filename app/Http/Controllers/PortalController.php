@@ -20,7 +20,7 @@ class PortalController extends Controller
         $fiscalYear = $unit->currentFiscalYear;
 
         return view('dashboard', [
-            'summary' => $fiscalYear->calculateSummary(),
+            'managementSummaryCards' => $fiscalYear->managementSummaryCards(),
         ]);
     }
 

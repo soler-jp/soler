@@ -23,6 +23,8 @@ class FiscalYear extends Model
 {
     use HasFactory;
 
+    private const PURCHASE_ACCOUNT_NAMES = ['仕入金額'];
+
     protected $fillable = [
         'business_unit_id',
         'year',
@@ -90,6 +92,75 @@ class FiscalYear extends Model
     }
 
     /**
+     * @return array<int, array{
+     *     key: string,
+     *     type: 'account_type'|'amount',
+     *     title: string,
+     *     variant: string,
+     *     account_type?: string,
+     *     account_names?: array<int, string>,
+     *     excluded_account_names?: array<int, string>,
+     *     amount?: int,
+     *     note_lines?: array<int, string>
+     * }>
+     */
+    public function managementSummaryCards(): array
+    {
+        $revenueAmount = $this->monthlyAccountTypeSummaryData(Account::TYPE_REVENUE)['total_amount'];
+        $purchaseAmount = $this->monthlyAccountTypeSummaryData(
+            Account::TYPE_EXPENSE,
+            self::PURCHASE_ACCOUNT_NAMES,
+        )['total_amount'];
+        $expenseAmount = $this->monthlyAccountTypeSummaryData(
+            Account::TYPE_EXPENSE,
+            excludedAccountNames: self::PURCHASE_ACCOUNT_NAMES,
+        )['total_amount'];
+
+        $cards = [
+            $this->managementAccountTypeCard('revenue', '売上', Account::TYPE_REVENUE),
+            $this->managementAccountTypeCard(
+                'expense',
+                '経費',
+                Account::TYPE_EXPENSE,
+                excludedAccountNames: $purchaseAmount > 0 ? self::PURCHASE_ACCOUNT_NAMES : [],
+            ),
+        ];
+
+        if ($purchaseAmount <= 0) {
+            $cards[] = [
+                'key' => 'profit',
+                'type' => 'amount',
+                'title' => '利益',
+                'variant' => 'profit',
+                'amount' => $revenueAmount - $expenseAmount,
+                'note_lines' => [],
+            ];
+
+            return $cards;
+        }
+
+        $cards[] = $this->managementAccountTypeCard(
+            'purchase',
+            '仕入れ',
+            Account::TYPE_EXPENSE,
+            accountNames: self::PURCHASE_ACCOUNT_NAMES,
+        );
+        $cards[] = [
+            'key' => 'current_difference',
+            'type' => 'amount',
+            'title' => '今の差し引き',
+            'variant' => 'current_difference',
+            'amount' => $revenueAmount - $expenseAmount - $purchaseAmount,
+            'note_lines' => [
+                sprintf('売上から、記録済みの経費と仕入(%s円)を引いた金額です。', number_format($purchaseAmount)),
+                '年末に在庫を入力すると、最終的な利益は変わることがあります。',
+            ],
+        ];
+
+        return $cards;
+    }
+
+    /**
      * @param  array<int, string>  $accountNames
      * @param  array<int, string>  $excludedAccountNames
      * @return array{months: array<int, array{year_month: string, label: string, amount: int}>, total_amount: int}
@@ -104,6 +175,37 @@ class FiscalYear extends Model
         return [
             'months' => $months,
             'total_amount' => collect($months)->sum('amount'),
+        ];
+    }
+
+    /**
+     * @param  array<int, string>  $accountNames
+     * @param  array<int, string>  $excludedAccountNames
+     * @return array{
+     *     key: string,
+     *     type: 'account_type',
+     *     title: string,
+     *     variant: string,
+     *     account_type: string,
+     *     account_names: array<int, string>,
+     *     excluded_account_names: array<int, string>
+     * }
+     */
+    private function managementAccountTypeCard(
+        string $key,
+        string $title,
+        string $accountType,
+        array $accountNames = [],
+        array $excludedAccountNames = [],
+    ): array {
+        return [
+            'key' => $key,
+            'type' => 'account_type',
+            'title' => $title,
+            'variant' => $accountType,
+            'account_type' => $accountType,
+            'account_names' => $accountNames,
+            'excluded_account_names' => $excludedAccountNames,
         ];
     }
 

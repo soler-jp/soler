@@ -240,6 +240,44 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
     }
 
     #[Test]
+    public function 経営サマリーカードは仕入れがなければ利益カードを返す(): void
+    {
+        [, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $this->registerRevenue($unit, $fiscalYear, '2025-07-01', 10000, '売上');
+        $this->registerExpense($unit, $fiscalYear, '2025-07-02', 3000, '経費');
+
+        $cards = $fiscalYear->managementSummaryCards();
+
+        $this->assertSame(['revenue', 'expense', 'profit'], array_column($cards, 'key'));
+        $this->assertSame(7000, $cards[2]['amount']);
+        $this->assertSame([], $cards[1]['excluded_account_names']);
+    }
+
+    #[Test]
+    public function 経営サマリーカードは仕入れがあれば仕入れと今の差し引きを返す(): void
+    {
+        [, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $this->registerRevenue($unit, $fiscalYear, '2025-08-01', 20000, '売上');
+        $this->registerExpense($unit, $fiscalYear, '2025-08-02', 4000, '経費');
+        $this->registerExpense($unit, $fiscalYear, '2025-08-03', 6000, '仕入れ', accountName: '仕入金額');
+
+        $cards = $fiscalYear->managementSummaryCards();
+
+        $this->assertSame(['revenue', 'expense', 'purchase', 'current_difference'], array_column($cards, 'key'));
+        $this->assertSame(['仕入金額'], $cards[1]['excluded_account_names']);
+        $this->assertSame(['仕入金額'], $cards[2]['account_names']);
+        $this->assertSame(10000, $cards[3]['amount']);
+        $this->assertSame([
+            '売上から、記録済みの経費と仕入(6,000円)を引いた金額です。',
+            '年末に在庫を入力すると、最終的な利益は変わることがあります。',
+        ], $cards[3]['note_lines']);
+    }
+
+    #[Test]
     public function 合計がゼロの月は集計から除外し明細は符号付き金額を返す(): void
     {
         [, $unit] = $this->createInitializedUser();

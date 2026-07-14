@@ -1,11 +1,12 @@
-<div class="space-y-4">
+<div class="flex w-full flex-col gap-4">
     @php($palette = $this->palette())
 
-    <div class="rounded-2xl border p-6 shadow-sm transition {{ $palette['panel'] }} {{ $palette['hover'] }}">
+    <div class="h-full w-full rounded-2xl border px-5 py-4 shadow-sm transition {{ $palette['panel'] }} {{ $palette['hover'] }}">
         <button type="button" wire:click="openMonthsModal" class="w-full text-left">
-            <h2 class="text-sm mb-2 {{ $palette['title'] }}">{{ $title }}</h2>
-            <p class="text-2xl font-bold {{ $palette['amount'] }}">
-                {{ number_format($totalAmount) }} 円
+            <h2 class="mb-1 text-xs font-medium {{ $palette['title'] }}">{{ $title }}</h2>
+            <p class="flex items-end gap-1 leading-none {{ $palette['amount'] }}">
+                <span class="text-xl font-bold lg:text-2xl">{{ number_format($totalAmount) }}</span>
+                <span class="text-[11px] font-medium leading-none">円</span>
             </p>
         </button>
     </div>
@@ -72,7 +73,9 @@
             <div class="p-6">
                 @if ($selectedMonth)
                     <livewire:dashboard.monthly-transaction-table :account-type="$accountType"
-                        :year-month="$selectedMonth" :variant="$variant" :key="$accountType.'-'.$selectedMonth" />
+                        :year-month="$selectedMonth" :variant="$variant" :account-names="$accountNames"
+                        :excluded-account-names="$excludedAccountNames"
+                        :key="$accountType.'-'.implode('-', $accountNames).'-'.implode('-', $excludedAccountNames).'-'.$selectedMonth" />
                 @endif
             </div>
         </div>
