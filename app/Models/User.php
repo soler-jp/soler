@@ -12,6 +12,15 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
+    protected static function booted(): void
+    {
+        static::deleting(function (User $user): void {
+            $user->businessUnits()->each(function (BusinessUnit $businessUnit): void {
+                $businessUnit->delete();
+            });
+        });
+    }
+
     /**
      * The attributes that are mass assignable.
      *

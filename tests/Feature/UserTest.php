@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\FixedAsset;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -83,5 +84,51 @@ class UserTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         $userA->setSelectedBusinessUnit($unitB);
+    }
+
+    #[Test]
+    public function userを削除すると関連する事業体と仕訳データも削除できる()
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '削除対象事業体']);
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $cashSubAccount = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $salesSubAccount = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+        $fixedAssetAccount = $businessUnit->getAccountByName('車両運搬具');
+
+        $transaction = $fiscalYear->registerTransaction(
+            [
+                'date' => '2025-01-01',
+                'description' => 'テスト売上',
+            ],
+            [
+                [
+                    'sub_account_id' => $cashSubAccount->id,
+                    'type' => 'debit',
+                    'net_amount' => 1000,
+                    'tax_amount' => 0,
+                ],
+                [
+                    'sub_account_id' => $salesSubAccount->id,
+                    'type' => 'credit',
+                    'net_amount' => 1000,
+                    'tax_amount' => 0,
+                ],
+            ]
+        );
+
+        $fixedAsset = FixedAsset::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'account_id' => $fixedAssetAccount->id,
+        ]);
+
+        $user->delete();
+
+        $this->assertModelMissing($user);
+        $this->assertModelMissing($businessUnit);
+        $this->assertModelMissing($fiscalYear);
+        $this->assertModelMissing($transaction);
+        $this->assertModelMissing($fixedAsset);
     }
 }

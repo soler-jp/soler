@@ -64,6 +64,10 @@ class BusinessUnit extends Model
     protected static function booted(): void
     {
         static::deleting(function (BusinessUnit $businessUnit): void {
+            $businessUnit->fixedAssets()->delete();
+            $businessUnit->fiscalYears()->each(function (FiscalYear $fiscalYear): void {
+                $fiscalYear->delete();
+            });
             $businessUnit->accounts->each->delete();
         });
     }
