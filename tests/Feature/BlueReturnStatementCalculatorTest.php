@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Account;
 use App\Models\DepreciationEntry;
 use App\Models\Transaction;
 use App\Models\User;
@@ -307,6 +308,157 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $this->assertSame(0, $summary['custom_expense_1']);
         $this->assertSame(0, $summary['reserve_reversal_1']);
         $this->assertSame(0, $summary['bad_debt_reserve_provision']);
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function 追加した費用勘定は任意科目欄と費用合計に反映される(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '任意科目テスト',
+        ]);
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $sales = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+        $meetingExpense = $businessUnit->createAccount([
+            'name' => '会議費',
+            'type' => Account::TYPE_EXPENSE,
+        ])
+            ->subAccounts()
+            ->firstOrFail();
+
+        $bookExpense = $businessUnit->createAccount([
+            'name' => '新聞図書費',
+            'type' => Account::TYPE_EXPENSE,
+        ])
+            ->subAccounts()
+            ->firstOrFail();
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-01-10',
+            'description' => '任意科目テスト売上',
+        ], [
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'gross_amount' => 50_000,
+            ],
+            [
+                'sub_account_id' => $sales->id,
+                'type' => 'credit',
+                'gross_amount' => 50_000,
+            ],
+        ]);
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-02-10',
+            'description' => '任意科目テスト会議費',
+        ], [
+            [
+                'sub_account_id' => $meetingExpense->id,
+                'type' => 'debit',
+                'gross_amount' => 12_000,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'credit',
+                'gross_amount' => 12_000,
+            ],
+        ]);
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-03-10',
+            'description' => '任意科目テスト新聞図書費',
+        ], [
+            [
+                'sub_account_id' => $bookExpense->id,
+                'type' => 'debit',
+                'gross_amount' => 8_000,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'credit',
+                'gross_amount' => 8_000,
+            ],
+        ]);
+
+        $statement = app(BlueReturnStatementCalculator::class)->calculate($fiscalYear, 0);
+        $profitAndLoss = $statement['profit_and_loss'];
+
+        $this->assertSame(12_000, $profitAndLoss['custom_expense_1']);
+        $this->assertSame(8_000, $profitAndLoss['custom_expense_2']);
+        $this->assertSame(0, $profitAndLoss['custom_expense_3']);
+        $this->assertSame('会議費', $statement['custom_expense_labels']['custom_expense_1_label']);
+        $this->assertSame('新聞図書費', $statement['custom_expense_labels']['custom_expense_2_label']);
+        $this->assertSame('', $statement['custom_expense_labels']['custom_expense_3_label']);
+        $this->assertSame(20_000, $profitAndLoss['total_expenses']);
+        $this->assertSame(30_000, $profitAndLoss['income_before_blue_return_deduction']);
+        $this->assertSame(
+            $fiscalYear->calculateSummary()['actual']['profit'],
+            $profitAndLoss['income_before_blue_return_deduction']
+        );
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function 任意科目欄を超える件数の追加費用勘定がある場合は例外になる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '任意科目超過テスト',
+        ]);
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $sales = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+
+        app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-01-10',
+            'description' => '任意科目超過テスト売上',
+        ], [
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'gross_amount' => 100_000,
+            ],
+            [
+                'sub_account_id' => $sales->id,
+                'type' => 'credit',
+                'gross_amount' => 100_000,
+            ],
+        ]);
+
+        for ($index = 1; $index <= 7; $index++) {
+            $expenseSubAccount = $businessUnit->createAccount([
+                'name' => "追加費用{$index}",
+                'type' => Account::TYPE_EXPENSE,
+            ])
+                ->subAccounts()
+                ->firstOrFail();
+
+            app(TransactionRegistrar::class)->register($fiscalYear, [
+                'date' => sprintf('2025-02-%02d', $index),
+                'description' => "任意科目超過テスト追加費用{$index}",
+            ], [
+                [
+                    'sub_account_id' => $expenseSubAccount->id,
+                    'type' => 'debit',
+                    'gross_amount' => 1_000,
+                ],
+                [
+                    'sub_account_id' => $cash->id,
+                    'type' => 'credit',
+                    'gross_amount' => 1_000,
+                ],
+            ]);
+        }
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('青色申告決算書の任意科目欄(6行)を超える費用勘定があります。');
+
+        app(BlueReturnStatementCalculator::class)->calculate($fiscalYear, 0);
     }
 
     #[Test]

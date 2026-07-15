@@ -237,6 +237,60 @@ return [
                 'size' => 8.0,
             ],
         ],
+        'custom_expense_1_label' => [
+            'text' => [
+                'x0' => 322.0,
+                'x1' => 389.0,
+                'y' => 365.8,
+                'align' => 'C',
+                'size' => 8.0,
+            ],
+        ],
+        'custom_expense_2_label' => [
+            'text' => [
+                'x0' => 322.0,
+                'x1' => 389.0,
+                'y' => 383.3,
+                'align' => 'C',
+                'size' => 8.0,
+            ],
+        ],
+        'custom_expense_3_label' => [
+            'text' => [
+                'x0' => 322.0,
+                'x1' => 389.0,
+                'y' => 400.7,
+                'align' => 'C',
+                'size' => 8.0,
+            ],
+        ],
+        'custom_expense_4_label' => [
+            'text' => [
+                'x0' => 322.0,
+                'x1' => 389.0,
+                'y' => 418.2,
+                'align' => 'C',
+                'size' => 8.0,
+            ],
+        ],
+        'custom_expense_5_label' => [
+            'text' => [
+                'x0' => 322.0,
+                'x1' => 389.0,
+                'y' => 435.6,
+                'align' => 'C',
+                'size' => 8.0,
+            ],
+        ],
+        'custom_expense_6_label' => [
+            'text' => [
+                'x0' => 322.0,
+                'x1' => 389.0,
+                'y' => 453.1,
+                'align' => 'C',
+                'size' => 8.0,
+            ],
+        ],
         'sales_amount' => [
             'amount' => [
                 'type' => 'digit_cells',

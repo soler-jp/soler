@@ -720,6 +720,14 @@ class FiscalYear extends Model
     /**
      * @return array{
      *     profit_and_loss: array<string, int>,
+     *     custom_expense_labels: array{
+     *         custom_expense_1_label: string,
+     *         custom_expense_2_label: string,
+     *         custom_expense_3_label: string,
+     *         custom_expense_4_label: string,
+     *         custom_expense_5_label: string,
+     *         custom_expense_6_label: string
+     *     },
      *     monthly_sales_and_purchases: array{
      *         months: array<int, array{
      *             year_month: string,

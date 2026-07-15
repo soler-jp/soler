@@ -68,6 +68,9 @@ class FieldFormatterTest extends TestCase
                 'tax_accountant_name' => '税理 士郎',
                 'tax_accountant_phone_number' => '03-9876-5432',
             ],
+            customExpenseLabels: [
+                'custom_expense_1_label' => '会議費',
+            ],
         );
 
         $this->assertSame('7', $formatted['era_year']);
@@ -89,6 +92,7 @@ class FieldFormatterTest extends TestCase
         $this->assertSame('税理 士郎', $formatted['tax_accountant_name']);
         $this->assertSame('03-9876-5432', $formatted['tax_accountant_phone_number']);
         $this->assertSame('1,234,567', $formatted['sales_amount']);
+        $this->assertSame('会議費', $formatted['custom_expense_1_label']);
     }
 
     #[Test]
@@ -660,9 +664,12 @@ class FieldFormatterTest extends TestCase
         $formatted = $formatter->formatProfitAndLoss([
             'sales_amount' => 0,
             'custom_expense_1' => 0,
+        ], [
+            'custom_expense_1_label' => '',
         ]);
 
         $this->assertSame('0', $formatted['sales_amount']);
         $this->assertSame('', $formatted['custom_expense_1']);
+        $this->assertSame('', $formatted['custom_expense_1_label']);
     }
 }

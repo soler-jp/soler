@@ -8,6 +8,7 @@ use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use RuntimeException;
 
 class BlueReturnStatementCalculator
 {
@@ -64,6 +65,14 @@ class BlueReturnStatementCalculator
      *         income_before_blue_return_deduction: int,
      *         blue_return_deduction: int,
      *         business_income: int
+     *     },
+     *     custom_expense_labels: array{
+     *         custom_expense_1_label: string,
+     *         custom_expense_2_label: string,
+     *         custom_expense_3_label: string,
+     *         custom_expense_4_label: string,
+     *         custom_expense_5_label: string,
+     *         custom_expense_6_label: string
      *     },
      *     monthly_sales_and_purchases: array{
      *         months: array<int, array{
@@ -180,21 +189,24 @@ class BlueReturnStatementCalculator
      */
     public function calculate(FiscalYear $fiscalYear, int $blueReturnDeduction): array
     {
+        $customExpenseAccountNames = $this->customExpenseAccountNames($fiscalYear);
         $totalsByAccountName = $this->summarizeSignedGrossAmounts(
             $fiscalYear,
             array_merge(
                 self::revenueAccountNames(),
                 self::inventoryAccountNames(),
-                self::expenseAccountNames()
+                self::expenseAccountNames(),
+                $customExpenseAccountNames
             )
         );
 
-        $profitAndLoss = $this->calculateProfitAndLoss($totalsByAccountName, $blueReturnDeduction);
+        $profitAndLoss = $this->calculateProfitAndLoss($totalsByAccountName, $customExpenseAccountNames, $blueReturnDeduction);
         $openingBalanceSummary = $this->balanceCalculator->calculateOpening($fiscalYear);
         $endingBalanceSummary = $this->balanceCalculator->calculate($fiscalYear);
 
         return [
             'profit_and_loss' => $profitAndLoss,
+            'custom_expense_labels' => $this->customExpenseLabelMap($customExpenseAccountNames, $profitAndLoss),
             'monthly_sales_and_purchases' => $this->calculateMonthlySalesAndPurchases($fiscalYear),
             'depreciation_calculation' => $this->calculateDepreciationCalculation($fiscalYear, $totalsByAccountName),
             'balance_sheet' => $this->calculateBalanceSheet($profitAndLoss, $openingBalanceSummary, $endingBalanceSummary),
@@ -250,7 +262,7 @@ class BlueReturnStatementCalculator
      *     business_income: int
      * }
      */
-    private function calculateProfitAndLoss(array $totalsByAccountName, int $blueReturnDeduction): array
+    private function calculateProfitAndLoss(array $totalsByAccountName, array $customExpenseAccountNames, int $blueReturnDeduction): array
     {
         if ($blueReturnDeduction < 0) {
             throw new \InvalidArgumentException("青色申告特別控除額が不正です: {$blueReturnDeduction}");
@@ -282,6 +294,7 @@ class BlueReturnStatementCalculator
         $interestAndDiscounts = $this->amountForAccount($totalsByAccountName, '利子割引料');
         $rentExpenses = $this->amountForAccount($totalsByAccountName, '地代家賃');
         $badDebts = $this->amountForAccount($totalsByAccountName, '貸倒金');
+        $customExpenses = $this->customExpenseAmounts($totalsByAccountName, $customExpenseAccountNames);
         $miscellaneousExpenses = $this->amountForAccount($totalsByAccountName, '雑費');
 
         $totalExpenses = array_sum([
@@ -302,6 +315,7 @@ class BlueReturnStatementCalculator
             $interestAndDiscounts,
             $rentExpenses,
             $badDebts,
+            ...$customExpenses,
             $miscellaneousExpenses,
         ]);
 
@@ -347,12 +361,12 @@ class BlueReturnStatementCalculator
             'interest_and_discounts' => $interestAndDiscounts,
             'rent_expenses' => $rentExpenses,
             'bad_debts' => $badDebts,
-            'custom_expense_1' => 0,
-            'custom_expense_2' => 0,
-            'custom_expense_3' => 0,
-            'custom_expense_4' => 0,
-            'custom_expense_5' => 0,
-            'custom_expense_6' => 0,
+            'custom_expense_1' => $customExpenses[0],
+            'custom_expense_2' => $customExpenses[1],
+            'custom_expense_3' => $customExpenses[2],
+            'custom_expense_4' => $customExpenses[3],
+            'custom_expense_5' => $customExpenses[4],
+            'custom_expense_6' => $customExpenses[5],
             'miscellaneous_expenses' => $miscellaneousExpenses,
             'total_expenses' => $totalExpenses,
             'profit_before_reserves' => $profitBeforeReserves,
@@ -946,5 +960,78 @@ class BlueReturnStatementCalculator
             '専従者給与',
             '雑費',
         ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function customExpenseAccountNames(FiscalYear $fiscalYear): array
+    {
+        return $fiscalYear->businessUnit
+            ->accounts()
+            ->where('type', Account::TYPE_EXPENSE)
+            ->whereNotIn('name', array_merge(self::inventoryAccountNames(), self::expenseAccountNames()))
+            ->orderBy('id')
+            ->pluck('name')
+            ->all();
+    }
+
+    /**
+     * @param  array<string, int>  $totalsByAccountName
+     * @param  array<int, string>  $customExpenseAccountNames
+     * @return array<int, int>
+     */
+    private function customExpenseAmounts(array $totalsByAccountName, array $customExpenseAccountNames): array
+    {
+        $customExpenses = array_map(
+            fn (string $accountName): int => $this->amountForAccount($totalsByAccountName, $accountName),
+            $customExpenseAccountNames
+        );
+
+        $nonZeroCustomExpenseCount = count(array_filter(
+            $customExpenses,
+            static fn (int $amount): bool => $amount !== 0
+        ));
+
+        if ($nonZeroCustomExpenseCount > 6) {
+            throw new RuntimeException('青色申告決算書の任意科目欄(6行)を超える費用勘定があります。');
+        }
+
+        return array_pad(array_slice($customExpenses, 0, 6), 6, 0);
+    }
+
+    /**
+     * @param  array<int, string>  $customExpenseAccountNames
+     * @param  array<string, int>  $profitAndLoss
+     * @return array{
+     *     custom_expense_1_label: string,
+     *     custom_expense_2_label: string,
+     *     custom_expense_3_label: string,
+     *     custom_expense_4_label: string,
+     *     custom_expense_5_label: string,
+     *     custom_expense_6_label: string
+     * }
+     */
+    private function customExpenseLabelMap(array $customExpenseAccountNames, array $profitAndLoss): array
+    {
+        $labels = [];
+
+        foreach (range(1, 6) as $index) {
+            $fieldKey = "custom_expense_{$index}";
+            $labels["{$fieldKey}_label"] = $profitAndLoss[$fieldKey] === 0
+                ? ''
+                : ($customExpenseAccountNames[$index - 1] ?? '');
+        }
+
+        /** @var array{
+         *     custom_expense_1_label: string,
+         *     custom_expense_2_label: string,
+         *     custom_expense_3_label: string,
+         *     custom_expense_4_label: string,
+         *     custom_expense_5_label: string,
+         *     custom_expense_6_label: string
+         * } $labels
+         */
+        return $labels;
     }
 }
