@@ -44,6 +44,15 @@ class BlueReturnPage1OverlayHeaderTest extends TestCase
         'tax_accountant_phone_number',
     ];
 
+    private const CUSTOM_EXPENSE_LABEL_FIELDS = [
+        'custom_expense_1_label',
+        'custom_expense_2_label',
+        'custom_expense_3_label',
+        'custom_expense_4_label',
+        'custom_expense_5_label',
+        'custom_expense_6_label',
+    ];
+
     #[Test]
     public function ヘッダーの桁マス欄はgeometryのグループと一致する(): void
     {
@@ -81,7 +90,7 @@ class BlueReturnPage1OverlayHeaderTest extends TestCase
     {
         $fields = $this->overlayFields();
 
-        foreach (self::HEADER_TEXT_FIELDS as $fieldKey) {
+        foreach (array_merge(self::HEADER_TEXT_FIELDS, self::CUSTOM_EXPENSE_LABEL_FIELDS) as $fieldKey) {
             $this->assertArrayHasKey($fieldKey, $fields, "{$fieldKey} が Page1Overlay にありません");
 
             $definition = $fields[$fieldKey]['text'];
@@ -111,7 +120,8 @@ class BlueReturnPage1OverlayHeaderTest extends TestCase
 
         $expectedKeyCount = count($fieldsMap['fields'])
             + count(self::HEADER_DIGIT_CELL_FIELDS)
-            + count(self::HEADER_TEXT_FIELDS);
+            + count(self::HEADER_TEXT_FIELDS)
+            + count(self::CUSTOM_EXPENSE_LABEL_FIELDS);
         $this->assertCount($expectedKeyCount, $fields);
     }
 

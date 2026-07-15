@@ -77,6 +77,7 @@ class FieldFormatter
      *
      * @param  array<string, int>  $profitAndLoss
      * @param  array<string, string>  $header
+     * @param  array<string, string>  $customExpenseLabels
      * @return array<string, string>
      */
     public function formatPage1(
@@ -86,7 +87,8 @@ class FieldFormatter
         int $openingDay,
         int $endingMonth,
         int $endingDay,
-        array $header = []
+        array $header = [],
+        array $customExpenseLabels = []
     ): array {
         return array_merge(
             [
@@ -97,7 +99,7 @@ class FieldFormatter
                 'ending_day' => (string) $endingDay,
             ],
             $this->formatPage1Header($header),
-            $this->formatProfitAndLoss($profitAndLoss)
+            $this->formatProfitAndLoss($profitAndLoss, $customExpenseLabels)
         );
     }
 
@@ -124,14 +126,19 @@ class FieldFormatter
 
     /**
      * @param  array<string, int>  $profitAndLoss
+     * @param  array<string, string>  $customExpenseLabels
      * @return array<string, string>
      */
-    public function formatProfitAndLoss(array $profitAndLoss): array
+    public function formatProfitAndLoss(array $profitAndLoss, array $customExpenseLabels = []): array
     {
         $formatted = [];
 
         foreach ($profitAndLoss as $fieldKey => $amount) {
             $formatted[$fieldKey] = $this->formatProfitAndLossAmount($fieldKey, $amount);
+        }
+
+        foreach ($customExpenseLabels as $fieldKey => $label) {
+            $formatted[$fieldKey] = $label;
         }
 
         return $formatted;

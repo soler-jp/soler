@@ -77,7 +77,7 @@ class BlueReturnStatementPdfGenerator
     }
 
     /**
-     * @param  array{profit_and_loss: array<string, int>}  $calculation
+     * @param  array{profit_and_loss: array<string, int>, custom_expense_labels: array<string, string>}  $calculation
      * @param  array<string, string>  $header
      * @return array<string, string>
      */
@@ -91,6 +91,7 @@ class BlueReturnStatementPdfGenerator
             endingMonth: (int) $fiscalYear->end_date->month,
             endingDay: (int) $fiscalYear->end_date->day,
             header: $header,
+            customExpenseLabels: $calculation['custom_expense_labels'],
         );
     }
 
