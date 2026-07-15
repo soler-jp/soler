@@ -15,5 +15,7 @@ class ExampleTest extends TestCase
         $response = $this->get('/');
 
         $response->assertStatus(200);
+        $response->assertSee('favicon.svg', false);
+        $response->assertSee('favicon-32x32.png', false);
     }
 }
