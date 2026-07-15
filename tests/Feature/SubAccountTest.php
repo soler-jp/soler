@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\BusinessUnit;
 use App\Models\SubAccount;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,5 +50,34 @@ class SubAccountTest extends TestCase
 
         $this->assertDatabaseHas('sub_accounts', ['id' => $sa1->id]);
         $this->assertDatabaseHas('sub_accounts', ['id' => $sa2->id]);
+    }
+
+    #[Test]
+    public function add_custom_sub_accountで補助科目を追加できる(): void
+    {
+        $businessUnit = BusinessUnit::factory()->create();
+        $account = $businessUnit->accounts()->create([
+            'name' => '会議費',
+            'type' => Account::TYPE_EXPENSE,
+        ]);
+
+        $subAccount = $account->addCustomSubAccount('役員会議');
+
+        $this->assertDatabaseHas('sub_accounts', [
+            'id' => $subAccount->id,
+            'account_id' => $account->id,
+            'name' => '役員会議',
+        ]);
+    }
+
+    #[Test]
+    public function add_custom_sub_accountは空名を許可しない(): void
+    {
+        $account = Account::factory()->create();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('name は必須です。');
+
+        $account->addCustomSubAccount('');
     }
 }

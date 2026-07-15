@@ -73,4 +73,11 @@ class Account extends Model
 
         return $this->subAccounts()->create($attributes);
     }
+
+    public function addCustomSubAccount(string $subAccountName): SubAccount
+    {
+        return $this->createSubAccount([
+            'name' => $subAccountName,
+        ]);
+    }
 }

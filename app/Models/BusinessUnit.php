@@ -222,17 +222,34 @@ class BusinessUnit extends Model
 
             if (isset(self::$defaultSubAccounts[$account->name])) {
                 foreach (self::$defaultSubAccounts[$account->name] as $subAccountName) {
-                    $account->subAccounts()->create([
-                        'name' => $subAccountName,
-                    ]);
+                    $account->addCustomSubAccount($subAccountName);
                 }
             } else {
-                $account->subAccounts()->create([
-                    'name' => $account->name,
-                ]);
+                $account->addCustomSubAccount($account->name);
             }
 
             return $account;
+        });
+    }
+
+    public function addCustomAccount(
+        string $type,
+        string $accountName,
+        ?string $subAccountName = null,
+    ): Account {
+        if ($this->getAccountByName($accountName) !== null) {
+            throw new \InvalidArgumentException('同名の勘定科目は既に存在します。');
+        }
+
+        return DB::transaction(function () use ($type, $accountName, $subAccountName): Account {
+            $account = $this->accounts()->create([
+                'name' => $accountName,
+                'type' => $type,
+            ]);
+
+            $account->addCustomSubAccount($subAccountName ?? $accountName);
+
+            return $account->refresh();
         });
     }
 
