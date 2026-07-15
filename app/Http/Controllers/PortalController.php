@@ -53,4 +53,15 @@ class PortalController extends Controller
             'kind' => $kind,
         ]);
     }
+
+    public function accountSummary(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user->selectedBusinessUnit?->currentFiscalYear) {
+            return redirect()->route('initialize');
+        }
+
+        return view('accounts.summary');
+    }
 }

@@ -41,6 +41,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/transactions/purchases', [PortalController::class, 'transactionIndex'])
         ->defaults('kind', 'purchase')
         ->name('transactions.purchases');
+
+    Route::get('/accounts/summary', [PortalController::class, 'accountSummary'])
+        ->name('accounts.summary');
 });
 
 Route::middleware(['auth', 'admin'])
