@@ -43,3 +43,7 @@ $businessUnit = $initializer->initialize(auth()->user(), [
 - `FiscalYear`
 - 期首仕訳
 - 必要に応じて追加の売上補助科目
+
+## 関連
+
+- カスタムの勘定科目や補助科目を後から追加する場合は [`manual/accounts.md`](accounts.md) を参照してください。

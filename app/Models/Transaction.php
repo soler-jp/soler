@@ -148,6 +148,10 @@ class Transaction extends Model
      */
     protected static function booted(): void
     {
+        static::deleting(function (Transaction $transaction): void {
+            $transaction->journalEntries()->delete();
+        });
+
         static::creating(function (Transaction $transaction) {
             if (! $transaction->fiscal_year_id) {
                 throw new \Exception('fiscal_year_id は必須です');

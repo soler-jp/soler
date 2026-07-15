@@ -426,6 +426,53 @@ class BusinessUnitTest extends TestCase
     }
 
     #[Test]
+    public function add_custom_accountは既定で同名の補助科目を作成する(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'カスタム勘定科目テスト事業所',
+        ]);
+
+        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費');
+
+        $this->assertSame('会議費', $account->name);
+        $this->assertSame(Account::TYPE_EXPENSE, $account->type);
+        $this->assertCount(1, $account->subAccounts);
+        $this->assertSame('会議費', $account->subAccounts->first()->name);
+    }
+
+    #[Test]
+    public function add_custom_accountは指定された別名の補助科目を作成できる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'カスタム補助科目テスト事業所',
+        ]);
+
+        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', '役員会議');
+
+        $this->assertSame('会議費', $account->name);
+        $this->assertCount(1, $account->subAccounts);
+        $this->assertSame('役員会議', $account->subAccounts->first()->name);
+    }
+
+    #[Test]
+    public function add_custom_accountは同一事業体内で同名の勘定科目を許可しない(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '重複勘定科目テスト事業所',
+        ]);
+
+        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('同名の勘定科目は既に存在します。');
+
+        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費');
+    }
+
+    #[Test]
     public function 事業主貸の_sub_accountに源泉徴収が自動で作成される()
     {
         $user = User::factory()->create();
