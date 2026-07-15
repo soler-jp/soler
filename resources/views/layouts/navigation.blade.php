@@ -6,6 +6,7 @@
         ['label' => '経費の種類別一覧', 'route' => 'transactions.expense-types'],
         ['label' => '仕入れ一覧', 'route' => 'transactions.purchases'],
         ['label' => '固定費', 'route' => 'fixed-expenses'],
+        ['label' => '青色申告決算書PDF', 'route' => 'blue-return-statement.pdf.show'],
     ];
 
     $adminItems = [];

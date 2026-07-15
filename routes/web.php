@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\BlueReturnStatementPdfController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\SetupController;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +23,11 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/fixed-expenses', [PortalController::class, 'fixedExpenses'])
         ->name('fixed-expenses');
+
+    Route::get('/blue-return-statement/pdf', [BlueReturnStatementPdfController::class, 'show'])
+        ->name('blue-return-statement.pdf.show');
+    Route::post('/blue-return-statement/pdf', [BlueReturnStatementPdfController::class, 'download'])
+        ->name('blue-return-statement.pdf.download');
 
     Route::get('/transactions/revenues', [PortalController::class, 'transactionIndex'])
         ->defaults('kind', 'revenue')

@@ -23,6 +23,7 @@ class NavigationLayoutTest extends TestCase
         $response->assertSee('売上一覧');
         $response->assertSee('経費の月別一覧');
         $response->assertSee('固定費');
+        $response->assertSee('青色申告決算書PDF');
         $response->assertSee('brand/logo-mark-light.png');
         $response->assertDontSee('ユーザー管理');
     }
