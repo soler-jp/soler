@@ -64,4 +64,15 @@ class PortalController extends Controller
 
         return view('accounts.summary');
     }
+
+    public function fiscalYears(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user->selectedBusinessUnit) {
+            return redirect()->route('initialize');
+        }
+
+        return view('fiscal-years.index');
+    }
 }

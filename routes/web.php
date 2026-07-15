@@ -44,6 +44,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/accounts/summary', [PortalController::class, 'accountSummary'])
         ->name('accounts.summary');
+
+    Route::get('/fiscal-years', [PortalController::class, 'fiscalYears'])
+        ->name('fiscal-years.index');
 });
 
 Route::middleware(['auth', 'admin'])

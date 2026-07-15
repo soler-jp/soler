@@ -402,6 +402,23 @@ class BusinessUnit extends Model
         return $this->belongsTo(FiscalYear::class, 'current_fiscal_year_id');
     }
 
+    public function activateFiscalYear(FiscalYear $fiscalYear): void
+    {
+        if ($fiscalYear->business_unit_id !== $this->id) {
+            throw new \InvalidArgumentException('他の事業体の年度は選択できません。');
+        }
+
+        DB::transaction(function () use ($fiscalYear): void {
+            $this->fiscalYears()->update(['is_active' => false]);
+
+            $this->fiscalYears()
+                ->whereKey($fiscalYear->id)
+                ->update(['is_active' => true]);
+
+            $this->update(['current_fiscal_year_id' => $fiscalYear->id]);
+        });
+    }
+
     public function setCurrentFiscalYear(FiscalYear $fiscalYear): void
     {
         if ($fiscalYear->business_unit_id !== $this->id) {
@@ -416,6 +433,31 @@ class BusinessUnit extends Model
         if (is_null($this->current_fiscal_year_id)) {
             $this->setCurrentFiscalYear($fiscalYear);
         }
+    }
+
+    public function createNextFiscalYearFrom(
+        FiscalYear $fiscalYear,
+        ?bool $isTaxable = null,
+        ?bool $isTaxExclusive = null,
+    ): FiscalYear {
+        if ($fiscalYear->business_unit_id !== $this->id) {
+            throw new \InvalidArgumentException('他の事業体の年度を基準に翌年度は作成できません。');
+        }
+
+        $nextYear = $fiscalYear->year + 1;
+
+        if ($this->fiscalYears()->where('year', $nextYear)->exists()) {
+            throw new \InvalidArgumentException('翌年度はすでに作成されています。');
+        }
+
+        $createdFiscalYear = $this->createFiscalYear($nextYear);
+
+        $createdFiscalYear->update([
+            'is_taxable' => $isTaxable ?? (bool) $fiscalYear->is_taxable,
+            'is_tax_exclusive' => $isTaxExclusive ?? (bool) $fiscalYear->is_tax_exclusive,
+        ]);
+
+        return $createdFiscalYear->refresh();
     }
 
     /**

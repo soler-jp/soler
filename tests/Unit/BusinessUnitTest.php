@@ -308,6 +308,62 @@ class BusinessUnitTest extends TestCase
     }
 
     #[Test]
+    public function activate_fiscal_yearで表示中年度とactiveフラグを切り替えられる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '切替テスト事業体']);
+        $fiscalYear2024 = $businessUnit->createFiscalYear(2024);
+        $fiscalYear2025 = $businessUnit->createFiscalYear(2025);
+
+        $businessUnit->activateFiscalYear($fiscalYear2025);
+
+        $businessUnit->refresh();
+
+        $this->assertSame($fiscalYear2025->id, $businessUnit->current_fiscal_year_id);
+        $this->assertTrue((bool) $fiscalYear2025->fresh()->is_active);
+        $this->assertFalse((bool) $fiscalYear2024->fresh()->is_active);
+    }
+
+    #[Test]
+    public function create_next_fiscal_year_fromで税設定を引き継いだ翌年度を作成できる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '翌年度作成テスト事業体']);
+        $fiscalYear2025 = $businessUnit->createFiscalYear(2025);
+        $fiscalYear2025->update([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+
+        $nextFiscalYear = $businessUnit->createNextFiscalYearFrom($fiscalYear2025);
+
+        $this->assertSame(2026, $nextFiscalYear->year);
+        $this->assertTrue((bool) $nextFiscalYear->is_taxable);
+        $this->assertFalse((bool) $nextFiscalYear->is_tax_exclusive);
+    }
+
+    #[Test]
+    public function create_next_fiscal_year_fromで翌年度の税設定を上書きできる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '翌年度税設定上書きテスト事業体']);
+        $fiscalYear2025 = $businessUnit->createFiscalYear(2025);
+        $fiscalYear2025->update([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+
+        $nextFiscalYear = $businessUnit->createNextFiscalYearFrom(
+            $fiscalYear2025,
+            isTaxable: false,
+            isTaxExclusive: false,
+        );
+
+        $this->assertFalse((bool) $nextFiscalYear->is_taxable);
+        $this->assertFalse((bool) $nextFiscalYear->is_tax_exclusive);
+    }
+
+    #[Test]
     public function 他の事業体の_fiscal_yearを設定しようとすると例外が発生する()
     {
         $userA = User::factory()->create();
