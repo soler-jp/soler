@@ -93,11 +93,14 @@
 
                     <div class="flex flex-wrap gap-1.5">
                         @foreach ($availableDebitAccountCounts as $accountName => $count)
+                            @php($isSelected = in_array($accountName, $debitAccountNames, true))
+                            @php($isAvailable = $this->debitAccountOptionIsAvailable($accountName))
+                            @php($displayCount = $this->debitAccountOptionCounts[$accountName] ?? $count)
                             <label wire:key="debit-account-{{ md5($accountName) }}" class="cursor-pointer">
                                 <input type="checkbox" value="{{ $accountName }}" wire:model.live="debitAccountNames" class="sr-only">
-                                <span class="{{ in_array($accountName, $debitAccountNames, true) ? 'border-rose-200 bg-rose-100 text-rose-800' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900' }} inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium transition">
+                                <span class="{{ $isSelected ? 'border-rose-200 bg-rose-100 text-rose-800' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900' }} {{ ! $isAvailable ? 'opacity-40 line-through' : '' }} inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium transition">
                                     <span>{{ $accountName }}</span>
-                                    <span class="{{ in_array($accountName, $debitAccountNames, true) ? 'bg-white/80 text-rose-700' : 'bg-gray-100 text-gray-500' }} rounded-full px-1.5 py-0.5 text-[9px] font-semibold">{{ $count }}</span>
+                                    <span class="{{ $isSelected ? 'bg-white/80 text-rose-700' : 'bg-gray-100 text-gray-500' }} rounded-full px-1.5 py-0.5 text-[9px] font-semibold">{{ $displayCount }}</span>
                                 </span>
                             </label>
                         @endforeach
@@ -118,11 +121,14 @@
 
                     <div class="flex flex-wrap gap-1.5">
                         @foreach ($availableCreditAccountCounts as $accountName => $count)
+                            @php($isSelected = in_array($accountName, $creditAccountNames, true))
+                            @php($isAvailable = $this->creditAccountOptionIsAvailable($accountName))
+                            @php($displayCount = $this->creditAccountOptionCounts[$accountName] ?? $count)
                             <label wire:key="credit-account-{{ md5($accountName) }}" class="cursor-pointer">
                                 <input type="checkbox" value="{{ $accountName }}" wire:model.live="creditAccountNames" class="sr-only">
-                                <span class="{{ in_array($accountName, $creditAccountNames, true) ? 'border-sky-200 bg-sky-100 text-sky-800' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900' }} inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium transition">
+                                <span class="{{ $isSelected ? 'border-sky-200 bg-sky-100 text-sky-800' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900' }} {{ ! $isAvailable ? 'opacity-40 line-through' : '' }} inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium transition">
                                     <span>{{ $accountName }}</span>
-                                    <span class="{{ in_array($accountName, $creditAccountNames, true) ? 'bg-white/80 text-sky-700' : 'bg-gray-100 text-gray-500' }} rounded-full px-1.5 py-0.5 text-[9px] font-semibold">{{ $count }}</span>
+                                    <span class="{{ $isSelected ? 'bg-white/80 text-sky-700' : 'bg-gray-100 text-gray-500' }} rounded-full px-1.5 py-0.5 text-[9px] font-semibold">{{ $displayCount }}</span>
                                 </span>
                             </label>
                         @endforeach

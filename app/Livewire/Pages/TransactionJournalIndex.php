@@ -28,16 +28,6 @@ class TransactionJournalIndex extends Component
     public array $creditAccountNames = [];
 
     /**
-     * @var array<string, int>
-     */
-    public array $availableDebitAccountCounts = [];
-
-    /**
-     * @var array<string, int>
-     */
-    public array $availableCreditAccountCounts = [];
-
-    /**
      * @var array<int, int>
      */
     public array $months = [];
@@ -59,6 +49,16 @@ class TransactionJournalIndex extends Component
 
     #[Url(as: 'direction')]
     public string $sortDirection = 'asc';
+
+    /**
+     * @var array<string, int>
+     */
+    public array $availableDebitAccountCounts = [];
+
+    /**
+     * @var array<string, int>
+     */
+    public array $availableCreditAccountCounts = [];
 
     public function mount(): void
     {
@@ -177,23 +177,40 @@ class TransactionJournalIndex extends Component
         return range(1, 12);
     }
 
+    /**
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function debitAccountOptionCounts(): array
+    {
+        $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
+
+        return $fiscalYear->transactionJournalAvailableAccountNameCounts(
+            'debit',
+            $this->filtersForDebitOptions(),
+        );
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function creditAccountOptionCounts(): array
+    {
+        $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
+
+        return $fiscalYear->transactionJournalAvailableAccountNameCounts(
+            'credit',
+            $this->filtersForCreditOptions(),
+        );
+    }
+
     #[Computed]
     public function transactions(): LengthAwarePaginator
     {
         $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
 
-        return $fiscalYear->searchTransactionsForJournal(TransactionSearchFilters::from(
-            debitAccountNames: $this->debitAccountNames,
-            creditAccountNames: $this->creditAccountNames,
-            keyword: $this->keyword,
-            months: $this->months,
-            exactAmount: $this->nullableInteger($this->exactAmount),
-            minAmount: $this->nullableInteger($this->minAmount),
-            maxAmount: $this->nullableInteger($this->maxAmount),
-            sortBy: $this->sortBy,
-            sortDirection: $this->sortDirection,
-            perPage: $this->perPage,
-        ));
+        return $fiscalYear->searchTransactionsForJournal($this->filters());
     }
 
     public function sortIndicator(string $column): string
@@ -203,6 +220,16 @@ class TransactionJournalIndex extends Component
         }
 
         return $this->sortDirection === 'asc' ? '↑' : '↓';
+    }
+
+    public function debitAccountOptionIsAvailable(string $accountName): bool
+    {
+        return array_key_exists($accountName, $this->debitAccountOptionCounts);
+    }
+
+    public function creditAccountOptionIsAvailable(string $accountName): bool
+    {
+        return array_key_exists($accountName, $this->creditAccountOptionCounts);
     }
 
     public function render(): View
@@ -219,5 +246,51 @@ class TransactionJournalIndex extends Component
         }
 
         return (int) $trimmed;
+    }
+
+    private function filters(): TransactionSearchFilters
+    {
+        return TransactionSearchFilters::from(
+            debitAccountNames: $this->debitAccountNames,
+            creditAccountNames: $this->creditAccountNames,
+            keyword: $this->keyword,
+            months: $this->months,
+            exactAmount: $this->nullableInteger($this->exactAmount),
+            minAmount: $this->nullableInteger($this->minAmount),
+            maxAmount: $this->nullableInteger($this->maxAmount),
+            sortBy: $this->sortBy,
+            sortDirection: $this->sortDirection,
+            perPage: $this->perPage,
+        );
+    }
+
+    private function filtersForDebitOptions(): TransactionSearchFilters
+    {
+        return TransactionSearchFilters::from(
+            creditAccountNames: $this->creditAccountNames,
+            keyword: $this->keyword,
+            months: $this->months,
+            exactAmount: $this->nullableInteger($this->exactAmount),
+            minAmount: $this->nullableInteger($this->minAmount),
+            maxAmount: $this->nullableInteger($this->maxAmount),
+            sortBy: $this->sortBy,
+            sortDirection: $this->sortDirection,
+            perPage: $this->perPage,
+        );
+    }
+
+    private function filtersForCreditOptions(): TransactionSearchFilters
+    {
+        return TransactionSearchFilters::from(
+            debitAccountNames: $this->debitAccountNames,
+            keyword: $this->keyword,
+            months: $this->months,
+            exactAmount: $this->nullableInteger($this->exactAmount),
+            minAmount: $this->nullableInteger($this->minAmount),
+            maxAmount: $this->nullableInteger($this->maxAmount),
+            sortBy: $this->sortBy,
+            sortDirection: $this->sortDirection,
+            perPage: $this->perPage,
+        );
     }
 }

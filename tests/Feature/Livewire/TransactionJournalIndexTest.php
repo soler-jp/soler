@@ -94,6 +94,38 @@ class TransactionJournalIndexTest extends TestCase
             ->assertSet('sortDirection', 'asc');
     }
 
+    #[Test]
+    public function 借方選択に応じて貸方候補件数が絞り込まれる(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $sales = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+        $supplies = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-01-10',
+            'description' => '売上入金',
+        ], [
+            ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 10000],
+            ['sub_account_id' => $sales->id, 'type' => 'credit', 'net_amount' => 10000],
+        ]);
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-01-12',
+            'description' => '備品購入',
+        ], [
+            ['sub_account_id' => $supplies->id, 'type' => 'debit', 'net_amount' => 3000],
+            ['sub_account_id' => $cash->id, 'type' => 'credit', 'net_amount' => 3000],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(TransactionJournalIndex::class)
+            ->set('debitAccountNames', ['現金'])
+            ->assertSet('creditAccountOptionCounts', ['売上高' => 1]);
+    }
+
     /**
      * @return array{0: User, 1: BusinessUnit}
      */

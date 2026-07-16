@@ -11,6 +11,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -356,6 +357,55 @@ class TransactionJournalSearchTest extends TestCase
         $this->assertSame([$first->id, $third->id, $second->id], collect($amountDesc->items())->pluck('id')->all());
         $this->assertSame([$second->id, $third->id, $first->id], collect($descriptionAsc->items())->pluck('id')->all());
         $this->assertSame([$third->id, $second->id, $first->id], collect($counterpartyAsc->items())->pluck('id')->all());
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function 借方貸方の相関に応じた候補科目件数を取得できる(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $sales = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+        $supplies = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+        $capital = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+
+        $this->registerTransaction($fiscalYear, [
+            'date' => '2025-09-01',
+            'description' => '売上',
+        ], [
+            ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 10000],
+            ['sub_account_id' => $sales->id, 'type' => 'credit', 'net_amount' => 10000],
+        ]);
+
+        $this->registerTransaction($fiscalYear, [
+            'date' => '2025-09-02',
+            'description' => '経費',
+        ], [
+            ['sub_account_id' => $supplies->id, 'type' => 'debit', 'net_amount' => 4000],
+            ['sub_account_id' => $cash->id, 'type' => 'credit', 'net_amount' => 4000],
+        ]);
+
+        $creditOptions = $fiscalYear->transactionJournalAvailableAccountNameCounts(
+            'credit',
+            TransactionSearchFilters::from(
+                debitAccountNames: ['現金'],
+            ),
+        );
+        $debitOptions = $fiscalYear->transactionJournalAvailableAccountNameCounts(
+            'debit',
+            TransactionSearchFilters::from(
+                creditAccountNames: ['売上高'],
+            ),
+        );
+
+        $this->assertSame(['売上高' => 1], $creditOptions);
+        $this->assertSame(['現金' => 1], $debitOptions);
+        $this->assertArrayNotHasKey('事業主借', $creditOptions);
+        $this->assertArrayNotHasKey('消耗品費', $debitOptions);
+        $this->assertNotContains('現金', array_keys($creditOptions));
+        $this->assertNotContains('消耗品費', array_keys($debitOptions));
     }
 
     /**

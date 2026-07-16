@@ -542,20 +542,89 @@ class FiscalYear extends Model
 
     public function searchTransactionsForJournal(TransactionSearchFilters $filters): LengthAwarePaginator
     {
-        $amountSubquery = $this->transactionJournalAmountSubquery();
-        $counterpartyNameSubquery = $this->transactionJournalCounterpartyNameSubquery();
-
-        $query = Transaction::query()
-            ->select('transactions.*')
+        $query = $this->transactionJournalQuery($filters)
             ->with([
                 'counterparty:id,name',
                 'journalEntries.subAccount.account:id,name,type',
             ])
-            ->selectSub(clone $amountSubquery, 'total_amount_for_search')
-            ->selectSub(clone $counterpartyNameSubquery, 'counterparty_name_for_sort')
+            ->selectSub($this->transactionJournalCounterpartyNameSubquery(), 'counterparty_name_for_sort');
+
+        $this->applyTransactionJournalSorting($query, $filters);
+
+        return $query->paginate($filters->perPage);
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function transactionJournalAccountNameCounts(string $type): array
+    {
+        if (! in_array($type, JournalEntry::TYPES, true)) {
+            throw new InvalidArgumentException('Unsupported journal entry type.');
+        }
+
+        return DB::table('transactions')
+            ->join('journal_entries', 'journal_entries.transaction_id', '=', 'transactions.id')
+            ->join('sub_accounts', 'sub_accounts.id', '=', 'journal_entries.sub_account_id')
+            ->join('accounts', 'accounts.id', '=', 'sub_accounts.account_id')
+            ->where('transactions.fiscal_year_id', $this->id)
+            ->where('transactions.is_active', true)
+            ->where('transactions.is_planned', false)
+            ->where('journal_entries.type', $type)
+            ->groupBy('accounts.id', 'accounts.name')
+            ->orderBy('accounts.id')
+            ->selectRaw('accounts.name, COUNT(DISTINCT transactions.id) as transaction_count')
+            ->pluck('transaction_count', 'accounts.name')
+            ->map(fn (mixed $count): int => (int) $count)
+            ->all();
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function transactionJournalAvailableAccountNameCounts(
+        string $type,
+        TransactionSearchFilters $filters,
+    ): array {
+        if (! in_array($type, JournalEntry::TYPES, true)) {
+            throw new InvalidArgumentException('Unsupported journal entry type.');
+        }
+
+        $filteredTransactionIds = $this->transactionJournalQuery($filters)
+            ->select('transactions.id');
+
+        return DB::query()
+            ->fromSub($filteredTransactionIds, 'filtered_transactions')
+            ->join('journal_entries', 'journal_entries.transaction_id', '=', 'filtered_transactions.id')
+            ->join('sub_accounts', 'sub_accounts.id', '=', 'journal_entries.sub_account_id')
+            ->join('accounts', 'accounts.id', '=', 'sub_accounts.account_id')
+            ->where('journal_entries.type', $type)
+            ->groupBy('accounts.id', 'accounts.name')
+            ->orderBy('accounts.id')
+            ->selectRaw('accounts.name, COUNT(DISTINCT filtered_transactions.id) as transaction_count')
+            ->pluck('transaction_count', 'accounts.name')
+            ->map(fn (mixed $count): int => (int) $count)
+            ->all();
+    }
+
+    private function transactionJournalAmountSubquery(): Builder
+    {
+        return JournalEntry::query()
+            ->selectRaw('COALESCE(SUM(net_amount), 0)')
+            ->whereColumn('transaction_id', 'transactions.id')
+            ->where('type', JournalEntry::TYPE_CREDIT);
+    }
+
+    private function transactionJournalQuery(TransactionSearchFilters $filters): Builder
+    {
+        $amountSubquery = $this->transactionJournalAmountSubquery();
+
+        $query = Transaction::query()
+            ->select('transactions.*')
             ->whereBelongsTo($this)
             ->where('is_active', true)
-            ->where('is_planned', false);
+            ->where('is_planned', false)
+            ->selectSub(clone $amountSubquery, 'total_amount_for_search');
 
         $this->applyTransactionJournalAccountNameFilter(
             $query,
@@ -603,42 +672,7 @@ class FiscalYear extends Model
             }
         }
 
-        $this->applyTransactionJournalSorting($query, $filters);
-
-        return $query->paginate($filters->perPage);
-    }
-
-    /**
-     * @return array<string, int>
-     */
-    public function transactionJournalAccountNameCounts(string $type): array
-    {
-        if (! in_array($type, JournalEntry::TYPES, true)) {
-            throw new InvalidArgumentException('Unsupported journal entry type.');
-        }
-
-        return DB::table('transactions')
-            ->join('journal_entries', 'journal_entries.transaction_id', '=', 'transactions.id')
-            ->join('sub_accounts', 'sub_accounts.id', '=', 'journal_entries.sub_account_id')
-            ->join('accounts', 'accounts.id', '=', 'sub_accounts.account_id')
-            ->where('transactions.fiscal_year_id', $this->id)
-            ->where('transactions.is_active', true)
-            ->where('transactions.is_planned', false)
-            ->where('journal_entries.type', $type)
-            ->groupBy('accounts.id', 'accounts.name')
-            ->orderBy('accounts.id')
-            ->selectRaw('accounts.name, COUNT(DISTINCT transactions.id) as transaction_count')
-            ->pluck('transaction_count', 'accounts.name')
-            ->map(fn (mixed $count): int => (int) $count)
-            ->all();
-    }
-
-    private function transactionJournalAmountSubquery(): Builder
-    {
-        return JournalEntry::query()
-            ->selectRaw('COALESCE(SUM(net_amount), 0)')
-            ->whereColumn('transaction_id', 'transactions.id')
-            ->where('type', JournalEntry::TYPE_CREDIT);
+        return $query;
     }
 
     private function transactionJournalCounterpartyNameSubquery(): Builder
