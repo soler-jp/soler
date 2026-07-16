@@ -1025,7 +1025,7 @@ class DepreciationServiceTest extends TestCase
                 fn (JournalEntry $journalEntry) => $journalEntry->type === JournalEntry::TYPE_DEBIT
                     && $journalEntry->sub_account_id === $expenseSubAccount->id
                     && $journalEntry->net_amount === $entry->deductible_amount
-                    && $journalEntry->tax_type === JournalEntry::TAX_TYPE_NON_TAXABLE
+                    && $journalEntry->tax_type === JournalEntry::TAX_TYPE_OUT_OF_SCOPE
             )
         );
 
@@ -1034,7 +1034,7 @@ class DepreciationServiceTest extends TestCase
                 fn (JournalEntry $journalEntry) => $journalEntry->type === JournalEntry::TYPE_CREDIT
                     && $journalEntry->sub_account_id === $assetSubAccount->id
                     && $journalEntry->net_amount === $entry->deductible_amount
-                    && $journalEntry->tax_type === JournalEntry::TAX_TYPE_NON_TAXABLE
+                    && $journalEntry->tax_type === JournalEntry::TAX_TYPE_OUT_OF_SCOPE
             )
         );
     }

@@ -399,8 +399,9 @@ class TransactionRegistrar
             JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10 => 10,
             JournalEntry::TAX_TYPE_TAXABLE_SALES_8,
             JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8 => 8,
-            JournalEntry::TAX_TYPE_NON_TAXABLE,
-            JournalEntry::TAX_TYPE_TAX_FREE => 0,
+            JournalEntry::TAX_TYPE_EXEMPT,
+            JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            JournalEntry::TAX_TYPE_ZERO_RATED => 0,
             default => throw ValidationException::withMessages([
                 'tax_type' => ['未対応の消費税区分です。'],
             ]),

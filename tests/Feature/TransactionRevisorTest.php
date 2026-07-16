@@ -55,7 +55,7 @@ class TransactionRevisorTest extends TestCase
                     'type' => JournalEntry::TYPE_CREDIT,
                     'net_amount' => 1100,
                     'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ],
         );
@@ -77,7 +77,7 @@ class TransactionRevisorTest extends TestCase
                     'type' => JournalEntry::TYPE_CREDIT,
                     'net_amount' => 2200,
                     'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ],
         ]);
@@ -157,7 +157,7 @@ class TransactionRevisorTest extends TestCase
                     'type' => JournalEntry::TYPE_CREDIT,
                     'net_amount' => 1100,
                     'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ],
         );
@@ -179,7 +179,7 @@ class TransactionRevisorTest extends TestCase
                     'type' => JournalEntry::TYPE_CREDIT,
                     'net_amount' => 2200,
                     'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ],
         ]);
@@ -217,7 +217,7 @@ class TransactionRevisorTest extends TestCase
                     'type' => JournalEntry::TYPE_CREDIT,
                     'net_amount' => 1100,
                     'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ],
         );
@@ -241,7 +241,7 @@ class TransactionRevisorTest extends TestCase
                     'type' => JournalEntry::TYPE_CREDIT,
                     'net_amount' => 2200,
                     'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ],
         ]);
@@ -263,7 +263,7 @@ class TransactionRevisorTest extends TestCase
                     'type' => JournalEntry::TYPE_CREDIT,
                     'net_amount' => 3300,
                     'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ],
         ]);
@@ -298,7 +298,7 @@ class TransactionRevisorTest extends TestCase
                     'type' => JournalEntry::TYPE_CREDIT,
                     'net_amount' => 1100,
                     'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ],
         );
@@ -325,7 +325,7 @@ class TransactionRevisorTest extends TestCase
                         'type' => JournalEntry::TYPE_CREDIT,
                         'net_amount' => 2200,
                         'tax_amount' => 0,
-                        'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                        'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                     ],
                 ],
             ]);

@@ -189,7 +189,7 @@ class RecurringTransactionPlan extends Model
         $taxType = $this->tax_type
             ?? ($this->tax_amount > 0
                 ? JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10
-                : JournalEntry::TAX_TYPE_NON_TAXABLE);
+                : JournalEntry::TAX_TYPE_OUT_OF_SCOPE);
 
         return [
             'transaction' => [

@@ -336,7 +336,7 @@ class TransactionTest extends TestCase
                 'type' => $entry['type'],
                 'net_amount' => $entry['net_amount'],
                 'tax_amount' => 0,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 'business_ratio' => $entry['business_ratio'] ?? null,
                 'is_effective' => true,
             ]);

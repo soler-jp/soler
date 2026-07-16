@@ -81,13 +81,13 @@ class ScenarioRulesTest extends TestCase
                     'sub_account_id' => $debitAccount->id,
                     'type' => JournalEntry::TYPE_DEBIT,
                     'net_amount' => 1000,
-                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
                 [
                     'sub_account_id' => $creditAccount->id,
                     'type' => JournalEntry::TYPE_CREDIT,
                     'net_amount' => 1000,
-                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ]);
 
@@ -138,7 +138,7 @@ class ScenarioRulesTest extends TestCase
                     'sub_account_id' => $cashSubAccount->id,
                     'type' => JournalEntry::TYPE_CREDIT,
                     'gross_amount' => 1100,
-                    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ]);
 
