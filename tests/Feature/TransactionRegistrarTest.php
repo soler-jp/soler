@@ -747,7 +747,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 5500,
                 'tax_amount' => 0,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ];
 
@@ -785,7 +785,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 5400,
                 'tax_amount' => 0,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ];
 
@@ -821,7 +821,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 4900,
                 'tax_amount' => 0,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ];
 
@@ -854,14 +854,14 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 3000,
                 'tax_amount' => null,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'net_amount' => 3000,
                 'tax_amount' => null,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ];
 
@@ -892,14 +892,14 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 3000,
                 'tax_amount' => 0,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'net_amount' => 3000,
                 'tax_amount' => 0,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ];
 
@@ -961,13 +961,13 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
                 'net_amount' => 3000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'net_amount' => 3000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
 
@@ -997,7 +997,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'gross_amount' => 1100,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
 
@@ -1012,7 +1012,7 @@ class TransactionRegistrarTest extends TestCase
         $this->assertSame(1100, $credit->net_amount);
         $this->assertSame(0, $credit->tax_amount);
         $this->assertSame(1100, $credit->gross_amount);
-        $this->assertSame(JournalEntry::TAX_TYPE_NON_TAXABLE, $credit->tax_type);
+        $this->assertSame(JournalEntry::TAX_TYPE_OUT_OF_SCOPE, $credit->tax_type);
     }
 
     #[Test]
@@ -1032,13 +1032,13 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
                 'gross_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'gross_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
         ]);
 
@@ -1046,7 +1046,7 @@ class TransactionRegistrarTest extends TestCase
             return $entry->net_amount === 1000
                 && $entry->tax_amount === 0
                 && $entry->gross_amount === 1000
-                && $entry->tax_type === JournalEntry::TAX_TYPE_NON_TAXABLE;
+                && $entry->tax_type === JournalEntry::TAX_TYPE_EXEMPT;
         }));
     }
 
@@ -1068,14 +1068,14 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $expenseSubAccount->id,
                 'type' => 'debit',
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 'business_ratio' => 60,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
 
@@ -1113,13 +1113,13 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $expenseSubAccount->id,
                 'type' => 'debit',
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
 
@@ -1151,14 +1151,14 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $expenseSubAccount->id,
                 'type' => 'debit',
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 'business_ratio' => 100,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
 
@@ -1191,14 +1191,14 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 'business_ratio' => 60,
             ],
             [
                 'sub_account_id' => $expenseSubAccount->id,
                 'type' => 'debit',
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
     }
@@ -1223,14 +1223,14 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $expenseSubAccount->id,
                 'type' => 'debit',
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 'business_ratio' => 101,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
     }
@@ -1252,7 +1252,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
                 'gross_amount' => 1100,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
@@ -1268,7 +1268,7 @@ class TransactionRegistrarTest extends TestCase
         $this->assertSame(1100, $debit->net_amount);
         $this->assertSame(0, $debit->tax_amount);
         $this->assertSame(1100, $debit->gross_amount);
-        $this->assertSame(JournalEntry::TAX_TYPE_NON_TAXABLE, $debit->tax_type);
+        $this->assertSame(JournalEntry::TAX_TYPE_OUT_OF_SCOPE, $debit->tax_type);
 
         $this->assertSame(1000, $credit->net_amount);
         $this->assertSame(100, $credit->tax_amount);
@@ -1295,13 +1295,13 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
                 'net_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'net_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
     }
@@ -1332,13 +1332,13 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'gross_amount' => 1100,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
     }
 
     #[Test]
-    public function 課税事業者はnon_taxableのgross_amount入力を税額ゼロで保存できる()
+    public function 課税事業者はexemptのgross_amount入力を税額ゼロで保存できる()
     {
         $fiscalYear = FiscalYear::factory()->create([
             'is_taxable' => true,
@@ -1354,13 +1354,13 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $debitSubAccount->id,
                 'type' => 'debit',
                 'gross_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => 'credit',
                 'gross_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
         ]);
 
@@ -1368,8 +1368,43 @@ class TransactionRegistrarTest extends TestCase
             return $entry->net_amount === 1000
                 && $entry->tax_amount === 0
                 && $entry->gross_amount === 1000
-                && $entry->tax_type === JournalEntry::TAX_TYPE_NON_TAXABLE;
+                && $entry->tax_type === JournalEntry::TAX_TYPE_EXEMPT;
         }));
+    }
+
+    #[Test]
+    public function 課税事業者はzero_ratedのgross_amount入力を税額ゼロで保存できる()
+    {
+        $fiscalYear = FiscalYear::factory()->create([
+            'is_taxable' => true,
+            'is_tax_exclusive' => false,
+        ]);
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => '課税事業者の免税売上',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'gross_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'gross_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_ZERO_RATED,
+            ],
+        ]);
+
+        $credit = $transaction->journalEntries()->where('type', 'credit')->firstOrFail();
+
+        $this->assertSame(1000, $credit->net_amount);
+        $this->assertSame(0, $credit->tax_amount);
+        $this->assertSame(1000, $credit->gross_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_ZERO_RATED, $credit->tax_type);
     }
 
     #[Test]
@@ -1393,7 +1428,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $cashSubAccount->id,
                 'type' => JournalEntry::TYPE_DEBIT,
                 'gross_amount' => 2200,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $salesSubAccount->id,
@@ -1407,7 +1442,7 @@ class TransactionRegistrarTest extends TestCase
 
         $this->assertSame(2200, $cashEntry->net_amount);
         $this->assertSame(0, $cashEntry->tax_amount);
-        $this->assertSame(JournalEntry::TAX_TYPE_NON_TAXABLE, $cashEntry->tax_type);
+        $this->assertSame(JournalEntry::TAX_TYPE_OUT_OF_SCOPE, $cashEntry->tax_type);
 
         $this->assertSame(2000, $salesEntry->net_amount);
         $this->assertSame(200, $salesEntry->tax_amount);
@@ -1440,7 +1475,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $cashSubAccount->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'gross_amount' => 1100,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
 
@@ -1453,7 +1488,7 @@ class TransactionRegistrarTest extends TestCase
 
         $this->assertSame(1100, $cashEntry->net_amount);
         $this->assertSame(0, $cashEntry->tax_amount);
-        $this->assertSame(JournalEntry::TAX_TYPE_NON_TAXABLE, $cashEntry->tax_type);
+        $this->assertSame(JournalEntry::TAX_TYPE_OUT_OF_SCOPE, $cashEntry->tax_type);
     }
 
     #[Test]
@@ -1477,7 +1512,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $cashSubAccount->id,
                 'type' => JournalEntry::TYPE_DEBIT,
                 'gross_amount' => 2200,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $salesSubAccount->id,
@@ -1521,7 +1556,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $cashSubAccount->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'gross_amount' => 1100,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
 
@@ -1559,7 +1594,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $cashSubAccount->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'gross_amount' => 1080,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
 
@@ -1603,7 +1638,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $cashSubAccount->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'gross_amount' => 7660,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
 
@@ -1625,7 +1660,7 @@ class TransactionRegistrarTest extends TestCase
 
         $this->assertSame(7660, $cashEntry->net_amount);
         $this->assertSame(0, $cashEntry->tax_amount);
-        $this->assertSame(JournalEntry::TAX_TYPE_NON_TAXABLE, $cashEntry->tax_type);
+        $this->assertSame(JournalEntry::TAX_TYPE_OUT_OF_SCOPE, $cashEntry->tax_type);
     }
 
     #[Test]
@@ -1649,13 +1684,13 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $expenseSubAccount->id,
                 'type' => JournalEntry::TYPE_DEBIT,
                 'gross_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
             [
                 'sub_account_id' => $cashSubAccount->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'gross_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
 
@@ -1663,7 +1698,7 @@ class TransactionRegistrarTest extends TestCase
 
         $this->assertSame(1000, $expenseEntry->net_amount);
         $this->assertSame(0, $expenseEntry->tax_amount);
-        $this->assertSame(JournalEntry::TAX_TYPE_NON_TAXABLE, $expenseEntry->tax_type);
+        $this->assertSame(JournalEntry::TAX_TYPE_EXEMPT, $expenseEntry->tax_type);
     }
 
     #[Test]
@@ -1686,7 +1721,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $debitSubAccount->id,
                 'type' => JournalEntry::TYPE_DEBIT,
                 'gross_amount' => 1100,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $creditSubAccount->id,
@@ -1723,7 +1758,7 @@ class TransactionRegistrarTest extends TestCase
                 'sub_account_id' => $creditSubAccount->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'gross_amount' => 1100,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ]);
     }

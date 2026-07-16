@@ -225,6 +225,30 @@ class JournalEntryTest extends TestCase
     }
 
     #[Test]
+    public function exemptとout_of_scopeとzero_ratedは有効なtax_typeとして受け付ける()
+    {
+        $transaction = Transaction::factory()->create();
+        $account = Account::factory()->create();
+        $subAccount = $account->subAccounts->first();
+
+        foreach ([
+            JournalEntry::TAX_TYPE_EXEMPT,
+            JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            JournalEntry::TAX_TYPE_ZERO_RATED,
+        ] as $taxType) {
+            $validated = JournalEntryValidator::validate([
+                'transaction_id' => $transaction->id,
+                'sub_account_id' => $subAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 1000,
+                'tax_type' => $taxType,
+            ], true);
+
+            $this->assertSame($taxType, $validated['tax_type']);
+        }
+    }
+
+    #[Test]
     public function purchase系tax_typeが貸方だとバリデーションエラー()
     {
         $transaction = Transaction::factory()->create();
@@ -377,14 +401,14 @@ class JournalEntryTest extends TestCase
                     'type' => 'debit',
                     'net_amount' => 10000,
                     'tax_amount' => 0,
-                    'tax_type' => 'non_taxable',
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
                 [
                     'sub_account_id' => $equitySubAccount->id,
                     'type' => 'credit',
                     'net_amount' => 10000,
                     'tax_amount' => 0,
-                    'tax_type' => 'non_taxable',
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ]
         );
@@ -401,14 +425,14 @@ class JournalEntryTest extends TestCase
                     'type' => 'debit',
                     'net_amount' => 20000,
                     'tax_amount' => 0,
-                    'tax_type' => 'non_taxable',
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
                 [
                     'sub_account_id' => $equitySubAccount->id,
                     'type' => 'credit',
                     'net_amount' => 20000,
                     'tax_amount' => 0,
-                    'tax_type' => 'non_taxable',
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ]
         );
@@ -425,14 +449,14 @@ class JournalEntryTest extends TestCase
                     'type' => 'debit',
                     'net_amount' => 30000,
                     'tax_amount' => 0,
-                    'tax_type' => 'non_taxable',
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
                 [
                     'sub_account_id' => $equitySubAccount->id,
                     'type' => 'credit',
                     'net_amount' => 30000,
                     'tax_amount' => 0,
-                    'tax_type' => 'non_taxable',
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ]
         );

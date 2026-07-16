@@ -767,7 +767,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $creditSubAccount->id,
             'amount' => 10000,
             'tax_amount' => 0,
-            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             'business_ratio' => 60,
         ]);
 
