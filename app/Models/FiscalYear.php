@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Data\TransactionSearchFilters;
 use App\Services\BlueReturnInputRegistrar;
 use App\Services\BlueReturnPdf\BlueReturnStatementPdfGenerator;
 use App\Services\BlueReturnStatementCalculator;
@@ -16,7 +17,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class FiscalYear extends Model
@@ -537,6 +540,106 @@ class FiscalYear extends Model
             ->all();
     }
 
+    public function searchTransactionsForJournal(TransactionSearchFilters $filters): LengthAwarePaginator
+    {
+        $amountSubquery = $this->transactionJournalAmountSubquery();
+
+        $query = Transaction::query()
+            ->select('transactions.*')
+            ->with([
+                'counterparty:id,name',
+                'journalEntries.subAccount.account:id,name,type',
+            ])
+            ->selectSub(clone $amountSubquery, 'total_amount_for_search')
+            ->whereBelongsTo($this)
+            ->where('is_active', true)
+            ->where('is_planned', false);
+
+        $this->applyTransactionJournalAccountNameFilter(
+            $query,
+            JournalEntry::TYPE_DEBIT,
+            $filters->debitAccountNames,
+        );
+        $this->applyTransactionJournalAccountNameFilter(
+            $query,
+            JournalEntry::TYPE_CREDIT,
+            $filters->creditAccountNames,
+        );
+
+        if ($filters->keyword !== '') {
+            $keyword = $filters->keyword;
+
+            $query->where(function (Builder $query) use ($keyword): void {
+                $query
+                    ->where('description', 'like', "%{$keyword}%")
+                    ->orWhereHas('counterparty', fn (Builder $counterpartyQuery): Builder => $counterpartyQuery
+                        ->where('name', 'like', "%{$keyword}%"))
+                    ->orWhereHas('journalEntries.subAccount.account', fn (Builder $accountQuery): Builder => $accountQuery
+                        ->where('name', 'like', "%{$keyword}%"))
+                    ->orWhereHas('journalEntries.subAccount', fn (Builder $subAccountQuery): Builder => $subAccountQuery
+                        ->where('name', 'like', "%{$keyword}%"));
+            });
+        }
+
+        if ($filters->months !== []) {
+            $query->where(function (Builder $query) use ($filters): void {
+                foreach ($filters->months as $month) {
+                    $query->orWhereMonth('date', $month);
+                }
+            });
+        }
+
+        if ($filters->exactAmount !== null) {
+            $query->where(clone $amountSubquery, '=', $filters->exactAmount);
+        } else {
+            if ($filters->minAmount !== null) {
+                $query->where(clone $amountSubquery, '>=', $filters->minAmount);
+            }
+
+            if ($filters->maxAmount !== null) {
+                $query->where(clone $amountSubquery, '<=', $filters->maxAmount);
+            }
+        }
+
+        return $query
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->paginate($filters->perPage);
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function transactionJournalAccountNameCounts(string $type): array
+    {
+        if (! in_array($type, JournalEntry::TYPES, true)) {
+            throw new InvalidArgumentException('Unsupported journal entry type.');
+        }
+
+        return DB::table('transactions')
+            ->join('journal_entries', 'journal_entries.transaction_id', '=', 'transactions.id')
+            ->join('sub_accounts', 'sub_accounts.id', '=', 'journal_entries.sub_account_id')
+            ->join('accounts', 'accounts.id', '=', 'sub_accounts.account_id')
+            ->where('transactions.fiscal_year_id', $this->id)
+            ->where('transactions.is_active', true)
+            ->where('transactions.is_planned', false)
+            ->where('journal_entries.type', $type)
+            ->groupBy('accounts.id', 'accounts.name')
+            ->orderBy('accounts.id')
+            ->selectRaw('accounts.name, COUNT(DISTINCT transactions.id) as transaction_count')
+            ->pluck('transaction_count', 'accounts.name')
+            ->map(fn (mixed $count): int => (int) $count)
+            ->all();
+    }
+
+    private function transactionJournalAmountSubquery(): Builder
+    {
+        return JournalEntry::query()
+            ->selectRaw('COALESCE(SUM(net_amount), 0)')
+            ->whereColumn('transaction_id', 'transactions.id')
+            ->where('type', JournalEntry::TYPE_CREDIT);
+    }
+
     private function monthlyDisplayAmount(Transaction $transaction, string $accountType): int
     {
         [$primaryType, $reverseType] = $this->monthlyEntryTypesFor($accountType);
@@ -581,6 +684,26 @@ class FiscalYear extends Model
         }
 
         return $accountType;
+    }
+
+    /**
+     * @param  array<int, string>  $accountNames
+     */
+    private function applyTransactionJournalAccountNameFilter(
+        Builder $query,
+        string $type,
+        array $accountNames,
+    ): void {
+        if ($accountNames === []) {
+            return;
+        }
+
+        $query->whereHas('journalEntries', function (Builder $journalEntryQuery) use ($type, $accountNames): void {
+            $journalEntryQuery
+                ->where('type', $type)
+                ->whereHas('subAccount.account', fn (Builder $accountQuery): Builder => $accountQuery
+                    ->whereIn('name', $accountNames));
+        });
     }
 
     /**

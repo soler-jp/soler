@@ -237,6 +237,58 @@ class Transaction extends Model
     }
 
     /**
+     * @return Collection<int, JournalEntry>
+     */
+    public function debitJournalEntries(): Collection
+    {
+        return $this->journalEntries->where('type', JournalEntry::TYPE_DEBIT)->values();
+    }
+
+    /**
+     * @return Collection<int, JournalEntry>
+     */
+    public function creditJournalEntries(): Collection
+    {
+        return $this->journalEntries->where('type', JournalEntry::TYPE_CREDIT)->values();
+    }
+
+    public function getDebitSummaryAttribute(): string
+    {
+        return $this->journalEntrySummary($this->debitJournalEntries());
+    }
+
+    public function getCreditSummaryAttribute(): string
+    {
+        return $this->journalEntrySummary($this->creditJournalEntries());
+    }
+
+    public function getJournalTaxTypeSummaryAttribute(): string
+    {
+        $labels = $this->journalEntries
+            ->pluck('tax_type')
+            ->filter()
+            ->unique()
+            ->map(fn (string $taxType): string => match ($taxType) {
+                JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+                JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+                JournalEntry::TAX_TYPE_DEEMED_TAXABLE_SALES_10,
+                JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10 => '10%',
+                JournalEntry::TAX_TYPE_TAXABLE_SALES_8,
+                JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8 => '8%',
+                JournalEntry::TAX_TYPE_TAX_FREE,
+                JournalEntry::TAX_TYPE_NON_TAXABLE => '非課税',
+                default => $taxType,
+            })
+            ->values();
+
+        if ($labels->isEmpty()) {
+            return '-';
+        }
+
+        return $labels->implode(' / ');
+    }
+
+    /**
      * @return Collection<int, int>
      */
     protected function businessRatioValues(): Collection
@@ -251,5 +303,24 @@ class Transaction extends Model
             ->filter(fn ($businessRatio) => $businessRatio !== null)
             ->unique()
             ->values();
+    }
+
+    /**
+     * @param  Collection<int, JournalEntry>  $journalEntries
+     */
+    private function journalEntrySummary(Collection $journalEntries): string
+    {
+        return $journalEntries
+            ->map(function (JournalEntry $journalEntry): string {
+                $accountName = $journalEntry->subAccount->account->name;
+                $subAccountName = $journalEntry->subAccount->name;
+
+                if ($subAccountName !== $accountName) {
+                    $accountName .= ' / '.$subAccountName;
+                }
+
+                return sprintf('%s %s', $accountName, number_format($journalEntry->gross_amount));
+            })
+            ->implode(' / ');
     }
 }
