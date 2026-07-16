@@ -5,6 +5,7 @@
         ['label' => '経費の月別一覧', 'route' => 'transactions.expenses'],
         ['label' => '経費の種類別一覧', 'route' => 'transactions.expense-types'],
         ['label' => '仕入れ一覧', 'route' => 'transactions.purchases'],
+        ['label' => '仕訳帳一覧', 'route' => 'transactions.journal'],
         ['label' => '勘定科目集計', 'route' => 'accounts.summary'],
         ['label' => '年度管理', 'route' => 'fiscal-years.index'],
         ['label' => '固定費', 'route' => 'fixed-expenses'],

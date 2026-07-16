@@ -54,6 +54,17 @@ class PortalController extends Controller
         ]);
     }
 
+    public function transactionJournal(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user->selectedBusinessUnit?->currentFiscalYear) {
+            return redirect()->route('initialize');
+        }
+
+        return view('transactions.journal');
+    }
+
     public function accountSummary(Request $request)
     {
         $user = $request->user();
