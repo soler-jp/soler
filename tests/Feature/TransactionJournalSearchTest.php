@@ -166,7 +166,7 @@ class TransactionJournalSearchTest extends TestCase
         ));
 
         $this->assertSame(
-            [$march->id, $january->id],
+            [$january->id, $march->id],
             collect($results->items())->pluck('id')->all(),
         );
         $this->assertNotContains($april->id, collect($results->items())->pluck('id')->all());
@@ -266,6 +266,96 @@ class TransactionJournalSearchTest extends TestCase
         $this->assertSame('消耗品費 4,000 / 旅費交通費 6,000', $results->items()[0]->debit_summary);
         $this->assertSame('現金 10,000', $results->items()[0]->credit_summary);
         $this->assertSame('非課税 / 10%', $results->items()[0]->journal_tax_type_summary);
+    }
+
+    #[Test]
+    public function 初期は日付昇順で並ぶ(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $sales = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+
+        $later = $this->registerTransaction($fiscalYear, [
+            'date' => '2025-07-20',
+            'description' => '後',
+        ], [
+            ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 2000],
+            ['sub_account_id' => $sales->id, 'type' => 'credit', 'net_amount' => 2000],
+        ]);
+
+        $earlier = $this->registerTransaction($fiscalYear, [
+            'date' => '2025-07-10',
+            'description' => '先',
+        ], [
+            ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 1000],
+            ['sub_account_id' => $sales->id, 'type' => 'credit', 'net_amount' => 1000],
+        ]);
+
+        $results = $fiscalYear->searchTransactionsForJournal(TransactionSearchFilters::from());
+
+        $this->assertSame([$earlier->id, $later->id], collect($results->items())->pluck('id')->all());
+    }
+
+    #[Test]
+    public function 伝票番号と金額と摘要と相手先で並び替えできる(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $sales = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+
+        $beta = Counterparty::factory()->create(['business_unit_id' => $unit->id, 'name' => 'Beta']);
+        $alpha = Counterparty::factory()->create(['business_unit_id' => $unit->id, 'name' => 'Alpha']);
+
+        $first = $this->registerTransaction($fiscalYear, [
+            'date' => '2025-08-03',
+            'description' => 'zeta',
+            'counterparty_id' => $beta->id,
+        ], [
+            ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 3000],
+            ['sub_account_id' => $sales->id, 'type' => 'credit', 'net_amount' => 3000],
+        ]);
+
+        $second = $this->registerTransaction($fiscalYear, [
+            'date' => '2025-08-01',
+            'description' => 'alpha',
+            'counterparty_id' => $alpha->id,
+        ], [
+            ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 1000],
+            ['sub_account_id' => $sales->id, 'type' => 'credit', 'net_amount' => 1000],
+        ]);
+
+        $third = $this->registerTransaction($fiscalYear, [
+            'date' => '2025-08-02',
+            'description' => 'middle',
+            'counterparty_id' => null,
+        ], [
+            ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 2000],
+            ['sub_account_id' => $sales->id, 'type' => 'credit', 'net_amount' => 2000],
+        ]);
+
+        $entryNumberDesc = $fiscalYear->searchTransactionsForJournal(TransactionSearchFilters::from(
+            sortBy: 'entry_number',
+            sortDirection: 'desc',
+        ));
+        $amountDesc = $fiscalYear->searchTransactionsForJournal(TransactionSearchFilters::from(
+            sortBy: 'amount',
+            sortDirection: 'desc',
+        ));
+        $descriptionAsc = $fiscalYear->searchTransactionsForJournal(TransactionSearchFilters::from(
+            sortBy: 'description',
+            sortDirection: 'asc',
+        ));
+        $counterpartyAsc = $fiscalYear->searchTransactionsForJournal(TransactionSearchFilters::from(
+            sortBy: 'counterparty',
+            sortDirection: 'asc',
+        ));
+
+        $this->assertSame([$third->id, $second->id, $first->id], collect($entryNumberDesc->items())->pluck('id')->all());
+        $this->assertSame([$first->id, $third->id, $second->id], collect($amountDesc->items())->pluck('id')->all());
+        $this->assertSame([$second->id, $third->id, $first->id], collect($descriptionAsc->items())->pluck('id')->all());
+        $this->assertSame([$third->id, $second->id, $first->id], collect($counterpartyAsc->items())->pluck('id')->all());
     }
 
     /**

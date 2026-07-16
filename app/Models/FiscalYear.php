@@ -543,6 +543,7 @@ class FiscalYear extends Model
     public function searchTransactionsForJournal(TransactionSearchFilters $filters): LengthAwarePaginator
     {
         $amountSubquery = $this->transactionJournalAmountSubquery();
+        $counterpartyNameSubquery = $this->transactionJournalCounterpartyNameSubquery();
 
         $query = Transaction::query()
             ->select('transactions.*')
@@ -551,6 +552,7 @@ class FiscalYear extends Model
                 'journalEntries.subAccount.account:id,name,type',
             ])
             ->selectSub(clone $amountSubquery, 'total_amount_for_search')
+            ->selectSub(clone $counterpartyNameSubquery, 'counterparty_name_for_sort')
             ->whereBelongsTo($this)
             ->where('is_active', true)
             ->where('is_planned', false);
@@ -601,10 +603,9 @@ class FiscalYear extends Model
             }
         }
 
-        return $query
-            ->orderByDesc('date')
-            ->orderByDesc('id')
-            ->paginate($filters->perPage);
+        $this->applyTransactionJournalSorting($query, $filters);
+
+        return $query->paginate($filters->perPage);
     }
 
     /**
@@ -638,6 +639,41 @@ class FiscalYear extends Model
             ->selectRaw('COALESCE(SUM(net_amount), 0)')
             ->whereColumn('transaction_id', 'transactions.id')
             ->where('type', JournalEntry::TYPE_CREDIT);
+    }
+
+    private function transactionJournalCounterpartyNameSubquery(): Builder
+    {
+        return Counterparty::query()
+            ->select('name')
+            ->whereColumn('counterparties.id', 'transactions.counterparty_id')
+            ->limit(1);
+    }
+
+    private function applyTransactionJournalSorting(
+        Builder $query,
+        TransactionSearchFilters $filters,
+    ): void {
+        $direction = $filters->sortDirection;
+
+        match ($filters->sortBy) {
+            'entry_number' => $query->orderBy('entry_number', $direction),
+            'amount' => $query->orderBy('total_amount_for_search', $direction),
+            'description' => $query->orderByRaw(
+                'COALESCE(description, ?) '.$direction,
+                ['']
+            ),
+            'counterparty' => $query->orderByRaw(
+                'COALESCE(counterparty_name_for_sort, ?) '.$direction,
+                ['']
+            ),
+            default => $query->orderBy('date', $direction),
+        };
+
+        if ($filters->sortBy !== 'date') {
+            $query->orderBy('date', 'asc');
+        }
+
+        $query->orderBy('id', $direction);
     }
 
     private function monthlyDisplayAmount(Transaction $transaction, string $accountType): int

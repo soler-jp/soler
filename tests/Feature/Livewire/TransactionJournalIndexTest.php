@@ -38,6 +38,8 @@ class TransactionJournalIndexTest extends TestCase
             ->test(TransactionJournalIndex::class)
             ->assertSet('debitAccountNames', [])
             ->assertSet('creditAccountNames', [])
+            ->assertSet('sortBy', 'date')
+            ->assertSet('sortDirection', 'asc')
             ->assertSee('未選択なら借方条件なし')
             ->assertSee('未選択なら貸方条件なし');
     }
@@ -73,6 +75,23 @@ class TransactionJournalIndexTest extends TestCase
             ->set('creditAccountNames', ['売上高'])
             ->assertSee('売上入金')
             ->assertDontSee('備品購入');
+    }
+
+    #[Test]
+    public function ヘッダクリックでソート項目と方向を切り替えられる(): void
+    {
+        [$user] = $this->createInitializedUser();
+
+        Livewire::actingAs($user)
+            ->test(TransactionJournalIndex::class)
+            ->call('sort', 'amount')
+            ->assertSet('sortBy', 'amount')
+            ->assertSet('sortDirection', 'asc')
+            ->call('sort', 'amount')
+            ->assertSet('sortDirection', 'desc')
+            ->call('sort', 'description')
+            ->assertSet('sortBy', 'description')
+            ->assertSet('sortDirection', 'asc');
     }
 
     /**

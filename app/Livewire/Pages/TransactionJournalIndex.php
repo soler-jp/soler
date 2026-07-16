@@ -54,6 +54,12 @@ class TransactionJournalIndex extends Component
     #[Url]
     public int $perPage = 100;
 
+    #[Url(as: 'sort')]
+    public string $sortBy = 'date';
+
+    #[Url(as: 'direction')]
+    public string $sortDirection = 'asc';
+
     public function mount(): void
     {
         $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
@@ -94,6 +100,22 @@ class TransactionJournalIndex extends Component
 
     public function updatedPerPage(): void
     {
+        $this->resetPage();
+    }
+
+    public function sort(string $column): void
+    {
+        if (! in_array($column, ['date', 'entry_number', 'amount', 'description', 'counterparty'], true)) {
+            return;
+        }
+
+        if ($this->sortBy === $column) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $column;
+            $this->sortDirection = 'asc';
+        }
+
         $this->resetPage();
     }
 
@@ -138,8 +160,12 @@ class TransactionJournalIndex extends Component
             'minAmount',
             'maxAmount',
             'perPage',
+            'sortBy',
+            'sortDirection',
         );
         $this->perPage = 100;
+        $this->sortBy = 'date';
+        $this->sortDirection = 'asc';
         $this->resetPage();
     }
 
@@ -164,8 +190,19 @@ class TransactionJournalIndex extends Component
             exactAmount: $this->nullableInteger($this->exactAmount),
             minAmount: $this->nullableInteger($this->minAmount),
             maxAmount: $this->nullableInteger($this->maxAmount),
+            sortBy: $this->sortBy,
+            sortDirection: $this->sortDirection,
             perPage: $this->perPage,
         ));
+    }
+
+    public function sortIndicator(string $column): string
+    {
+        if ($this->sortBy !== $column) {
+            return '↕';
+        }
+
+        return $this->sortDirection === 'asc' ? '↑' : '↓';
     }
 
     public function render(): View

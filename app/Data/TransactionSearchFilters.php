@@ -17,6 +17,8 @@ final readonly class TransactionSearchFilters
         public ?int $exactAmount = null,
         public ?int $minAmount = null,
         public ?int $maxAmount = null,
+        public string $sortBy = 'date',
+        public string $sortDirection = 'asc',
         public int $perPage = 100,
     ) {}
 
@@ -33,6 +35,8 @@ final readonly class TransactionSearchFilters
         ?int $exactAmount = null,
         ?int $minAmount = null,
         ?int $maxAmount = null,
+        string $sortBy = 'date',
+        string $sortDirection = 'asc',
         int $perPage = 100,
     ): self {
         return new self(
@@ -43,6 +47,8 @@ final readonly class TransactionSearchFilters
             exactAmount: $exactAmount,
             minAmount: $minAmount,
             maxAmount: $maxAmount,
+            sortBy: self::normalizeSortBy($sortBy),
+            sortDirection: self::normalizeSortDirection($sortDirection),
             perPage: in_array($perPage, [50, 100, 200], true) ? $perPage : 100,
         );
     }
@@ -71,5 +77,17 @@ final readonly class TransactionSearchFilters
         sort($unique);
 
         return $unique;
+    }
+
+    private static function normalizeSortBy(string $sortBy): string
+    {
+        return in_array($sortBy, ['date', 'entry_number', 'amount', 'description', 'counterparty'], true)
+            ? $sortBy
+            : 'date';
+    }
+
+    private static function normalizeSortDirection(string $sortDirection): string
+    {
+        return in_array($sortDirection, ['asc', 'desc'], true) ? $sortDirection : 'asc';
     }
 }

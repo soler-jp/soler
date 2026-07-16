@@ -137,24 +137,49 @@
                 <table class="min-w-[1240px] table-fixed text-xs text-slate-800">
                     <thead class="bg-slate-800 text-slate-100">
                         <tr>
-                            <th class="w-28 px-3 py-3 text-left font-semibold">日付</th>
-                            <th class="w-24 px-3 py-3 text-left font-semibold">伝票番号</th>
+                            <th class="w-24 px-3 py-3 text-left font-semibold">
+                                <button type="button" wire:click="sort('entry_number')" class="inline-flex items-center gap-1 transition hover:text-white/80">
+                                    <span>No</span>
+                                    <span class="text-[10px]">{{ $this->sortIndicator('entry_number') }}</span>
+                                </button>
+                            </th>
+                            <th class="w-28 px-3 py-3 text-left font-semibold">
+                                <button type="button" wire:click="sort('date')" class="inline-flex items-center gap-1 transition hover:text-white/80">
+                                    <span>日付</span>
+                                    <span class="text-[10px]">{{ $this->sortIndicator('date') }}</span>
+                                </button>
+                            </th>
                             <th class="w-[22rem] border-l border-slate-700 px-3 py-3 text-left font-semibold">借方</th>
                             <th class="w-[22rem] border-l border-slate-700 px-3 py-3 text-left font-semibold">貸方</th>
-                            <th class="w-28 border-l border-slate-700 px-3 py-3 text-right font-semibold">金額</th>
+                            <th class="w-28 border-l border-slate-700 px-3 py-3 text-right font-semibold">
+                                <button type="button" wire:click="sort('amount')" class="inline-flex items-center gap-1 transition hover:text-white/80">
+                                    <span>金額</span>
+                                    <span class="text-[10px]">{{ $this->sortIndicator('amount') }}</span>
+                                </button>
+                            </th>
                             <th class="w-32 border-l border-slate-700 px-3 py-3 text-left font-semibold">税区分</th>
-                            <th class="w-64 border-l border-slate-700 px-3 py-3 text-left font-semibold">摘要</th>
-                            <th class="w-48 border-l border-slate-700 px-3 py-3 text-left font-semibold">相手先</th>
+                            <th class="w-64 border-l border-slate-700 px-3 py-3 text-left font-semibold">
+                                <button type="button" wire:click="sort('description')" class="inline-flex items-center gap-1 transition hover:text-white/80">
+                                    <span>摘要</span>
+                                    <span class="text-[10px]">{{ $this->sortIndicator('description') }}</span>
+                                </button>
+                            </th>
+                            <th class="w-48 border-l border-slate-700 px-3 py-3 text-left font-semibold">
+                                <button type="button" wire:click="sort('counterparty')" class="inline-flex items-center gap-1 transition hover:text-white/80">
+                                    <span>相手先</span>
+                                    <span class="text-[10px]">{{ $this->sortIndicator('counterparty') }}</span>
+                                </button>
+                            </th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200">
                         @forelse ($this->transactions as $transaction)
                             <tr wire:key="transaction-journal-{{ $transaction->id }}" class="align-top">
-                                <td class="whitespace-nowrap px-3 py-2.5 font-medium text-slate-700">
-                                    {{ $transaction->date->format('Y-m-d') }}
-                                </td>
                                 <td class="whitespace-nowrap px-3 py-2.5 text-slate-500">
                                     {{ $transaction->entry_number }}
+                                </td>
+                                <td class="whitespace-nowrap px-3 py-2.5 font-medium text-slate-700">
+                                    {{ $transaction->date->format('Y-m-d') }}
                                 </td>
                                 <td class="border-l border-slate-200 bg-rose-50/40 px-3 py-2.5">
                                     <div class="space-y-1">
