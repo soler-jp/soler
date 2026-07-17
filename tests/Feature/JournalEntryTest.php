@@ -249,6 +249,26 @@ class JournalEntryTest extends TestCase
     }
 
     #[Test]
+    public function tax_amount_sourceが正しい値ならバリデーションが通る()
+    {
+        $transaction = Transaction::factory()->create();
+        $account = Account::factory()->create();
+
+        $subAccount = $account->subAccounts->first();
+
+        $validated = JournalEntryValidator::validate([
+            'transaction_id' => $transaction->id,
+            'sub_account_id' => $subAccount->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => 1000,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            'tax_amount_source' => JournalEntry::TAX_AMOUNT_SOURCE_USER_INPUT,
+        ], true);
+
+        $this->assertSame(JournalEntry::TAX_AMOUNT_SOURCE_USER_INPUT, $validated['tax_amount_source']);
+    }
+
+    #[Test]
     public function purchase系tax_typeが貸方だとバリデーションエラー()
     {
         $transaction = Transaction::factory()->create();

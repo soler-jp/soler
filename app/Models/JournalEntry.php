@@ -18,6 +18,7 @@ class JournalEntry extends Model
         'net_amount',
         'tax_amount',
         'tax_type',
+        'tax_amount_source',
         'business_ratio',
         'allocation_group_id',
         'is_effective',
@@ -72,6 +73,18 @@ class JournalEntry extends Model
         self::TAX_TYPE_EXEMPT,
         self::TAX_TYPE_OUT_OF_SCOPE,
         self::TAX_TYPE_ZERO_RATED,
+    ];
+
+    public const TAX_AMOUNT_SOURCE_USER_INPUT = 'user_input';
+
+    public const TAX_AMOUNT_SOURCE_DEFAULTED = 'defaulted';
+
+    public const TAX_AMOUNT_SOURCE_COMPUTED_FROM_GROSS = 'computed_from_gross';
+
+    public const TAX_AMOUNT_SOURCES = [
+        self::TAX_AMOUNT_SOURCE_USER_INPUT,
+        self::TAX_AMOUNT_SOURCE_DEFAULTED,
+        self::TAX_AMOUNT_SOURCE_COMPUTED_FROM_GROSS,
     ];
 
     // リレーション
