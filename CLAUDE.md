@@ -198,3 +198,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - The `mysql` group is additive: grouped tests still run in the normal SQLite suite unless explicitly excluded.
 
 </laravel-boost-guidelines>
+
+# Project Conventions
+
+- Enum的な定数値（`tax_type`など）をテストコードで参照するときは、生の文字列リテラルではなくモデルの定数（例: `JournalEntry::TAX_TYPE_OUT_OF_SCOPE`）を使う。定数名を変更した際にテスト側の文字列リテラルまで追跡・置換する手間を避けるため。
