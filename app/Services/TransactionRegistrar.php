@@ -288,6 +288,7 @@ class TransactionRegistrar
     {
         $hasGrossAmount = array_key_exists('gross_amount', $entry) && ! array_key_exists('net_amount', $entry);
         $hasBusinessRatio = array_key_exists('business_ratio', $entry) && $entry['business_ratio'] !== null;
+        $taxTypeProvided = array_key_exists('tax_type', $entry) && $entry['tax_type'] !== null;
 
         if (! $hasGrossAmount) {
             if ($hasBusinessRatio) {
@@ -296,7 +297,7 @@ class TransactionRegistrar
                 ]);
             }
 
-            return [$entry];
+            return [$this->withTaxAmountSource($entry)];
         }
 
         $grossAmount = (int) $entry['gross_amount'];
@@ -308,7 +309,12 @@ class TransactionRegistrar
             ]);
         }
 
-        $taxType ??= $this->defaultTaxTypeForExemptBusiness($entry['type'] ?? null);
+        if ($taxType === null) {
+            $taxType = $this->defaultTaxTypeForExemptBusiness($entry['type'] ?? null);
+        }
+
+        $taxAmountSource = JournalEntry::TAX_AMOUNT_SOURCE_COMPUTED_FROM_GROSS;
+
         $subAccount = $this->resolveSubAccount($fiscalYear, $entry['sub_account_id'] ?? null);
         $allowsAllocation = $this->canApplyHouseholdAllocation($subAccount, $entry['type'] ?? null, $hasGrossAmount);
 
@@ -340,6 +346,7 @@ class TransactionRegistrar
                     'net_amount' => $netAmount,
                     'tax_amount' => $taxAmount,
                     'tax_type' => $taxType,
+                    'tax_amount_source' => $taxAmountSource,
                 ]),
             ];
         }
@@ -354,6 +361,7 @@ class TransactionRegistrar
             'net_amount' => $businessNetAmount,
             'tax_amount' => $businessTaxAmount,
             'tax_type' => $taxType,
+            'tax_amount_source' => $taxAmountSource,
             'business_ratio' => $businessRatio,
         ]);
 
@@ -380,6 +388,25 @@ class TransactionRegistrar
         }
 
         return [$businessEntry, $householdEntry];
+    }
+
+    protected function withTaxAmountSource(array $entry): array
+    {
+        if (($entry['tax_type'] ?? null) === null) {
+            unset($entry['tax_amount_source']);
+
+            return $entry;
+        }
+
+        if (array_key_exists('tax_amount_source', $entry) && $entry['tax_amount_source'] !== null) {
+            return $entry;
+        }
+
+        $entry['tax_amount_source'] = array_key_exists('tax_amount', $entry)
+            ? JournalEntry::TAX_AMOUNT_SOURCE_USER_INPUT
+            : JournalEntry::TAX_AMOUNT_SOURCE_DEFAULTED;
+
+        return $entry;
     }
 
     protected function defaultTaxTypeForExemptBusiness(?string $entryType): string

@@ -976,6 +976,42 @@ class TransactionRegistrarTest extends TestCase
     }
 
     #[Test]
+    public function 明示したtax_amountはuser_inputとして保存される()
+    {
+        $fiscalYear = FiscalYear::factory()->create();
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => now()->toDateString(),
+            'description' => 'tax_amount_source 明示入力',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 3000,
+                'tax_amount' => 0,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 3000,
+                'tax_amount' => 0,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ]);
+
+        $this->assertSame(
+            JournalEntry::TAX_AMOUNT_SOURCE_USER_INPUT,
+            $transaction->journalEntries()->where('type', 'debit')->firstOrFail()->tax_amount_source
+        );
+        $this->assertSame(
+            JournalEntry::TAX_AMOUNT_SOURCE_USER_INPUT,
+            $transaction->journalEntries()->where('type', 'credit')->firstOrFail()->tax_amount_source
+        );
+    }
+
+    #[Test]
     public function 免税事業者はgross_amount入力を見なし10パーセントで分解して保存できる()
     {
         $fiscalYear = FiscalYear::factory()->create([
@@ -1008,11 +1044,13 @@ class TransactionRegistrarTest extends TestCase
         $this->assertSame(100, $debit->tax_amount);
         $this->assertSame(1100, $debit->gross_amount);
         $this->assertSame(JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10, $debit->tax_type);
+        $this->assertSame(JournalEntry::TAX_AMOUNT_SOURCE_COMPUTED_FROM_GROSS, $debit->tax_amount_source);
 
         $this->assertSame(1100, $credit->net_amount);
         $this->assertSame(0, $credit->tax_amount);
         $this->assertSame(1100, $credit->gross_amount);
         $this->assertSame(JournalEntry::TAX_TYPE_OUT_OF_SCOPE, $credit->tax_type);
+        $this->assertSame(JournalEntry::TAX_AMOUNT_SOURCE_COMPUTED_FROM_GROSS, $credit->tax_amount_source);
     }
 
     #[Test]

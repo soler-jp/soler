@@ -83,6 +83,9 @@
   - 税抜本体額
 - `tax_amount`
   - その仕訳に対応する消費税相当額
+- `tax_amount_source`
+  - その `tax_amount` をどう決めたか
+  - `user_input` / `defaulted` / `computed_from_gross` のいずれか
 - `gross_amount`
   - 入力値としての総額
 - `net_amount + tax_amount`
@@ -115,14 +118,15 @@
 
 - UI では `gross_amount` を入力する
 - 通常取引は、既定で見なし 10% として `net_amount` と `tax_amount` に分解する
-- 本当に非課税の取引だけは `non_taxable` として扱う
+- 本当に非課税の取引だけは `exempt`、不課税の取引だけは `out_of_scope` として扱う
 - 生成された `tax_amount` は内部管理値であり、税務申告用の税額ではない
 
 ### 課税事業者
 
 - UI では `gross_amount` と `tax_type` を入力する
 - `tax_type` から税率を解決し、`net_amount` と `tax_amount` を計算する
-- 本当に非課税の取引では `tax_amount = 0` とし、`non_taxable` などの区分を使う
+- 本当に非課税の取引では `tax_amount = 0` とし、`exempt` または `out_of_scope` などの区分を使う
+- `tax_amount_source` には、税込入力の分解なら `computed_from_gross`、税額明示入力なら `user_input`、税額 0 の内部補完なら `defaulted` を保存する
 
 ### 共通
 
@@ -162,7 +166,7 @@
   - 貸方: `売上高 / 一般売上`
   - 総額: `2,200`
 - 保存イメージ
-  - 借方: `net_amount = 2200`, `tax_amount = 0`, `tax_type = non_taxable`
+  - 借方: `net_amount = 2200`, `tax_amount = 0`, `tax_type = out_of_scope`
   - 貸方: `net_amount = 2000`, `tax_amount = 200`, `tax_type = deemed_taxable_sales_10`
 - 意味
   - 免税事業者でも、売上側は見なし 10% で内部按分して保持する
@@ -179,7 +183,7 @@
   - 総額: `1,100`
 - 保存イメージ
   - 借方: `net_amount = 1000`, `tax_amount = 100`, `tax_type = deemed_taxable_purchases_10`
-  - 貸方: `net_amount = 1100`, `tax_amount = 0`, `tax_type = non_taxable`
+  - 貸方: `net_amount = 1100`, `tax_amount = 0`, `tax_type = out_of_scope`
 - 意味
   - 経費側だけを見なし 10% で分解し、支払手段側は総額そのままで持つ
 
@@ -194,10 +198,11 @@
   - 総額: `2,200`
   - 税区分: `taxable_sales_10`
 - 保存イメージ
-  - 借方: `net_amount = 2200`, `tax_amount = 0`, `tax_type = non_taxable`
+  - 借方: `net_amount = 2200`, `tax_amount = 0`, `tax_type = out_of_scope`
   - 貸方: `net_amount = 2000`, `tax_amount = 200`, `tax_type = taxable_sales_10`
 - 意味
   - 課税事業者では `gross_amount + tax_type` を受け、税区分に従って分解する
+  - このケースの `tax_amount_source` は売上側が `computed_from_gross`、入金側も `computed_from_gross` になる
 
 ### 4. 課税事業者の 10% 経費
 
@@ -211,7 +216,7 @@
   - 税区分: `taxable_purchases_10`
 - 保存イメージ
   - 借方: `net_amount = 1000`, `tax_amount = 100`, `tax_type = taxable_purchases_10`
-  - 貸方: `net_amount = 1100`, `tax_amount = 0`, `tax_type = non_taxable`
+  - 貸方: `net_amount = 1100`, `tax_amount = 0`, `tax_type = out_of_scope`
 - 意味
   - 課税仕入・課税経費の代表ケースとして使う
 
@@ -224,10 +229,10 @@
   - 借方: `地代家賃` など
   - 貸方: `現金 / レジ現金`
   - 総額: `1,000`
-  - 税区分: `non_taxable`
+  - 税区分: `out_of_scope`
 - 保存イメージ
-  - 借方: `net_amount = 1000`, `tax_amount = 0`, `tax_type = non_taxable`
-  - 貸方: `net_amount = 1000`, `tax_amount = 0`, `tax_type = non_taxable`
+  - 借方: `net_amount = 1000`, `tax_amount = 0`, `tax_type = out_of_scope`
+  - 貸方: `net_amount = 1000`, `tax_amount = 0`, `tax_type = out_of_scope`
 - 意味
   - 本当に非課税の取引では、総額をそのまま本体額として保存する
 
@@ -243,7 +248,7 @@
   - 税区分: `taxable_purchases_8`
 - 保存イメージ
   - 借方: `net_amount = 1000`, `tax_amount = 80`, `tax_type = taxable_purchases_8`
-  - 貸方: `net_amount = 1080`, `tax_amount = 0`, `tax_type = non_taxable`
+  - 貸方: `net_amount = 1080`, `tax_amount = 0`, `tax_type = out_of_scope`
 - 意味
   - 軽減税率の仕入・経費も、10% ケースと同じ 2 行モデルで扱う
 
@@ -255,7 +260,7 @@
 - 入力
   - 借方1: `仕入金額` `2,160` `taxable_purchases_8`
   - 借方2: `仕入金額` `5,500` `taxable_purchases_10`
-  - 貸方: `現金 / レジ現金` `7,660` `non_taxable`
+  - 貸方: `現金 / レジ現金` `7,660` `out_of_scope`
 - 保存イメージ
   - 借方1: `net_amount = 2000`, `tax_amount = 160`
   - 借方2: `net_amount = 5000`, `tax_amount = 500`
