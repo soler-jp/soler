@@ -839,8 +839,9 @@ class FiscalYear extends Model
                 JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10 => '10%',
                 JournalEntry::TAX_TYPE_TAXABLE_SALES_8,
                 JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8 => '8%',
-                JournalEntry::TAX_TYPE_TAX_FREE,
-                JournalEntry::TAX_TYPE_NON_TAXABLE => '非課税',
+                JournalEntry::TAX_TYPE_EXEMPT => '非課税',
+                JournalEntry::TAX_TYPE_OUT_OF_SCOPE => '不課税',
+                JournalEntry::TAX_TYPE_ZERO_RATED => '免税',
                 default => $taxType,
             })
             ->values();

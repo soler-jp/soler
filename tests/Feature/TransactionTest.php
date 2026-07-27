@@ -305,12 +305,43 @@ class TransactionTest extends TestCase
         $this->assertEquals('2025-0001', $t->display_number);
     }
 
+    #[Test]
+    public function journal_tax_type_summaryは新しい税区分ラベルを返す()
+    {
+        $transaction = $this->createTransactionWithJournalEntries([
+            [
+                'account' => '消耗品費',
+                'sub_account' => '消耗品費',
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
+            ],
+            [
+                'account' => '通信費',
+                'sub_account' => '通信費',
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 2000,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'account' => '売上高',
+                'sub_account' => '売上高',
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 3000,
+                'tax_type' => JournalEntry::TAX_TYPE_ZERO_RATED,
+            ],
+        ]);
+
+        $this->assertSame('非課税 / 不課税 / 免税', $transaction->journal_tax_type_summary);
+    }
+
     /**
      * @param  array<int, array{
      *     account: string,
      *     sub_account: string,
      *     type: string,
      *     net_amount: int,
+     *     tax_type?: string,
      *     business_ratio?: int|null
      * }>  $journalEntries
      */
@@ -336,7 +367,7 @@ class TransactionTest extends TestCase
                 'type' => $entry['type'],
                 'net_amount' => $entry['net_amount'],
                 'tax_amount' => 0,
-                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+                'tax_type' => $entry['tax_type'] ?? JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 'business_ratio' => $entry['business_ratio'] ?? null,
                 'is_effective' => true,
             ]);

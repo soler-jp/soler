@@ -155,13 +155,13 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
                 'type' => JournalEntry::TYPE_DEBIT,
                 'gross_amount' => 10000,
                 'business_ratio' => 60,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
             [
                 'sub_account_id' => $cash->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
         ]);
 
@@ -173,13 +173,13 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
                 'sub_account_id' => $unit->getAccountByName('仕入金額')->subAccounts()->firstOrFail()->id,
                 'type' => JournalEntry::TYPE_DEBIT,
                 'net_amount' => 12000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
             [
                 'sub_account_id' => $cash->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 12000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
         ]);
 
@@ -205,6 +205,39 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
         $this->assertSame('非課税', $transaction['tax_type_label']);
         $this->assertSame('文具店', $transaction['counterparty_name']);
         $this->assertStringNotContainsString('家事按分', $transaction['debit_label']);
+    }
+
+    #[Test]
+    public function 月別明細は新しい税区分ラベルを返す(): void
+    {
+        [, $unit] = $this->createInitializedUser();
+        $unit->currentFiscalYear->forceFill(['is_taxable' => true])->save();
+        $unit->refresh();
+
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $this->registerExpense(
+            $unit,
+            $fiscalYear,
+            '2025-04-10',
+            3000,
+            '対象外経費',
+            taxType: JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+        );
+        $this->registerRevenue(
+            $unit,
+            $fiscalYear,
+            '2025-04-11',
+            5000,
+            '免税売上',
+            taxType: JournalEntry::TAX_TYPE_ZERO_RATED,
+        );
+
+        $expenseTransaction = $fiscalYear->monthlyAccountTypeTransactions(Account::TYPE_EXPENSE, '2025-04')[0];
+        $revenueTransaction = $fiscalYear->monthlyAccountTypeTransactions(Account::TYPE_REVENUE, '2025-04')[0];
+
+        $this->assertSame('不課税', $expenseTransaction['tax_type_label']);
+        $this->assertSame('免税', $revenueTransaction['tax_type_label']);
     }
 
     #[Test]
@@ -324,7 +357,7 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
         int $amount,
         string $description,
         ?Counterparty $counterparty = null,
-        string $taxType = JournalEntry::TAX_TYPE_NON_TAXABLE,
+        string $taxType = JournalEntry::TAX_TYPE_EXEMPT,
         bool $reverse = false,
     ): Transaction {
         $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
@@ -339,13 +372,13 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
                 'sub_account_id' => $reverse ? $sales->id : $cash->id,
                 'type' => JournalEntry::TYPE_DEBIT,
                 'net_amount' => $amount,
-                'tax_type' => $reverse ? $taxType : JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => $reverse ? $taxType : JournalEntry::TAX_TYPE_EXEMPT,
             ],
             [
                 'sub_account_id' => $reverse ? $cash->id : $sales->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => $amount,
-                'tax_type' => $reverse ? JournalEntry::TAX_TYPE_NON_TAXABLE : $taxType,
+                'tax_type' => $reverse ? JournalEntry::TAX_TYPE_EXEMPT : $taxType,
             ],
         ]);
     }
@@ -357,6 +390,7 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
         int $amount,
         string $description,
         string $accountName = '消耗品費',
+        string $taxType = JournalEntry::TAX_TYPE_EXEMPT,
         bool $reverse = false,
     ): Transaction {
         $expense = $unit->getAccountByName($accountName)->subAccounts()->firstOrFail();
@@ -370,13 +404,13 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
                 'sub_account_id' => $reverse ? $cash->id : $expense->id,
                 'type' => JournalEntry::TYPE_DEBIT,
                 'net_amount' => $amount,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => $taxType,
             ],
             [
                 'sub_account_id' => $reverse ? $expense->id : $cash->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => $amount,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => $reverse ? $taxType : JournalEntry::TAX_TYPE_EXEMPT,
             ],
         ]);
     }
