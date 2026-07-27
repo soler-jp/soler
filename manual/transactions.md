@@ -10,6 +10,20 @@
 - 現在の `FiscalYear` があること
 - 仕訳に使う補助科目が事業体に属していること
 
+## `tax_amount_source`
+
+`JournalEntry` には、消費税額の算出根拠として `tax_amount_source` を保存します。
+
+- `user_input`
+  - ユーザーが `tax_amount` を明示指定した
+- `defaulted`
+  - `tax_type` はあるが `tax_amount` を渡しておらず、内部で `0` を補完した
+- `computed_from_gross`
+  - `gross_amount` と `tax_type` から内部的に `net_amount` と `tax_amount` を計算した
+
+現時点では、主に課税事業者の通常入力と、`gross_amount` ベースの定期取引実行時の扱いを整理するための項目です。
+免税事業者の「課税だった場合のシミュレーション」かどうかまでは表さず、その意味づけが必要な場合は別のフラグで扱います。
+
 ## 取引先を登録
 
 `TransactionRegistrar` では、取引先を次の 3 パターンで扱えます。
@@ -76,7 +90,7 @@ app(TransactionRegistrar::class)->register(
             'sub_account_id' => $receiptSubAccount->id,
             'type' => 'debit',
             'gross_amount' => 10_000,
-            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
         ],
         [
             'sub_account_id' => $revenueSubAccount->id,
@@ -114,7 +128,7 @@ app(TransactionRegistrar::class)->register(
             'sub_account_id' => $receiptSubAccount->id,
             'type' => 'debit',
             'gross_amount' => 11_000,
-            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
         ],
         [
             'sub_account_id' => $revenueSubAccount->id,
@@ -126,7 +140,7 @@ app(TransactionRegistrar::class)->register(
 );
 ```
 
-この例では、借方の入金先は `non_taxable` 扱いで、貸方の売上側に `taxable_sales_10` を付けます。
+この例では、借方の入金先は `out_of_scope` 扱いで、貸方の売上側に `taxable_sales_10` を付けます。
 そのため、11,000 円の税込売上は 10,000 円の本体額と 1,000 円の預かり消費税に分解されます。
 軽減税率 8% の売上を登録する場合は、貸方の `tax_type` を `JournalEntry::TAX_TYPE_TAXABLE_SALES_8` に変えます。
 
@@ -155,7 +169,7 @@ app(TransactionRegistrar::class)->register(
             'sub_account_id' => $cashSubAccount->id,
             'type' => 'debit',
             'gross_amount' => 7_660,
-            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
         ],
         [
             'sub_account_id' => $salesSubAccount->id,
@@ -214,7 +228,7 @@ app(TransactionRegistrar::class)->register(
             'sub_account_id' => $paymentSubAccount->id,
             'type' => 'credit',
             'gross_amount' => 1_100,
-            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
         ],
     ],
 );
@@ -251,7 +265,7 @@ app(TransactionRegistrar::class)->register(
             'sub_account_id' => $paymentSubAccount->id,
             'type' => 'credit',
             'gross_amount' => 1_100,
-            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
         ],
     ],
 );
@@ -285,14 +299,14 @@ app(TransactionRegistrar::class)->register(
             'sub_account_id' => $expenseSubAccount->id,
             'type' => 'debit',
             'gross_amount' => 10_000,
-            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             'business_ratio' => 60,
         ],
         [
             'sub_account_id' => $cashSubAccount->id,
             'type' => 'credit',
             'gross_amount' => 10_000,
-            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
         ],
     ],
 );
@@ -339,7 +353,7 @@ app(TransactionRegistrar::class)->register(
             'sub_account_id' => $cashSubAccount->id,
             'type' => 'credit',
             'gross_amount' => 7_660,
-            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
         ],
     ],
 );
@@ -400,7 +414,7 @@ $revised = app(TransactionRevisor::class)->revise(
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 2200,
                 'tax_amount' => 0,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ],
     ],

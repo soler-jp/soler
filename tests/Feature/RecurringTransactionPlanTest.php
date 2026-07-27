@@ -767,7 +767,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $creditSubAccount->id,
             'amount' => 10000,
             'tax_amount' => 0,
-            'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             'business_ratio' => 60,
         ]);
 
@@ -780,6 +780,35 @@ class RecurringTransactionPlanTest extends TestCase
         $this->assertSame(6000, $transaction->journalEntries->firstWhere('business_ratio', 60)?->net_amount);
         $this->assertNotNull($householdSubAccount);
         $this->assertSame(4000, $transaction->journalEntries->firstWhere('sub_account_id', $householdSubAccount->id)?->net_amount);
+    }
+
+    #[Test]
+    public function tax_type未指定の定期取引はcomputed_from_grossとして予定仕訳を生成できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '定期税区分既定値テスト事業']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
+        $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '税区分既定値プラン',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'is_income' => false,
+            'debit_sub_account_id' => $debitSubAccount->id,
+            'credit_sub_account_id' => $creditSubAccount->id,
+            'amount' => 10000,
+            'tax_amount' => 0,
+        ]);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->firstOrFail();
+        $debitEntry = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+
+        $this->assertNotNull($debitEntry);
+        $this->assertSame(JournalEntry::TAX_TYPE_OUT_OF_SCOPE, $debitEntry->tax_type);
+        $this->assertSame(JournalEntry::TAX_AMOUNT_SOURCE_COMPUTED_FROM_GROSS, $debitEntry->tax_amount_source);
     }
 
     #[Test]

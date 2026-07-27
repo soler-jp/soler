@@ -18,6 +18,7 @@ class JournalEntry extends Model
         'net_amount',
         'tax_amount',
         'tax_type',
+        'tax_amount_source',
         'business_ratio',
         'allocation_group_id',
         'is_effective',
@@ -53,9 +54,14 @@ class JournalEntry extends Model
 
     public const TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10 = 'deemed_taxable_purchases_10';
 
-    public const TAX_TYPE_NON_TAXABLE = 'non_taxable';
+    // exempt: 非課税。課税売上割合の計算では売上高に含まれるが、消費税は発生しない。
+    public const TAX_TYPE_EXEMPT = 'exempt';
 
-    public const TAX_TYPE_TAX_FREE = 'tax_free';
+    // out_of_scope: 不課税。消費税の課税対象外で、課税売上割合の計算にも含めない。
+    public const TAX_TYPE_OUT_OF_SCOPE = 'out_of_scope';
+
+    // zero_rated: 免税。課税取引だが税率は 0% で、典型例は輸出売上。
+    public const TAX_TYPE_ZERO_RATED = 'zero_rated';
 
     public const TAX_TYPES = [
         self::TAX_TYPE_TAXABLE_SALES_10,
@@ -64,8 +70,21 @@ class JournalEntry extends Model
         self::TAX_TYPE_TAXABLE_PURCHASES_8,
         self::TAX_TYPE_DEEMED_TAXABLE_SALES_10,
         self::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10,
-        self::TAX_TYPE_NON_TAXABLE,
-        self::TAX_TYPE_TAX_FREE,
+        self::TAX_TYPE_EXEMPT,
+        self::TAX_TYPE_OUT_OF_SCOPE,
+        self::TAX_TYPE_ZERO_RATED,
+    ];
+
+    public const TAX_AMOUNT_SOURCE_USER_INPUT = 'user_input';
+
+    public const TAX_AMOUNT_SOURCE_DEFAULTED = 'defaulted';
+
+    public const TAX_AMOUNT_SOURCE_COMPUTED_FROM_GROSS = 'computed_from_gross';
+
+    public const TAX_AMOUNT_SOURCES = [
+        self::TAX_AMOUNT_SOURCE_USER_INPUT,
+        self::TAX_AMOUNT_SOURCE_DEFAULTED,
+        self::TAX_AMOUNT_SOURCE_COMPUTED_FROM_GROSS,
     ];
 
     // リレーション
