@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\CreditCardStatementLineRegistrar;
 use Database\Factories\CreditCardStatementLineFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -108,5 +109,31 @@ class CreditCardStatementLine extends Model
     public function isReviewPending(): bool
     {
         return $this->status === self::STATUS_UNREVIEWED;
+    }
+
+    public function registerTransaction(
+        array $attributes,
+        ?User $user = null,
+    ): Transaction {
+        $user ??= auth()->user();
+
+        $transaction = app(CreditCardStatementLineRegistrar::class)
+            ->register($this, $user, $attributes);
+
+        $this->refresh();
+
+        return $transaction;
+    }
+
+    public function cancelTransactionRegistration(
+        ?User $user = null,
+        ?string $reason = null,
+    ): void {
+        $user ??= auth()->user();
+
+        app(CreditCardStatementLineRegistrar::class)
+            ->cancelRegistration($this, $user, $reason);
+
+        $this->refresh();
     }
 }
