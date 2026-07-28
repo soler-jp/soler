@@ -93,6 +93,8 @@ CSV明細の保存、レビュー、会計登録の責務を分離し、事業�
 - `network` は `Visa` や `Mastercard` や `JCB` のような国際ブランドを表す。
 - `last_four` は同一 `issuer_name + network` の複数カードを識別する補助情報として使う。
 - `business_unit_id` と `name` は一意とし、同一事業体内で同名カードは作らない。
+- `parser_key` はカード設定として保持する値であり、通常は `orico_csv_v1` / `aeon_csv_v1` / `rakuten_csv_v1` のいずれかを設定する。
+- `parser_key = generic_csv_v1` は自動判別モードを表す設定値であり、CSV内容から具体 parser を選ぶ。
 
 関連:
 
@@ -210,9 +212,10 @@ CSV明細の保存、レビュー、会計登録の責務を分離し、事業�
 - `status = private` は「今は私用扱いだが、明細は保持する」を意味する。
 - `status = registered` のときだけ `transaction_id` が入る想定で扱う。
 - 借方・貸方・税区分・消費税額はこのモデルに持たせない。
-- `fingerprint` は、CSV内の行番号ではなく、明細内容から作る論理的な識別子として使う。
-- `line_number` は同一 batch 内での物理的な行位置の識別に使い、`fingerprint` は再取込や表記揺れをまたいだ重複検知に使う。
-- 同一 Statement 配下で同じ `fingerprint` を持つ active 行があれば、重複候補として `duplicate` 判定に使えるようにする。
+- `line_number` は同一 batch 内での物理的な行位置の識別に使う。
+- `fingerprint` は、明細内容に加えて同内容行の出現順も含めた論理識別子として使う。
+- そのため、同一CSV内に同日・同店・同額の行が複数あっても、それぞれ別の `fingerprint` を持つ。
+- 初版では `fingerprint` を import 時の自動 `duplicate` 判定には使わず、原本行の安定識別子として保持する。
 
 ### 2-4. CreditCardImportBatch
 
@@ -252,6 +255,8 @@ CSV取込の履歴を表す。
 - 修正版CSVを再アップロードするときは、旧 batch を `inactive` にし、そこから作られた `StatementLine` と `Transaction` もまとめて `inactive` にする。
 - 履歴は削除せず保持し、通常の一覧・進捗計算・登録対象抽出では `active` のみを見る。
 - `credit_card_statement_id` を batch にも持つことで、「どの請求明細に対する取込か」と「どの取込から作られた行か」をそれぞれ1段で辿れるようにする。
+- `parser_key` にはカード設定値ではなく、その batch で実際に使った具体 parser の key を保存する。
+- したがって `CreditCard.parser_key = generic_csv_v1` のカードでも、batch 側には `orico_csv_v1` / `aeon_csv_v1` / `rakuten_csv_v1` のいずれかが残る想定とする。
 
 ## 3. 状態管理
 
@@ -278,17 +283,18 @@ CSV取込の履歴を表す。
 - `private`
   - 今は私用扱いで会計登録しない
 - `duplicate`
-  - 重複取込と判断した
+  - 将来、別取込との照合などで重複扱いにしたときの状態
 - `ignored`
   - キャンセルやノイズ行など、保持はするが登録対象外
 
 ### 3-3. 状態遷移の考え方
 
-- 初回取込時は原則 `unreviewed`
+- 初回取込時は全行を `unreviewed`
 - 会計登録したら `registered`
 - 私用と判断したら `private`
 - `private` から将来 `registered` に変更できる
-- `duplicate` と `ignored` も原本保持のため削除しない
+- `ignored` も原本保持のため削除しない
+- `duplicate` は初版では自動付与しない
 
 ## 4. Transaction との関係
 
@@ -367,7 +373,7 @@ CSV取込の履歴を表す。
 - `used_on`、`posted_on`、`merchant_name`、`description`、`amount` を正規化する
 - `raw_payload` に元データを残す
 - `fingerprint` の元になる値を揃える
-- 同じ内容の行が再取込されても同じ `fingerprint` になりやすい形へ正規化する
+- 同じ内容の行が複数ある場合でも、出現順を含めて各行を区別できる `fingerprint` を作る
 
 ### 7-3. Parser がやらないこと
 

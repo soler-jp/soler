@@ -117,12 +117,9 @@ class CreditCardImportBatch extends Model
                 'is_active' => false,
             ]);
 
-            $this->transactions()->update([
-                'is_active' => false,
-                'deactivated_at' => now(),
-                'deactivated_by' => $user?->id,
-                'deactivation_reason' => $reason,
-            ]);
+            $this->transactions()
+                ->get()
+                ->each(fn (Transaction $transaction): bool => tap(true, fn () => $transaction->deactivate($user, $reason)));
         });
     }
 }
