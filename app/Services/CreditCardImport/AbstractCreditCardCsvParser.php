@@ -185,7 +185,6 @@ abstract class AbstractCreditCardCsvParser implements CreditCardCsvParser
     protected function buildLine(
         int $lineNumber,
         ?string $usedOn,
-        ?string $postedOn,
         string $merchantName,
         string $description,
         int $amount,
@@ -195,7 +194,6 @@ abstract class AbstractCreditCardCsvParser implements CreditCardCsvParser
         return new ParsedCreditCardStatementLine(
             lineNumber: $lineNumber,
             usedOn: $usedOn,
-            postedOn: $postedOn,
             merchantName: $merchantName,
             description: $description,
             amount: $amount,

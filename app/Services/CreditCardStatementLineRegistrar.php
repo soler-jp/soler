@@ -197,11 +197,11 @@ class CreditCardStatementLineRegistrar
 
     protected function resolveTransactionDate(CreditCardStatementLine $line): Carbon
     {
-        $date = $line->used_on ?? $line->posted_on;
+        $date = $line->used_on;
 
         if ($date === null) {
             throw ValidationException::withMessages([
-                'date' => ['利用日または計上日が設定された明細行だけを登録できます。'],
+                'date' => ['利用日が設定された明細行だけを登録できます。'],
             ]);
         }
 

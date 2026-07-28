@@ -156,7 +156,6 @@ class CreditCardImportService
             'credit_card_import_batch_id' => $batch->id,
             'line_number' => $parsedLine->lineNumber,
             'used_on' => $parsedLine->usedOn,
-            'posted_on' => $parsedLine->postedOn,
             'merchant_name' => $parsedLine->merchantName,
             'description' => $parsedLine->description,
             'amount' => $parsedLine->amount,

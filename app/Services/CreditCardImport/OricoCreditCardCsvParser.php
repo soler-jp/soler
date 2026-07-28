@@ -68,7 +68,6 @@ class OricoCreditCardCsvParser extends AbstractCreditCardCsvParser
             $lines[] = $this->buildLine(
                 lineNumber: count($lines) + 1,
                 usedOn: $usedOn,
-                postedOn: null,
                 merchantName: $merchantName,
                 description: $merchantName,
                 amount: $amount,

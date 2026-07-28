@@ -37,7 +37,6 @@ class CreditCardStatementLine extends Model
         'credit_card_import_batch_id',
         'line_number',
         'used_on',
-        'posted_on',
         'merchant_name',
         'description',
         'amount',
@@ -54,7 +53,6 @@ class CreditCardStatementLine extends Model
     protected $casts = [
         'line_number' => 'integer',
         'used_on' => 'date',
-        'posted_on' => 'date',
         'amount' => 'integer',
         'is_active' => 'boolean',
         'raw_payload' => 'json:unicode',

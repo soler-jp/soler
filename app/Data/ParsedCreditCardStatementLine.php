@@ -10,7 +10,6 @@ class ParsedCreditCardStatementLine
     public function __construct(
         public readonly int $lineNumber,
         public readonly ?string $usedOn,
-        public readonly ?string $postedOn,
         public readonly string $merchantName,
         public readonly string $description,
         public readonly int $amount,

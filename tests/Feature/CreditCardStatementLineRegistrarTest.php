@@ -45,20 +45,19 @@ class CreditCardStatementLineRegistrarTest extends TestCase
     }
 
     #[Test]
-    public function used_onがない場合はposted_onから会計年度を解決できる(): void
+    public function used_onがない明細は登録できない(): void
     {
         [$user, $line, $expenseSubAccount] = $this->createRegisterableLine([
             'used_on' => null,
-            'posted_on' => '2025-05-20',
         ]);
 
-        $transaction = $line->registerTransaction([
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('利用日が設定された明細行だけを登録できます。');
+
+        $line->registerTransaction([
             'debit_sub_account_id' => $expenseSubAccount->id,
             'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
         ], $user);
-
-        $this->assertSame('2025-05-20', $transaction->date->toDateString());
-        $this->assertSame(2025, $transaction->fiscalYear->year);
     }
 
     #[Test]
@@ -284,7 +283,6 @@ class CreditCardStatementLineRegistrarTest extends TestCase
             'credit_card_statement_id' => $statement->id,
             'credit_card_import_batch_id' => $mutateBatch ? $batch->id : null,
             'used_on' => '2025-06-15',
-            'posted_on' => '2025-06-20',
             'merchant_name' => 'AMAZON',
             'description' => 'AMAZON MARKETPLACE',
             'amount' => 1_100,
