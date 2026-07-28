@@ -64,6 +64,12 @@ class BusinessUnit extends Model
     protected static function booted(): void
     {
         static::deleting(function (BusinessUnit $businessUnit): void {
+            if ($businessUnit->current_fiscal_year_id !== null) {
+                $businessUnit->updateQuietly([
+                    'current_fiscal_year_id' => null,
+                ]);
+            }
+
             $businessUnit->fixedAssets()->delete();
             $businessUnit->fiscalYears()->each(function (FiscalYear $fiscalYear): void {
                 $fiscalYear->delete();

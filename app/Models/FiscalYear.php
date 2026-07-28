@@ -45,6 +45,15 @@ class FiscalYear extends Model
         'end_date' => 'date',
     ];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (FiscalYear $fiscalYear): void {
+            $fiscalYear->transactions()->each(function (Transaction $transaction): void {
+                $transaction->delete();
+            });
+        });
+    }
+
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class);

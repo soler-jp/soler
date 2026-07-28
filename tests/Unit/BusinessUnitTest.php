@@ -241,6 +241,47 @@ class BusinessUnitTest extends TestCase
     }
 
     #[Test]
+    public function current_fiscal_yearを保持した事業体も関連取引ごと削除できる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '削除テスト事業体']);
+        $fiscalYear = $businessUnit->createFiscalYear(2025);
+
+        $cashSubAccount = $businessUnit->getAccountByName('現金')?->subAccounts()->firstOrFail();
+        $salesSubAccount = $businessUnit->getAccountByName('売上高')?->subAccounts()->firstOrFail();
+
+        $this->assertNotNull($cashSubAccount);
+        $this->assertNotNull($salesSubAccount);
+
+        $transaction = $fiscalYear->registerTransaction(
+            [
+                'date' => '2025-01-01',
+                'description' => '削除連鎖テスト',
+            ],
+            [
+                [
+                    'sub_account_id' => $cashSubAccount->id,
+                    'type' => 'debit',
+                    'net_amount' => 1000,
+                    'tax_amount' => 0,
+                ],
+                [
+                    'sub_account_id' => $salesSubAccount->id,
+                    'type' => 'credit',
+                    'net_amount' => 1000,
+                    'tax_amount' => 0,
+                ],
+            ]
+        );
+
+        $businessUnit->delete();
+
+        $this->assertModelMissing($businessUnit);
+        $this->assertModelMissing($fiscalYear);
+        $this->assertModelMissing($transaction);
+    }
+
+    #[Test]
     public function fixed_assetsの一覧と償却中一覧を取得できる(): void
     {
         $user = User::factory()->create();
