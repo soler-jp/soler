@@ -44,6 +44,106 @@ class CreditCardModelsTest extends TestCase
     }
 
     #[Test]
+    public function 必須項目が揃っていればクレジットカードのバリデーションに成功する(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'カード検証成功テスト',
+        ]);
+        $liabilitySubAccount = $businessUnit->getAccountByName('未払金')
+            ?->subAccounts()
+            ->firstOrFail();
+
+        $validated = CreditCard::validate([
+            'business_unit_id' => $businessUnit->id,
+            'name' => '事業用Orico',
+            'issuer_name' => 'Orico',
+            'network' => 'visa',
+            'last_four' => '8765',
+            'ownership_type' => CreditCard::OWNERSHIP_TYPE_BUSINESS,
+            'parser_key' => 'orico_csv_v1',
+            'liability_sub_account_id' => $liabilitySubAccount->id,
+            'is_active' => true,
+        ]);
+
+        $this->assertSame($businessUnit->id, $validated['business_unit_id']);
+        $this->assertSame('事業用Orico', $validated['name']);
+        $this->assertSame($liabilitySubAccount->id, $validated['liability_sub_account_id']);
+    }
+
+    #[Test]
+    public function 同じ事業体でクレジットカード名が重複するとバリデーションエラーになる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'カード重複テスト',
+        ]);
+
+        CreditCard::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'name' => '重複カード',
+        ]);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('【重複カード】はすでに使われているので使用できません');
+
+        CreditCard::validate([
+            'business_unit_id' => $businessUnit->id,
+            'name' => '重複カード',
+            'issuer_name' => 'Orico',
+            'ownership_type' => CreditCard::OWNERSHIP_TYPE_BUSINESS,
+            'parser_key' => 'orico_csv_v1',
+        ]);
+    }
+
+    #[Test]
+    public function 他事業体の補助科目を指定するとバリデーションエラーになる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'カード補助科目テスト',
+        ]);
+        $otherUser = User::factory()->create();
+        $otherBusinessUnit = $otherUser->createBusinessUnitWithDefaults([
+            'name' => '別事業体',
+        ]);
+        $otherLiabilitySubAccount = $otherBusinessUnit->getAccountByName('未払金')
+            ?->subAccounts()
+            ->firstOrFail();
+
+        $this->expectException(ValidationException::class);
+
+        CreditCard::validate([
+            'business_unit_id' => $businessUnit->id,
+            'name' => '別事業体補助科目カード',
+            'issuer_name' => 'Orico',
+            'ownership_type' => CreditCard::OWNERSHIP_TYPE_BUSINESS,
+            'parser_key' => 'orico_csv_v1',
+            'liability_sub_account_id' => $otherLiabilitySubAccount->id,
+        ]);
+    }
+
+    #[Test]
+    public function 所有者でないユーザーは事業体にクレジットカードを追加できない(): void
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $businessUnit = $owner->createBusinessUnitWithDefaults([
+            'name' => 'カード認可テスト',
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この事業体にクレジットカードを追加する権限がありません。');
+
+        $businessUnit->createCreditCard([
+            'name' => '不正カード',
+            'issuer_name' => 'Orico',
+            'ownership_type' => CreditCard::OWNERSHIP_TYPE_BUSINESS,
+            'parser_key' => 'orico_csv_v1',
+        ], $otherUser);
+    }
+
+    #[Test]
     public function 個人カード明細行は私用扱いで保持できる(): void
     {
         $businessUnit = BusinessUnit::factory()->create();
