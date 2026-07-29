@@ -72,7 +72,7 @@ class TabListTest extends TestCase
             'credit_sub_account_id' => $creditSubAccount->id,
         ]);
 
-        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
 
         $tx = $transactions->first();
         $orgDebit = $tx->journalEntries->where('type', 'debit')->first();
@@ -144,7 +144,7 @@ class TabListTest extends TestCase
             'credit_sub_account_id' => $creditSubAccount->id,
         ]);
 
-        $tx = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->firstOrFail();
+        $tx = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
 
         Livewire::actingAs($user)
             ->test(TabList::class)
@@ -178,7 +178,7 @@ class TabListTest extends TestCase
             'credit_sub_account_id' => $otherCredit->id,
         ]);
 
-        $otherTx = $otherUnit->generatePlannedTransactionsForPlan($plan, $otherFiscalYear)->first();
+        $otherTx = $otherUnit->generatePlannedTransactionsForPlan($plan, $otherFiscalYear, $otherUser)->first();
         $ownCredit = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         Livewire::actingAs($user)
@@ -232,7 +232,7 @@ class TabListTest extends TestCase
             'credit_sub_account_id' => $creditSubAccount->id,
         ]);
 
-        $tx = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->first();
+        $tx = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->first();
 
         Livewire::actingAs($user)
             ->test(TabList::class)

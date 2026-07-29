@@ -210,7 +210,7 @@ class BusinessFlowScenarioTest extends TestCase
             'tax_amount' => 0,
         ]);
 
-        $plannedTransactions = $unit->generatePlannedTransactionsForPlan($fixedCostPlan, $fiscalYear);
+        $plannedTransactions = $unit->generatePlannedTransactionsForPlan($fixedCostPlan, $fiscalYear, $user);
         $this->assertCount(12, $plannedTransactions);
         $firstPlanned = $plannedTransactions->firstOrFail();
         $this->assertTrue($firstPlanned->is_planned);

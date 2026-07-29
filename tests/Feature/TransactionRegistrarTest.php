@@ -2079,13 +2079,13 @@ class TransactionRegistrarTest extends TestCase
 
         $registrar = new TransactionRegistrar;
 
-        $generated = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+        $generated = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
         $this->assertCount(12, $generated);
 
         $registrar->cancelPlanned($generated->first(), $user);
 
         // 存在チェックは is_active を見ないため、取消済みでも再生成されない
-        $regenerated = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+        $regenerated = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
         $this->assertCount(0, $regenerated);
     }
 

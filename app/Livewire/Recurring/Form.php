@@ -88,7 +88,8 @@ class Form extends Component
 
                 $unit->generatePlannedTransactionsForPlan(
                     $plan,
-                    $unit->currentFiscalYear
+                    $unit->currentFiscalYear,
+                    auth()->user(),
                 );
             });
 

@@ -386,11 +386,16 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             ->refresh();
     }
 
-    public function generatePlannedTransactionsForPlan(RecurringTransactionPlan $plan, FiscalYear $fiscalYear): Collection
-    {
+    public function generatePlannedTransactionsForPlan(
+        RecurringTransactionPlan $plan,
+        FiscalYear $fiscalYear,
+        User $actor
+    ): Collection {
         if ($plan->business_unit_id !== $this->id) {
             throw new \InvalidArgumentException('This plan does not belong to this business unit.');
         }
+
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体の予定取引を生成する権限がありません。');
 
         if ($plan->is_active === false) {
             return collect();

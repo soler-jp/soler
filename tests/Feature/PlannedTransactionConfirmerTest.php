@@ -37,7 +37,7 @@ class PlannedTransactionConfirmerTest extends TestCase
             'credit_sub_account_id' => $credit->id,
         ]);
 
-        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->firstOrFail();
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
 
         return [$unit, $transaction];
     }
