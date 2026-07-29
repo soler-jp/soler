@@ -89,6 +89,11 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         return $this;
     }
 
+    public function canAccess(User $user): bool
+    {
+        return $this->user_id === $user->id;
+    }
+
     public function fiscalYears()
     {
         return $this->hasMany(FiscalYear::class);
