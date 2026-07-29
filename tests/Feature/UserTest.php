@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\FixedAsset;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -84,6 +85,18 @@ class UserTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         $userA->setSelectedBusinessUnit($unitB);
+    }
+
+    #[Test]
+    public function selected_business_unit_or_failは未選択なら例外を投げる(): void
+    {
+        $user = User::factory()->create();
+
+        $this->assertNull($user->current_business_unit_id);
+
+        $this->expectException(AuthorizationException::class);
+
+        $user->selectedBusinessUnitOrFail();
     }
 
     #[Test]

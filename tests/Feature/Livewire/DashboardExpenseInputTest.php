@@ -463,4 +463,16 @@ class DashboardExpenseInputTest extends TestCase
             ->call('submit')
             ->assertSee('経費を登録しました');
     }
+
+    #[Test]
+    public function 事業体が未選択なら経費フォーム表示を拒否する(): void
+    {
+        $user = User::factory()->create();
+
+        $this->assertNull($user->current_business_unit_id);
+
+        Livewire::actingAs($user)
+            ->test('dashboard-expense-input')
+            ->assertForbidden();
+    }
 }

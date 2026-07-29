@@ -27,7 +27,7 @@ class DashboardExpenseInput extends Component
     {
         $this->date = now()->toDateString();
 
-        $unit = auth()->user()->selectedBusinessUnit;
+        $unit = auth()->user()->selectedBusinessUnitOrFail();
 
         $this->expenseAccounts = $unit->accounts()
             ->with('subAccounts')
@@ -44,7 +44,7 @@ class DashboardExpenseInput extends Component
 
     public function submit()
     {
-        $unit = auth()->user()->selectedBusinessUnit;
+        $unit = auth()->user()->selectedBusinessUnitOrFail();
 
         $this->validate([
             'date' => ['required', 'date'],

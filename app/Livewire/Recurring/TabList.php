@@ -18,7 +18,7 @@ class TabList extends Component
     public function mount()
     {
         $user = Auth::user();
-        $unit = $user->selectedBusinessUnit;
+        $unit = $user->selectedBusinessUnitOrFail();
 
         $this->creditAccounts = $unit->accounts()
             ->with('subAccounts')
@@ -34,7 +34,7 @@ class TabList extends Component
 
     public function confirm(int $transactionId)
     {
-        $unit = Auth::user()->selectedBusinessUnit;
+        $unit = Auth::user()->selectedBusinessUnitOrFail();
         $fiscalYear = $unit->currentFiscalYear;
         $data = $this->inputs[$transactionId] ?? [];
         $date = $data['date'] ?? null;
@@ -92,7 +92,7 @@ class TabList extends Component
     public function render()
     {
         $user = Auth::user();
-        $unit = $user->selectedBusinessUnit;
+        $unit = $user->selectedBusinessUnitOrFail();
         $fiscalYear = $unit->currentFiscalYear;
 
         $plans = $unit->recurringTransactionPlans()

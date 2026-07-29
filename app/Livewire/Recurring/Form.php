@@ -31,7 +31,7 @@ class Form extends Component
     {
         $this->date = now()->toDateString();
 
-        $unit = auth()->user()->selectedBusinessUnit;
+        $unit = auth()->user()->selectedBusinessUnitOrFail();
 
         $this->expenseAccounts = $unit->accounts()
             ->with('subAccounts')
@@ -48,7 +48,7 @@ class Form extends Component
 
     public function save()
     {
-        $unit = auth()->user()->selectedBusinessUnit;
+        $unit = auth()->user()->selectedBusinessUnitOrFail();
 
         $validated = $this->validate([
             'form.name' => ['required', 'string', 'max:255'],

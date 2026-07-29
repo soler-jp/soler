@@ -27,7 +27,7 @@ class DashboardRevenueInput extends Component
 
     public function save()
     {
-        $unit = auth()->user()->selectedBusinessUnit;
+        $unit = auth()->user()->selectedBusinessUnitOrFail();
 
         $this->validate([
             'date' => ['required', 'date'],
@@ -102,7 +102,7 @@ class DashboardRevenueInput extends Component
     {
         $this->date = now()->toDateString();
 
-        $unit = auth()->user()->selectedBusinessUnit;
+        $unit = auth()->user()->selectedBusinessUnitOrFail();
 
         $this->revenueSubAccountId = $unit->getAccountByName('売上高')->subAccounts()->first()->id;
         $this->withheldTaxSubAccountId = $unit->getSubAccountByName('事業主貸', '源泉徴収')->id;
