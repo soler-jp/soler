@@ -33,7 +33,7 @@ class DepreciationEntryScenarioTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $assetSubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query): void {
@@ -186,8 +186,8 @@ class DepreciationEntryScenarioTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
         ]);
-        $fiscalYear2023 = $unit->createFiscalYear(2023);
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
 
         $paymentSubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query): void {

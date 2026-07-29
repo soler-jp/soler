@@ -32,7 +32,7 @@ class FreelancerBookTest extends TestCase
             'name' => 'テスト事業所',
         ]);
 
-        $this->fiscalYear = $this->unit->createFiscalYear(2024);
+        $this->fiscalYear = $this->unit->createFiscalYear(2024, $user);
 
         $names = [
             'bank' => '当座預金',

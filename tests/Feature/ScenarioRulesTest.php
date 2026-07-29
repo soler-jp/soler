@@ -62,7 +62,7 @@ class ScenarioRulesTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => '締め済み事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2026);
+        $fiscalYear = $unit->createFiscalYear(2026, $user);
         $fiscalYear->forceFill(['is_closed' => true])->save();
 
         $debitAccount = $unit->getSubAccountByName('現金', '現金');

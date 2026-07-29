@@ -104,7 +104,7 @@ class UserTest extends TestCase
     {
         $user = User::factory()->create();
         $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '削除対象事業体']);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $salesSubAccount = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();

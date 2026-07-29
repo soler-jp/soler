@@ -25,7 +25,7 @@ class FiscalYearCloserTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => '締め前チェック事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cash = $unit->getSubAccountByName('現金', '現金');
         $ownerLoan = $unit->getSubAccountByName('事業主借', '事業主借');
@@ -92,7 +92,7 @@ class FiscalYearCloserTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => '締め実行事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $closedFiscalYear = app(FiscalYearCloser::class)->close($fiscalYear, $user);
 
@@ -115,7 +115,7 @@ class FiscalYearCloserTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => '締め失敗事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cash = $unit->getSubAccountByName('現金', '現金');
         $ownerLoan = $unit->getSubAccountByName('事業主借', '事業主借');
@@ -140,7 +140,7 @@ class FiscalYearCloserTest extends TestCase
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '決算認可テスト']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $this->expectException(AuthorizationException::class);
 

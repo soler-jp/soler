@@ -43,7 +43,7 @@ class TransactionRegistrarTest extends TestCase
             'name' => 'テスト事業体',
         ], $attributes));
 
-        return $unit->createFiscalYear(2025);
+        return $unit->createFiscalYear(2025, $user);
     }
 
     #[Test]
@@ -116,7 +116,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先自動作成事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
@@ -147,7 +147,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先自動作成事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
@@ -177,7 +177,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先自動作成事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
@@ -207,7 +207,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先再利用事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $first = (new TransactionRegistrar)->register($fiscalYear, [
@@ -256,7 +256,7 @@ class TransactionRegistrarTest extends TestCase
 
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先エラー事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         (new TransactionRegistrar)->register($fiscalYear, [
@@ -286,7 +286,7 @@ class TransactionRegistrarTest extends TestCase
 
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先エラー事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         (new TransactionRegistrar)->register($fiscalYear, [
@@ -317,7 +317,7 @@ class TransactionRegistrarTest extends TestCase
         $otherUser = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
         $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $counterparty = Counterparty::factory()->create([
@@ -375,7 +375,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先紐づけ事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $counterparty = Counterparty::factory()->create([
@@ -414,7 +414,7 @@ class TransactionRegistrarTest extends TestCase
 
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先矛盾事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $counterparty = Counterparty::factory()->create([
@@ -1094,7 +1094,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '家事按分テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
         $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
         $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
         $householdSubAccount = $unit->getSubAccountByName('事業主貸', '家事按分');
@@ -1140,7 +1140,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '事業割合未指定テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
         $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
         $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
 
@@ -1178,7 +1178,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '事業割合100テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
         $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
         $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
 
@@ -1215,7 +1215,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '事業割合エラーテスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
         $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
         $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
 
@@ -1247,7 +1247,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '事業割合範囲外テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
         $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
         $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
 
@@ -1809,7 +1809,7 @@ class TransactionRegistrarTest extends TestCase
         $otherUser = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
         $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $ownExpense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $foreignAsset = $otherUnit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -1839,7 +1839,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'Test帳簿']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $account = $unit->accounts()->first();
         $subAccount = $account->subAccounts->first();
@@ -1872,7 +1872,7 @@ class TransactionRegistrarTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -1914,7 +1914,7 @@ class TransactionRegistrarTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -1971,7 +1971,7 @@ class TransactionRegistrarTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -2016,7 +2016,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -2060,7 +2060,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -2096,7 +2096,7 @@ class TransactionRegistrarTest extends TestCase
 
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -2192,7 +2192,7 @@ class TransactionRegistrarTest extends TestCase
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取消認可テスト']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debit = $unit->getAccountByName('通信費')->subAccounts()->firstOrFail();
         $credit = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();

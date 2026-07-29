@@ -269,8 +269,8 @@ class CreditCardStatementLineRegistrarTest extends TestCase
     ): array {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'カード登録テスト事業']);
-        $unit->createFiscalYear(2025);
-        $unit->createFiscalYear(2026);
+        $unit->createFiscalYear(2025, $user);
+        $unit->createFiscalYear(2026, $user);
 
         $cardSubAccount = $ownershipType === CreditCard::OWNERSHIP_TYPE_BUSINESS
             ? $unit->getAccountByName('未払金')->subAccounts()->firstOrFail()

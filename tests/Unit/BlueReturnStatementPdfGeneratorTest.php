@@ -25,7 +25,7 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'PDF基盤テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $pdf = $generator->generate($fiscalYear, 650000);
 
@@ -41,7 +41,7 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'PDF基盤テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $pdf = $fiscalYear->generateBlueReturnStatementPdf(650000);
 
@@ -57,7 +57,7 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'PDF基盤テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $pdf = $generator->generate($fiscalYear, 650000, [
             'filing_number' => '12345678',
@@ -89,7 +89,7 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'PDF基盤テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2022);
+        $fiscalYear = $businessUnit->createFiscalYear(2022, $user);
 
         $pdf = $generator->generate($fiscalYear, 650000);
 
@@ -106,7 +106,7 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'PDF基盤テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2019);
+        $fiscalYear = $businessUnit->createFiscalYear(2019, $user);
 
         $this->expectException(InvalidArgumentException::class);
 

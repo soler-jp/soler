@@ -21,7 +21,7 @@ class PlannedTransactionConfirmerTest extends TestCase
     private function makePlannedTransaction(User $user): array
     {
         $unit = $user->createBusinessUnitWithDefaults(['name' => '確定認可テスト']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debit = $unit->getAccountByName('通信費')->subAccounts()->firstOrFail();
         $credit = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();

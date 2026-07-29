@@ -28,7 +28,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '青色申告テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $sales = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
@@ -318,7 +318,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '任意科目テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $sales = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
@@ -409,7 +409,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '任意科目超過テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $sales = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
@@ -469,7 +469,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '月別集計テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $sales = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
@@ -711,7 +711,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '減価償却明細テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $assetSubAccount = $businessUnit->subAccounts()
             ->whereHas('account', function ($query): void {
@@ -783,8 +783,8 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '減価償却明細パターンテスト',
         ]);
-        $fiscalYear2023 = $businessUnit->createFiscalYear(2023);
-        $fiscalYear2024 = $businessUnit->createFiscalYear(2024);
+        $fiscalYear2023 = $businessUnit->createFiscalYear(2023, $user);
+        $fiscalYear2024 = $businessUnit->createFiscalYear(2024, $user);
 
         $assetSubAccount = $businessUnit->subAccounts()
             ->whereHas('account', function ($query): void {
@@ -901,7 +901,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '貸借対照表変換テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $deposit = $businessUnit->getAccountByName('その他の預金')->subAccounts()->firstOrFail();
@@ -1043,7 +1043,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '青果小売業',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
 
@@ -1174,7 +1174,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '青色申告テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $this->expectException(\InvalidArgumentException::class);
 

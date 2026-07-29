@@ -73,7 +73,7 @@ class BusinessFlowScenarioTest extends TestCase
             'name' => '期首パターン事業体',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2026);
+        $fiscalYear = $unit->createFiscalYear(2026, $user);
         $this->assertDatabaseCount('transactions', 0);
 
         $emptyResult = $fiscalYear->registerOpeningEntry([]);

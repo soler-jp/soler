@@ -25,7 +25,7 @@ class InventoryClosingServiceTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $entries = [];
         foreach ($openingBySubAccountName as $subAccountName => $amount) {

@@ -22,7 +22,7 @@ class BusinessUnitResolutionTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '解決テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expenseSubAccount = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
         $cashSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();

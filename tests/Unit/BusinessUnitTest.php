@@ -229,9 +229,9 @@ class BusinessUnitTest extends TestCase
             'name' => 'テスト事業体',
         ]);
 
-        $fiscal2024 = $unit->createFiscalYear(2024);
+        $fiscal2024 = $unit->createFiscalYear(2024, $user);
 
-        $fiscal2025 = $unit->createFiscalYear(2025);
+        $fiscal2025 = $unit->createFiscalYear(2025, $user);
 
         $unit->update([
             'current_fiscal_year_id' => $fiscal2025->id,
@@ -246,7 +246,7 @@ class BusinessUnitTest extends TestCase
     {
         $user = User::factory()->create();
         $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '削除テスト事業体']);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $businessUnit->getAccountByName('現金')?->subAccounts()->firstOrFail();
         $salesSubAccount = $businessUnit->getAccountByName('売上高')?->subAccounts()->firstOrFail();
@@ -290,7 +290,7 @@ class BusinessUnitTest extends TestCase
             'name' => '固定資産テスト事業体',
         ]);
 
-        $unit->createFiscalYear(2031);
+        $unit->createFiscalYear(2031, $user);
 
         $assetAccount = $unit->getAccountByName('車両運搬具');
         $this->assertNotNull($assetAccount);
@@ -322,7 +322,7 @@ class BusinessUnitTest extends TestCase
         ]);
 
         $allFixedAssets = $unit->allFixedAssets();
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
         $depreciatingFixedAssets = $unit->depreciatingFixedAssets($fiscalYear2025);
 
         $this->assertSame(
@@ -341,7 +341,7 @@ class BusinessUnitTest extends TestCase
         $user = User::factory()->create();
         $businessUnit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
 
-        $fiscalYear2025 = $businessUnit->createFiscalYear(2025);
+        $fiscalYear2025 = $businessUnit->createFiscalYear(2025, $user);
 
         $businessUnit->setCurrentFiscalYear($fiscalYear2025);
 
@@ -377,7 +377,7 @@ class BusinessUnitTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '初期事業体']);
 
-        $fiscal = $unit->createFiscalYear(2025);
+        $fiscal = $unit->createFiscalYear(2025, $user);
 
         $this->assertTrue($unit->currentFiscalYear->is($fiscal));
     }
@@ -388,13 +388,13 @@ class BusinessUnitTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
 
-        $fiscal2024 = $unit->createFiscalYear(2024);
+        $fiscal2024 = $unit->createFiscalYear(2024, $user);
 
         // 既にcurrentFiscalYearが設定されている
         $unit->setCurrentFiscalYear($fiscal2024);
 
         // 新しい年度を作成してもcurrentFiscalYearは変わらない
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
 
         $this->assertTrue($unit->currentFiscalYear->is($fiscal2024));
     }
@@ -607,7 +607,7 @@ class BusinessUnitTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業所',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cashAccount = $businessUnit->getAccountByName('現金');
         $bankAccount = $businessUnit->getAccountByName('その他の預金');

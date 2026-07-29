@@ -26,7 +26,7 @@ class FiscalYearSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
         $expense = $this->subAccountByTypeOrName($unit, 'expense');
@@ -64,7 +64,7 @@ class FiscalYearSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業所']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
         $expense = $this->subAccountByTypeOrName($unit, 'expense');
@@ -124,8 +124,8 @@ class FiscalYearSummaryTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '複数年度テスト']);
 
-        $fy2025 = $unit->createFiscalYear(2025);
-        $fy2026 = $unit->createFiscalYear(2026);
+        $fy2025 = $unit->createFiscalYear(2025, $user);
+        $fy2026 = $unit->createFiscalYear(2026, $user);
 
         $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
         $asset = $this->subAccountByTypeOrName($unit, 'asset');
@@ -162,7 +162,7 @@ class FiscalYearSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '売上のみ']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
         $asset = $this->subAccountByTypeOrName($unit, 'asset');
@@ -189,7 +189,7 @@ class FiscalYearSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '経費のみ']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $this->subAccountByTypeOrName($unit, 'expense');
         $liability = $this->subAccountByTypeOrName($unit, 'liability');
@@ -216,7 +216,7 @@ class FiscalYearSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '空の年度']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $summary = $fiscalYear->calculateSummary()['actual'];
 
@@ -231,7 +231,7 @@ class FiscalYearSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '純額集計']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
         $expense = $this->subAccountByTypeOrName($unit, 'expense');
@@ -297,7 +297,7 @@ class FiscalYearSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '棚卸損益集計']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $openingInventory = $this->subAccountByTypeOrName($unit, '期首商品（棚卸高）');
         $closingInventory = $this->subAccountByTypeOrName($unit, '期末商品（棚卸高）');
@@ -340,7 +340,7 @@ class FiscalYearSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $revenue = $this->subAccountByTypeOrName($unit, '売上高');
         $expense = $this->subAccountByTypeOrName($unit, '水道光熱費');
@@ -403,7 +403,7 @@ class FiscalYearSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '金額集計テスト']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
         $expense = $this->subAccountByTypeOrName($unit, 'expense');
@@ -589,7 +589,7 @@ class FiscalYearSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'inactive実績集計']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
         $expense = $this->subAccountByTypeOrName($unit, 'expense');
@@ -630,7 +630,7 @@ class FiscalYearSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'inactive予定集計']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
         $expense = $this->subAccountByTypeOrName($unit, 'expense');
@@ -693,7 +693,7 @@ class FiscalYearSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'ダッシュボード表示テスト']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $revenue = $this->subAccountByTypeOrName($unit, 'revenue');
         $asset = $this->subAccountByTypeOrName($unit, 'asset');

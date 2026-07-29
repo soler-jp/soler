@@ -43,7 +43,7 @@ class FiscalYearBalanceTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '残高テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cash = $this->subAccountByName($unit, '現金');
         $deposit = $this->subAccountByName($unit, 'その他の預金');
@@ -105,7 +105,7 @@ class FiscalYearBalanceTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '除外テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cash = $this->subAccountByName($unit, '現金');
         $ownerLoan = $this->subAccountByName($unit, '事業主借');
@@ -163,7 +163,7 @@ class FiscalYearBalanceTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '期首テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $fiscalYear->registerOpeningEntry([
             ['account_name' => '現金', 'sub_account_name' => '現金', 'amount' => 100000],
@@ -191,7 +191,7 @@ class FiscalYearBalanceTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '負債テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cash = $this->subAccountByName($unit, '現金');
         $loan = $this->subAccountByName($unit, '借入金');
@@ -222,7 +222,7 @@ class FiscalYearBalanceTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '棚卸残高テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $openingInventory = $this->subAccountByName($unit, '期首商品（棚卸高）');
         $closingInventory = $this->subAccountByName($unit, '期末商品（棚卸高）');
@@ -268,7 +268,7 @@ class FiscalYearBalanceTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '空データテスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $summary = $fiscalYear->calculateBalanceSummary();
 

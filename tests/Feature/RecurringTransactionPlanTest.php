@@ -59,7 +59,7 @@ class RecurringTransactionPlanTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debit = $unit->subAccounts()->whereHas('account', function ($q) {
             $q->where('name', '消耗品費');
@@ -317,7 +317,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業'])->refresh();
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
 
         $debitSub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
         $creditSub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))->first();
@@ -354,7 +354,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '末日テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
@@ -385,7 +385,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '隔月プラン事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
@@ -421,7 +421,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '年一プラン事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
@@ -453,7 +453,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '非アクティブ事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
@@ -478,7 +478,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'リンクテスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
@@ -508,7 +508,7 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '認可テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
@@ -533,7 +533,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '重複防止テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan = $unit->createRecurringTransactionPlan([
@@ -570,7 +570,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '同日許可テスト']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->first();
 
         $plan1 = $unit->createRecurringTransactionPlan([
@@ -622,7 +622,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '隔月奇数月テスト']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $subAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
 
         $plan = $unit->createRecurringTransactionPlan([
@@ -658,7 +658,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '隔月偶数月テスト']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $subAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
 
         $plan = $unit->createRecurringTransactionPlan([
@@ -694,7 +694,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '隔月nullテスト']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $subAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
 
         $plan = $unit->createRecurringTransactionPlan([
@@ -731,7 +731,7 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => '確認テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
         $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
@@ -780,7 +780,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '按分定期テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
         $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
@@ -815,7 +815,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '定期税区分既定値テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
         $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
@@ -845,7 +845,7 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => '貸方変更テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
         $originalCreditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
@@ -897,7 +897,7 @@ class RecurringTransactionPlanTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '確認テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $subAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
 
         $plan1 = $unit->createRecurringTransactionPlan([
@@ -944,9 +944,9 @@ class RecurringTransactionPlanTest extends TestCase
         $otherUser = User::factory()->create();
 
         $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
-        $otherUnit->createFiscalYear(2025);
+        $otherUnit->createFiscalYear(2025, $otherUser);
 
         $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
         $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
@@ -996,7 +996,7 @@ class RecurringTransactionPlanTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => '決算後確定不可']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();
         $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
 

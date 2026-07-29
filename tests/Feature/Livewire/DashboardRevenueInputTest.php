@@ -318,7 +318,7 @@ class DashboardRevenueInputTest extends TestCase
             'is_tax_exclusive' => false,
         ]);
 
-        $fy = $unit->createFiscalYear(2025);
+        $fy = $unit->createFiscalYear(2025, $user);
         $unit->setCurrentFiscalYear($fy);
 
         $revenueSubAccount = $unit->getSubAccountByName('売上高', '売上高');

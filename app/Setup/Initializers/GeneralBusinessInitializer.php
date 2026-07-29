@@ -22,7 +22,7 @@ class GeneralBusinessInitializer
             'is_tax_exclusive' => $inputs['is_tax_exclusive'],
         ]);
 
-        $fiscalYear = $unit->createFiscalYear($inputs['year']);
+        $fiscalYear = $unit->createFiscalYear($inputs['year'], $user);
 
         $fiscalYear->update([
             'is_active' => true,

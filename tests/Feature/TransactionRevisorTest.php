@@ -23,7 +23,7 @@ class TransactionRevisorTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '改訂テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $originalExpense = $unit->getAccountByName('通信費')->subAccounts()->firstOrFail();
         $revisedExpense = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
@@ -119,7 +119,7 @@ class TransactionRevisorTest extends TestCase
 
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '定期取引改訂不可']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debitSubAccount = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
         $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
@@ -194,7 +194,7 @@ class TransactionRevisorTest extends TestCase
 
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '再改訂防止']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->getAccountByName('通信費')->subAccounts()->firstOrFail();
         $credit = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
@@ -275,7 +275,7 @@ class TransactionRevisorTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '決算済年度改訂不可']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->getAccountByName('通信費')->subAccounts()->firstOrFail();
         $credit = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
@@ -346,7 +346,7 @@ class TransactionRevisorTest extends TestCase
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '改訂認可テスト']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debit = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
         $credit = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();

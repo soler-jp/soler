@@ -392,7 +392,7 @@ class JournalEntryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $account = $unit->accounts()
             ->where('name', 'その他の預金')

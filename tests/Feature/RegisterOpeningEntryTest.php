@@ -18,7 +18,7 @@ class RegisterOpeningEntryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $txn = $fiscalYear->registerOpeningEntry([]);
 
@@ -31,7 +31,7 @@ class RegisterOpeningEntryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $txn = $fiscalYear->registerOpeningEntry([
             [
@@ -84,7 +84,7 @@ class RegisterOpeningEntryTest extends TestCase
             'name' => '地方信用金庫',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $transaction = $fiscalYear->registerOpeningEntry([
             [
@@ -127,7 +127,7 @@ class RegisterOpeningEntryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashAccount = $unit->accounts()->where('name', '現金')->first();
 
@@ -164,7 +164,7 @@ class RegisterOpeningEntryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $fiscalYear->registerOpeningEntry([
             [

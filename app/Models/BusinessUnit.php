@@ -280,8 +280,10 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
     /**
      * FiscalYearを作成するヘルパーメソッド
      */
-    public function createFiscalYear(int $year): FiscalYear
+    public function createFiscalYear(int $year, User $actor): FiscalYear
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体に会計年度を追加する権限がありません。');
+
         return DB::transaction(function () use ($year): FiscalYear {
             $hasActive = $this->fiscalYears()->where('is_active', true)->exists();
 

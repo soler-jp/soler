@@ -73,7 +73,7 @@ class CounterpartyTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $counterparty = Counterparty::factory()->create([
             'business_unit_id' => $unit->id,

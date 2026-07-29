@@ -22,7 +22,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debitSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $creditSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
@@ -68,7 +68,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
@@ -167,7 +167,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
@@ -242,7 +242,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => '無効化元帳テスト',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
@@ -311,7 +311,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => '予定取引元帳テスト',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
@@ -378,7 +378,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => '予定取引補助科目元帳テスト',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
@@ -445,7 +445,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => '予定取引出納帳テスト',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('現金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
@@ -512,8 +512,8 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $fiscal2024 = $unit->createFiscalYear(2024);
-        $fiscal2025 = $unit->createFiscalYear(2025);
+        $fiscal2024 = $unit->createFiscalYear(2024, $user);
+        $fiscal2025 = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
@@ -581,7 +581,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $subAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
 
@@ -599,7 +599,7 @@ class GeneralLedgerServiceTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $account = $unit->getAccountByName('現金');
         $subAccountA = $account->subAccounts()->create(['name' => 'レジ2']);
@@ -670,7 +670,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashAccount = $unit->getAccountByName('現金');
         $cashSubAccount = $cashAccount->subAccounts()->first();

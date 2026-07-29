@@ -94,7 +94,7 @@ class TransactionTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => '無効化制御事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $transaction = Transaction::factory()->create([
             'fiscal_year_id' => $fiscalYear->id,
         ]);
@@ -318,7 +318,7 @@ class TransactionTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'Transaction状態テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
 
         $transaction = Transaction::create([
             'fiscal_year_id' => $fiscalYear->id,

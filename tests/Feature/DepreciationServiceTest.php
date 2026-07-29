@@ -23,7 +23,7 @@ class DepreciationServiceTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $paymentSubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query) {
@@ -69,7 +69,7 @@ class DepreciationServiceTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $assetSubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query) {
@@ -120,7 +120,7 @@ class DepreciationServiceTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
         ]);
-        $fiscalYear2024 = $unit->createFiscalYear(2024);
+        $fiscalYear2024 = $unit->createFiscalYear(2024, $user);
 
         $paymentSubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query) {
@@ -161,8 +161,8 @@ class DepreciationServiceTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
         ]);
-        $fiscalYear2023 = $unit->createFiscalYear(2023);
-        $fiscalYear2024 = $unit->createFiscalYear(2024);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+        $fiscalYear2024 = $unit->createFiscalYear(2024, $user);
 
         $paymentSubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query) {
@@ -213,7 +213,7 @@ class DepreciationServiceTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
         ]);
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
 
         $paymentSubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query) {
@@ -238,7 +238,7 @@ class DepreciationServiceTest extends TestCase
 
         $this->assertSame(1, DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->count());
 
-        $fiscalYear2026 = $unit->createFiscalYear(2026);
+        $fiscalYear2026 = $unit->createFiscalYear(2026, $user);
 
         $entries = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)
             ->orderBy('fiscal_year_id')
@@ -269,9 +269,9 @@ class DepreciationServiceTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
         ]);
-        $fiscalYear2022 = $unit->createFiscalYear(2022);
-        $fiscalYear2023 = $unit->createFiscalYear(2023);
-        $fiscalYear2024 = $unit->createFiscalYear(2024);
+        $fiscalYear2022 = $unit->createFiscalYear(2022, $user);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+        $fiscalYear2024 = $unit->createFiscalYear(2024, $user);
 
         $paymentSubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query) {
@@ -324,7 +324,7 @@ class DepreciationServiceTest extends TestCase
             'name' => 'テスト事業体',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2023);
+        $fiscalYear = $unit->createFiscalYear(2023, $user);
 
         // 免税事業者, 税込価格
         $fiscalYear->update(['is_taxable_supplier' => false]);
@@ -423,7 +423,7 @@ class DepreciationServiceTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $paymentSubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query) {
@@ -537,9 +537,9 @@ class DepreciationServiceTest extends TestCase
             'name' => 'テスト事業体',
         ]);
 
-        $fiscalYear2030 = $unit->createFiscalYear(2030);
-        $fiscalYear2031 = $unit->createFiscalYear(2031);
-        $fiscalYear2032 = $unit->createFiscalYear(2032);
+        $fiscalYear2030 = $unit->createFiscalYear(2030, $user);
+        $fiscalYear2031 = $unit->createFiscalYear(2031, $user);
+        $fiscalYear2032 = $unit->createFiscalYear(2032, $user);
 
         $assetAccount = $unit->getAccountByName('車両運搬具');
         $this->assertNotNull($assetAccount);
@@ -598,7 +598,7 @@ class DepreciationServiceTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $paymentSubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query) {
@@ -634,7 +634,7 @@ class DepreciationServiceTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear2023 = $unit->createFiscalYear(2023);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
 
         $assetSubAccount = $unit->subAccounts()
             ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
@@ -674,9 +674,9 @@ class DepreciationServiceTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
 
-        $fiscalYear2023 = $unit->createFiscalYear(2023);
-        $fiscalYear2024 = $unit->createFiscalYear(2024);
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+        $fiscalYear2024 = $unit->createFiscalYear(2024, $user);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
 
         $assetSubAccount = $unit->subAccounts()
             ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
@@ -743,9 +743,9 @@ class DepreciationServiceTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
 
-        $fiscalYear2023 = $unit->createFiscalYear(2023);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
         // 2024年度はDBに作成しない
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
 
         $assetSubAccount = $unit->subAccounts()
             ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
@@ -789,8 +789,8 @@ class DepreciationServiceTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear2024 = $unit->createFiscalYear(2024);
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2024 = $unit->createFiscalYear(2024, $user);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
 
         $assetSubAccount = $unit->subAccounts()
             ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
@@ -846,7 +846,7 @@ class DepreciationServiceTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
 
         $assetSubAccount = $unit->subAccounts()
             ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
@@ -883,7 +883,7 @@ class DepreciationServiceTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
 
         $assetSubAccount = $unit->subAccounts()
             ->whereHas('account', fn ($q) => $q->where('name', '機械装置'))
@@ -974,7 +974,7 @@ class DepreciationServiceTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
 
         $assetSubAccount = $unit->subAccounts()
             ->whereHas('account', fn ($query) => $query->where('name', '機械装置'))
@@ -1044,7 +1044,7 @@ class DepreciationServiceTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
 
         $assetSubAccount = $unit->subAccounts()
             ->whereHas('account', fn ($query) => $query->where('name', '機械装置'))
@@ -1085,7 +1085,7 @@ class DepreciationServiceTest extends TestCase
     //     {
     //         $user = User::factory()->create();
     //         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-    //         $fiscalYear = $unit->createFiscalYear(2023);
+    //         $fiscalYear = $unit->createFiscalYear(2023, $user);
 
     //         // 課税事業者
     //         $fiscalYear->update(['is_taxable' => true]);

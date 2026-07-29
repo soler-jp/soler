@@ -23,7 +23,7 @@ class FiscalYearTransactionTest extends TestCase
             'is_taxable' => false,
             'is_tax_exclusive' => false,
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $account = $unit->createAccount([
             'name' => 'テスト科目',
@@ -91,7 +91,7 @@ class FiscalYearTransactionTest extends TestCase
             'is_taxable' => false,
             'is_tax_exclusive' => false,
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $transactionData = [
             'date' => '2025-06-15',
@@ -135,7 +135,7 @@ class FiscalYearTransactionTest extends TestCase
             'is_taxable' => false,
             'is_tax_exclusive' => false,
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $transactionData = [
             'date' => '2025-06-15',

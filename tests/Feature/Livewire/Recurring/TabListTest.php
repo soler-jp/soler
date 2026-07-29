@@ -18,7 +18,7 @@ class TabListTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $unit->createRecurringTransactionPlan([
             'name' => 'サーバー代',
@@ -56,7 +56,7 @@ class TabListTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debitSubAccount = $unit->subAccounts()->first();
         $creditSubAccount = $unit->subAccounts()->first(); // 同一でもOK（ここでは簡略化）
@@ -127,7 +127,7 @@ class TabListTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debitSubAccount = $unit->getAccountByName('消耗品費')->subAccounts()->first();
         $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->first();
@@ -159,10 +159,10 @@ class TabListTest extends TestCase
         $otherUser = User::factory()->create();
 
         $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
 
         $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
-        $otherFiscalYear = $otherUnit->createFiscalYear(2025);
+        $otherFiscalYear = $otherUnit->createFiscalYear(2025, $otherUser);
 
         $otherDebit = $otherUnit->subAccounts()->first();
         $otherCredit = $otherUnit->getAccountByName('現金')->subAccounts()->first();
@@ -212,10 +212,10 @@ class TabListTest extends TestCase
         $otherUser = User::factory()->create();
 
         $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
-        $otherUnit->createFiscalYear(2025);
+        $otherUnit->createFiscalYear(2025, $otherUser);
 
         $debitSubAccount = $unit->subAccounts()->first();
         $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->first();
