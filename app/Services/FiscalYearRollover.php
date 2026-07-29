@@ -36,6 +36,7 @@ class FiscalYearRollover
                 $nextYear,
                 $rolloverData['opening_entries'],
                 $rolloverData['capital_entry'],
+                $actor,
             );
 
             if ($openingTransaction === null) {

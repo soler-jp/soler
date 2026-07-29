@@ -926,7 +926,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
             'sub_account_name' => '元入金',
             'type' => 'credit',
             'amount' => 70_000,
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-04-01',

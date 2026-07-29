@@ -2,15 +2,19 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\Account;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\Transaction;
+use App\Models\User;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 class OpeningEntryRegistrar
 {
+    use AuthorizesBusinessUnitAccess;
+
     private const DESCRIPTION = '期首残高設定';
 
     /**
@@ -74,8 +78,10 @@ class OpeningEntryRegistrar
      * @param  array<int, array{account_name: string, sub_account_name: string, amount: int, type: 'debit'|'credit'}>  $entries
      * @param  array{account_name: string, sub_account_name: string, amount: int, type: 'debit'|'credit'}  $capitalEntry
      */
-    public function registerForRollover(FiscalYear $fiscalYear, array $entries, array $capitalEntry): ?Transaction
+    public function registerForRollover(FiscalYear $fiscalYear, array $entries, array $capitalEntry, User $actor): ?Transaction
     {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度に期首仕訳を登録する権限がありません。');
+
         if ($entries === [] && (int) $capitalEntry['amount'] === 0) {
             return null;
         }
