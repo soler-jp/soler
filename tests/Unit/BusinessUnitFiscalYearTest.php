@@ -264,7 +264,7 @@ class BusinessUnitFiscalYearTest extends TestCase
         ], $rolloverData['capital_entry']);
 
         $nextFiscalYear = $businessUnit->createFiscalYear($rolloverData['next_year'], $user);
-        $openingTransaction = app(FiscalYearRollover::class)->rollover($fiscalYear, $nextFiscalYear);
+        $openingTransaction = app(FiscalYearRollover::class)->rollover($fiscalYear, $nextFiscalYear, $user);
 
         $this->assertInstanceOf(Transaction::class, $openingTransaction);
         $this->assertCount(2, $openingTransaction->journalEntries);

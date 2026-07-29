@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\FiscalYearRollover;
 use App\Services\TransactionRegistrar;
 use DomainException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
@@ -115,7 +116,7 @@ class FiscalYearRolloverTest extends TestCase
             'type' => 'credit',
         ], $rolloverData['capital_entry']);
 
-        $openingTransaction = app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        $openingTransaction = app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
 
         $this->assertSame('期首残高設定', $openingTransaction->description);
         $this->assertTrue($openingTransaction->is_opening_entry);
@@ -211,7 +212,7 @@ class FiscalYearRolloverTest extends TestCase
             'type' => 'debit',
         ], $rolloverData['capital_entry']);
 
-        $openingTransaction = app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        $openingTransaction = app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
 
         $this->assertCount(3, $openingTransaction->journalEntries);
         $this->assertSame(200_000, $openingTransaction->journalEntries->where('type', 'debit')->sum('net_amount'));
@@ -339,7 +340,7 @@ class FiscalYearRolloverTest extends TestCase
             ],
         ], $rolloverData['opening_entries']);
 
-        $openingTransaction = app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        $openingTransaction = app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
 
         $this->assertCount(2, $openingTransaction->journalEntries);
         $this->assertSame(680_000, $nextYear->calculateBalanceSummary()['asset']['total_balance']);
@@ -361,7 +362,7 @@ class FiscalYearRolloverTest extends TestCase
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('締め済みの会計年度のみ繰越できます。');
 
-        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
     }
 
     #[Test]
@@ -384,7 +385,7 @@ class FiscalYearRolloverTest extends TestCase
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('繰越元と繰越先は同じ事業体でなければなりません。');
 
-        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
     }
 
     #[Test]
@@ -404,7 +405,7 @@ class FiscalYearRolloverTest extends TestCase
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('繰越先は翌年度でなければなりません。');
 
-        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
     }
 
     #[Test]
@@ -431,7 +432,7 @@ class FiscalYearRolloverTest extends TestCase
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('繰越先の会計年度にはすでに期首仕訳があります。');
 
-        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
     }
 
     #[Test]
@@ -451,6 +452,26 @@ class FiscalYearRolloverTest extends TestCase
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('繰越する残高がありません。');
 
-        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
+
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function 他ユーザーは会計年度を繰り越せない(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '繰越認可事業体',
+        ]);
+        $closedYear = $businessUnit->createFiscalYear(2025, $user);
+        $nextYear = $businessUnit->createFiscalYear(2026, $user);
+
+        $closedYear->close($user);
+
+        $this->expectException(AuthorizationException::class);
+
+        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $otherUser);
     }
 }
