@@ -220,7 +220,7 @@ class BusinessFlowScenarioTest extends TestCase
             'date' => '2025-06-10',
             'amount' => 3500,
             'credit_sub_account_id' => $paymentSubAccount->id,
-        ]);
+        ], $user);
 
         $this->assertNotNull($confirmed);
         $this->assertFalse($confirmed->is_planned);

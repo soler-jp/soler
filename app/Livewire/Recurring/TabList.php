@@ -34,7 +34,8 @@ class TabList extends Component
 
     public function confirm(int $transactionId)
     {
-        $unit = Auth::user()->selectedBusinessUnitOrFail();
+        $actor = Auth::user();
+        $unit = $actor->selectedBusinessUnitOrFail();
         $fiscalYear = $unit->currentFiscalYear;
         $data = $this->inputs[$transactionId] ?? [];
         $date = $data['date'] ?? null;
@@ -62,7 +63,7 @@ class TabList extends Component
         }
 
         try {
-            $transaction = $plan->confirmTransaction($transactionId, $validated);
+            $transaction = $plan->confirmTransaction($transactionId, $validated, $actor);
         } catch (ValidationException $e) {
             foreach ($e->errors() as $field => $messages) {
                 foreach ($messages as $message) {

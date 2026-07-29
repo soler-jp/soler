@@ -89,7 +89,7 @@ class RecurringTransactionPlanTest extends TestCase
             'amount' => 1400,
             'business_ratio' => 80,
             'credit_sub_account_id' => $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail()->id,
-        ]);
+        ], $user);
 
         $this->assertNotNull($confirmed);
         $this->assertFalse($confirmed->is_planned);
@@ -554,6 +554,38 @@ class RecurringTransactionPlanTest extends TestCase
     }
 
     #[Test]
+    public function 他ユーザーは定期取引の予定取引を確定できない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '確定認可テスト事業']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+        $sub = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '水道光熱費'))->firstOrFail();
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '確定認可テストプラン',
+            'interval' => 'monthly',
+            'day_of_month' => 1,
+            'is_income' => false,
+            'debit_sub_account_id' => $sub->id,
+            'credit_sub_account_id' => $sub->id,
+            'amount' => 3000,
+            'tax_amount' => 0,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この定期取引を確定する権限がありません。');
+
+        $plan->confirmTransaction($transaction->id, [
+            'date' => '2025-12-10',
+            'amount' => 3000,
+            'credit_sub_account_id' => $sub->id,
+        ], $otherUser);
+    }
+
+    #[Test]
     #[Group('mysql')]
     public function 同じ日付の予定取引が既に存在する場合は作成されない()
     {
@@ -780,7 +812,7 @@ class RecurringTransactionPlanTest extends TestCase
             'date' => '2025-12-10',
             'amount' => 1400,
             'credit_sub_account_id' => $newCreditSubAccount->id,
-        ]);
+        ], $user);
 
         $this->assertNotNull($confirmed);
         $this->assertFalse($confirmed->is_planned);
@@ -894,7 +926,7 @@ class RecurringTransactionPlanTest extends TestCase
             'date' => $transaction->date->toDateString(),
             'amount' => 1100,
             'credit_sub_account_id' => $newCreditSubAccount->id,
-        ]);
+        ], $user);
 
         $this->assertDatabaseHas('journal_entries', [
             'transaction_id' => $transaction->id,
@@ -954,7 +986,7 @@ class RecurringTransactionPlanTest extends TestCase
             'date' => '2025-12-10',
             'amount' => 1400,
             'credit_sub_account_id' => $subAccount->id,
-        ]);
+        ], $user);
 
         $this->assertNull($result);
         $this->assertDatabaseHas('transactions', [
@@ -996,7 +1028,7 @@ class RecurringTransactionPlanTest extends TestCase
                 'date' => '2025-12-10',
                 'amount' => 1400,
                 'credit_sub_account_id' => $foreignCreditSubAccount->id,
-            ]);
+            ], $user);
 
             $this->fail('ValidationException was not thrown.');
         } catch (ValidationException $e) {
@@ -1047,6 +1079,6 @@ class RecurringTransactionPlanTest extends TestCase
             'date' => '2025-12-10',
             'amount' => 1100,
             'credit_sub_account_id' => $creditSubAccount->id,
-        ]);
+        ], $user);
     }
 }
