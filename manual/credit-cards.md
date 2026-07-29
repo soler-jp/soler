@@ -44,8 +44,7 @@
 ```php
 use App\Models\CreditCard;
 
-$creditCard = CreditCard::create([
-    'business_unit_id' => $businessUnit->id,
+$creditCard = $businessUnit->createCreditCard([
     'name' => '事業用オリコ',
     'issuer_name' => 'Orico',
     'network' => 'visa',

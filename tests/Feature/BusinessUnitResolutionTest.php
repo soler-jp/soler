@@ -97,8 +97,7 @@ class BusinessUnitResolutionTest extends TestCase
         ]);
 
         // クレジットカードと明細取込（statement / batch / line）
-        $creditCard = CreditCard::create([
-            'business_unit_id' => $unit->id,
+        $creditCard = $unit->createCreditCard([
             'name' => '事業用楽天カード',
             'issuer_name' => 'Rakuten',
             'network' => 'visa',

@@ -20,13 +20,22 @@ class CreditCardModelsTest extends TestCase
     #[Test]
     public function 事業体に紐づくクレジットカードを作成できる(): void
     {
-        $businessUnit = BusinessUnit::factory()->create();
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'クレジットカード作成テスト',
+        ]);
+        $liabilitySubAccount = $businessUnit->getAccountByName('未払金')
+            ?->subAccounts()
+            ->firstOrFail();
 
-        $creditCard = CreditCard::factory()->create([
-            'business_unit_id' => $businessUnit->id,
+        $creditCard = $businessUnit->createCreditCard([
+            'name' => '事業用Orico',
             'issuer_name' => 'Orico',
             'network' => 'visa',
             'last_four' => '8765',
+            'ownership_type' => CreditCard::OWNERSHIP_TYPE_BUSINESS,
+            'parser_key' => 'orico_csv_v1',
+            'liability_sub_account_id' => $liabilitySubAccount->id,
         ]);
 
         $this->assertTrue($businessUnit->creditCards->contains($creditCard));

@@ -366,6 +366,13 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             ->refresh();
     }
 
+    public function createCreditCard(array $attributes): CreditCard
+    {
+        return $this->creditCards()
+            ->create($attributes)
+            ->refresh();
+    }
+
     public function generatePlannedTransactionsForPlan(RecurringTransactionPlan $plan, FiscalYear $fiscalYear): Collection
     {
         if ($plan->business_unit_id !== $this->id) {
