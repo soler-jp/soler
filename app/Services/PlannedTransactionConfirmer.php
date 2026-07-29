@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Concerns\AuthorizesBusinessUnitAccess;
 use App\Validators\JournalEntryValidator;
 use App\Validators\TransactionValidator;
 use Illuminate\Support\Facades\DB;
@@ -11,6 +12,8 @@ use Illuminate\Validation\ValidationException;
 
 class PlannedTransactionConfirmer
 {
+    use AuthorizesBusinessUnitAccess;
+
     public function __construct(
         public TransactionRegistrar $transactionRegistrar,
     ) {}
@@ -21,6 +24,8 @@ class PlannedTransactionConfirmer
         array $overrides = [],
         array $journalEntriesData = [],
     ): Transaction {
+        $this->authorizeBusinessUnitAccess($transaction, $user, 'この予定取引を確定する権限がありません。');
+
         return DB::transaction(function () use ($transaction, $overrides, $journalEntriesData): Transaction {
             $lockedTransaction = Transaction::query()
                 ->with(['fiscalYear.businessUnit', 'journalEntries'])

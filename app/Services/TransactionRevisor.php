@@ -4,18 +4,23 @@ namespace App\Services;
 
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Concerns\AuthorizesBusinessUnitAccess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class TransactionRevisor
 {
+    use AuthorizesBusinessUnitAccess;
+
     public function __construct(
         public TransactionRegistrar $transactionRegistrar
     ) {}
 
     public function revise(Transaction $transaction, User $user, array $data): Transaction
     {
+        $this->authorizeBusinessUnitAccess($transaction, $user, 'この取引を修正する権限がありません。');
+
         $validated = Validator::make(
             $data,
             [

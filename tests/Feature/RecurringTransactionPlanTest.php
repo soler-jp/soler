@@ -54,6 +54,7 @@ class RecurringTransactionPlanTest extends TestCase
     public function 確定時に事業割合を上書きできる()
     {
         $user = User::factory()->create();
+        $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業',
         ]);
@@ -702,6 +703,7 @@ class RecurringTransactionPlanTest extends TestCase
     public function planned_transactionを確定できる()
     {
         $user = User::factory()->create();
+        $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => '確認テスト事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
@@ -815,6 +817,7 @@ class RecurringTransactionPlanTest extends TestCase
     public function planned_transaction確定時に貸方補助科目を変更できる()
     {
         $user = User::factory()->create();
+        $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => '貸方変更テスト事業']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
@@ -965,6 +968,7 @@ class RecurringTransactionPlanTest extends TestCase
     public function 決算済み年度の予定取引は確定できない()
     {
         $user = User::factory()->create();
+        $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => '決算後確定不可']);
         $fiscalYear = $unit->createFiscalYear(2025);
         $debitSubAccount = $unit->getAccountByName('水道光熱費')->subAccounts()->firstOrFail();

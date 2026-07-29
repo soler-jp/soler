@@ -10,6 +10,7 @@ use App\Models\FiscalYear;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\CreditCardImport\CreditCardImportService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
@@ -311,5 +312,46 @@ CSV;
         $this->assertNotFalse($contents, sprintf('Failed to read fixture [%s].', $path));
 
         return $contents;
+    }
+
+    #[Test]
+    public function 他ユーザーは明細を取り込めない(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $creditCard = CreditCard::factory()->create([
+            'business_unit_id' => $user->createBusinessUnitWithDefaults(['name' => '取込認可テスト'])->id,
+            'parser_key' => 'rakuten_csv_v1',
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+
+        // 認可は parse より前に走るため、CSV 内容の妥当性までは問われない
+        $this->app->make(CreditCardImportService::class)->import(
+            $creditCard,
+            'dummy',
+            'rakuten.csv',
+            $otherUser,
+        );
+    }
+
+    #[Test]
+    public function actorがnullなら取り込めない(): void
+    {
+        $user = User::factory()->create();
+        $creditCard = CreditCard::factory()->create([
+            'business_unit_id' => $user->createBusinessUnitWithDefaults(['name' => 'システム取込テスト'])->id,
+            'parser_key' => 'rakuten_csv_v1',
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+
+        // 認可は parse より前に走るため、CSV 内容の妥当性までは問われない
+        $this->app->make(CreditCardImportService::class)->import(
+            $creditCard,
+            'dummy',
+            'rakuten.csv',
+            null,
+        );
     }
 }

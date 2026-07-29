@@ -7,7 +7,7 @@ use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
+use App\Services\Concerns\AuthorizesBusinessUnitAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -15,6 +15,8 @@ use Illuminate\Validation\ValidationException;
 
 class CreditCardStatementLineRegistrar
 {
+    use AuthorizesBusinessUnitAccess;
+
     public function __construct(
         private readonly TransactionRegistrar $transactionRegistrar,
     ) {}
@@ -112,15 +114,11 @@ class CreditCardStatementLineRegistrar
 
     protected function authorizeUser(CreditCardStatementLine $line, ?User $user): void
     {
-        if ($user === null) {
-            return;
-        }
-
-        $businessUnit = $line->resolveBusinessUnit();
-
-        if ($businessUnit === null || $businessUnit->user_id !== $user->id) {
-            throw new AuthorizationException('このクレジットカード明細を操作する権限がありません。');
-        }
+        $this->authorizeBusinessUnitAccess(
+            $line,
+            $user,
+            'このクレジットカード明細を操作する権限がありません。',
+        );
     }
 
     protected function ensureLineCanBeRegistered(CreditCardStatementLine $line): void

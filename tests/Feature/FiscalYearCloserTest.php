@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\DepreciationService;
 use App\Services\FiscalYearCloser;
 use App\Services\TransactionRegistrar;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
@@ -131,5 +132,18 @@ class FiscalYearCloserTest extends TestCase
         $this->expectException(ValidationException::class);
 
         app(FiscalYearCloser::class)->close($fiscalYear, $user);
+    }
+
+    #[Test]
+    public function 他ユーザーは会計年度を決算できない(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '決算認可テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $this->expectException(AuthorizationException::class);
+
+        app(FiscalYearCloser::class)->close($fiscalYear, $otherUser);
     }
 }

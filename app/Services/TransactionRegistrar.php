@@ -9,6 +9,7 @@ use App\Models\JournalEntry;
 use App\Models\SubAccount;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Concerns\AuthorizesBusinessUnitAccess;
 use App\Validators\JournalEntryValidator;
 use App\Validators\TransactionValidator;
 use Illuminate\Support\Carbon;
@@ -18,6 +19,8 @@ use Illuminate\Validation\ValidationException;
 
 class TransactionRegistrar
 {
+    use AuthorizesBusinessUnitAccess;
+
     /**
      * 取引と仕訳の登録を行う
      *
@@ -486,6 +489,8 @@ class TransactionRegistrar
      */
     public function cancelPlanned(Transaction $transaction, ?User $user = null): Transaction
     {
+        $this->authorizeBusinessUnitAccess($transaction, $user, 'この予定取引を取消する権限がありません。');
+
         if (! $transaction->is_planned) {
             throw new \InvalidArgumentException('本登録された取引は取消できません。');
         }

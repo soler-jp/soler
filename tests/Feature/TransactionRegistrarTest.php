@@ -9,6 +9,7 @@ use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
@@ -1869,6 +1870,7 @@ class TransactionRegistrarTest extends TestCase
     public function 予定取引を本登録に変更できる()
     {
         $user = User::factory()->create();
+        $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
@@ -1910,6 +1912,7 @@ class TransactionRegistrarTest extends TestCase
     public function 本登録時に仕訳の内容を変更できて元の仕訳は上書きされる()
     {
         $user = User::factory()->create();
+        $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
@@ -1966,6 +1969,7 @@ class TransactionRegistrarTest extends TestCase
     public function 予定取引を0円の本登録に変換して取消できる()
     {
         $user = User::factory()->create();
+        $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025);
 
@@ -2116,7 +2120,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ]);
 
-        $registrar->cancelPlanned($transaction);
+        $registrar->cancelPlanned($transaction, $user);
     }
 
     private function registerWithDate(FiscalYear $fiscalYear, string $date): Transaction
@@ -2180,5 +2184,31 @@ class TransactionRegistrarTest extends TestCase
         $this->expectExceptionMessage('取引日は会計年度の期間内（2025-01-01〜2025-12-31）で指定してください。');
 
         $this->registerWithDate($fiscalYear, '2026-01-01');
+    }
+
+    #[Test]
+    public function 他ユーザーは予定取引をcancel_plannedで取消できない(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取消認可テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $debit = $unit->getAccountByName('通信費')->subAccounts()->firstOrFail();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+
+        $registrar = new TransactionRegistrar;
+        $transaction = $registrar->register($fiscalYear, [
+            'date' => '2025-05-01',
+            'description' => '取消認可テスト予定',
+            'is_planned' => true,
+        ], [
+            ['sub_account_id' => $debit->id, 'type' => JournalEntry::TYPE_DEBIT, 'net_amount' => 1000],
+            ['sub_account_id' => $credit->id, 'type' => JournalEntry::TYPE_CREDIT, 'net_amount' => 1000],
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+
+        $registrar->cancelPlanned($transaction, $otherUser);
     }
 }

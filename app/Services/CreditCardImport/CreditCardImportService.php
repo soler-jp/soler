@@ -9,11 +9,14 @@ use App\Models\CreditCardImportBatch;
 use App\Models\CreditCardStatement;
 use App\Models\CreditCardStatementLine;
 use App\Models\User;
+use App\Services\Concerns\AuthorizesBusinessUnitAccess;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class CreditCardImportService
 {
+    use AuthorizesBusinessUnitAccess;
+
     public function __construct(
         private readonly CreditCardCsvParserRegistry $parserRegistry,
     ) {}
@@ -35,6 +38,8 @@ class CreditCardImportService
         ?User $uploadedBy = null,
         array $overrides = [],
     ): CreditCardImportBatch {
+        $this->authorizeBusinessUnitAccess($creditCard, $uploadedBy, 'このクレジットカードに明細を取り込む権限がありません。');
+
         $parser = $this->resolveParser($creditCard, $csvContents);
         $parsedStatement = $parser->parse($csvContents, $overrides);
 

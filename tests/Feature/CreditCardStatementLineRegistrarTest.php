@@ -8,6 +8,7 @@ use App\Models\CreditCardStatement;
 use App\Models\CreditCardStatementLine;
 use App\Models\JournalEntry;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Group;
@@ -245,6 +246,20 @@ class CreditCardStatementLineRegistrarTest extends TestCase
             'debit_sub_account_id' => $expenseSubAccount->id,
             'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
         ], $user);
+    }
+
+    #[Test]
+    public function 未所属ユーザーは明細を登録できない(): void
+    {
+        [$owner, $line, $expenseSubAccount] = $this->createRegisterableLine();
+        $otherUser = User::factory()->create();
+
+        $this->expectException(AuthorizationException::class);
+
+        $line->registerTransaction([
+            'debit_sub_account_id' => $expenseSubAccount->id,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+        ], $otherUser);
     }
 
     private function createRegisterableLine(

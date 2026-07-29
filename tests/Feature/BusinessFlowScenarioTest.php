@@ -112,6 +112,7 @@ class BusinessFlowScenarioTest extends TestCase
     public function 日々業務から期末処理までの上位フローを通してsummaryが整合する(bool $isTaxable, bool $isTaxExclusive): void
     {
         $user = User::factory()->create();
+        $this->actingAs($user);
         $unit = (new GeneralBusinessInitializer)->initialize($user, [
             'name' => '業務フロー事業体',
             'type' => 'general',

@@ -8,6 +8,7 @@ use App\Models\RecurringTransactionPlan;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
 use App\Services\TransactionRevisor;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
@@ -337,5 +338,36 @@ class TransactionRevisorTest extends TestCase
                 $exception->errors()['transaction'] ?? []
             );
         }
+    }
+
+    #[Test]
+    public function 他ユーザーは取引を修正できない(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '改訂認可テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025);
+
+        $debit = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+
+        $transaction = app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '認可テスト取引',
+            'created_by' => $user->id,
+        ], [
+            ['sub_account_id' => $debit->id, 'type' => JournalEntry::TYPE_DEBIT, 'net_amount' => 1000],
+            ['sub_account_id' => $credit->id, 'type' => JournalEntry::TYPE_CREDIT, 'net_amount' => 1000],
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+
+        app(TransactionRevisor::class)->revise($transaction, $otherUser, [
+            'transaction' => ['revision_reason' => '不正な修正'],
+            'journal_entries' => [
+                ['sub_account_id' => $debit->id, 'type' => JournalEntry::TYPE_DEBIT, 'net_amount' => 2000],
+                ['sub_account_id' => $credit->id, 'type' => JournalEntry::TYPE_CREDIT, 'net_amount' => 2000],
+            ],
+        ]);
     }
 }
