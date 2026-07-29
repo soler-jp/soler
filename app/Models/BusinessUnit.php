@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Contracts\ResolvesBusinessUnit;
 use App\Services\DepreciationService;
 use App\Services\TransactionRegistrar;
@@ -17,6 +18,7 @@ use Illuminate\Validation\Rules\Exists;
 
 class BusinessUnit extends Model implements ResolvesBusinessUnit
 {
+    use AuthorizesBusinessUnitAccess;
     use HasFactory;
 
     public const HOUSEHOLD_ALLOCATION_SUB_ACCOUNT_NAME = '家事按分';
@@ -366,10 +368,16 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             ->refresh();
     }
 
-    public function createCreditCard(array $attributes): CreditCard
+    public function createCreditCard(array $attributes, User $actor): CreditCard
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体にクレジットカードを追加する権限がありません。');
+
+        $attributes['business_unit_id'] = $this->id;
+
+        $validated = CreditCard::validate($attributes);
+
         return $this->creditCards()
-            ->create($attributes)
+            ->create($validated)
             ->refresh();
     }
 

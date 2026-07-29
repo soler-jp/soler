@@ -9,7 +9,9 @@ use App\Models\CreditCardStatement;
 use App\Models\CreditCardStatementLine;
 use App\Models\Transaction;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -36,7 +38,7 @@ class CreditCardModelsTest extends TestCase
             'ownership_type' => CreditCard::OWNERSHIP_TYPE_BUSINESS,
             'parser_key' => 'orico_csv_v1',
             'liability_sub_account_id' => $liabilitySubAccount->id,
-        ]);
+        ], $user);
 
         $this->assertTrue($businessUnit->creditCards->contains($creditCard));
         $this->assertTrue($creditCard->requiresFullRegistration());

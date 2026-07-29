@@ -106,7 +106,7 @@ class BusinessUnitResolutionTest extends TestCase
             'parser_key' => 'rakuten_csv_v1',
             'liability_sub_account_id' => $cardLiabilitySubAccount->id,
             'is_active' => true,
-        ]);
+        ], $user);
 
         $csvContents = <<<'CSV'
 利用日,利用店名・商品名,利用者,支払方法,利用金額,手数料/利息,支払総額,支払月,7月支払金額,当月請求額,8月繰越残高,8月以降請求額

@@ -53,7 +53,7 @@ $creditCard = $businessUnit->createCreditCard([
     'parser_key' => 'orico_csv_v1',
     'liability_sub_account_id' => $cardLiabilitySubAccount->id,
     'is_active' => true,
-]);
+], auth()->user());
 ```
 
 ## `ownership_type` の使い分け
