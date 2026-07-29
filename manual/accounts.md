@@ -65,7 +65,7 @@ $user = App\Models\User::findOrFail(1);
 $businessUnit = $user->businessUnits()->findOrFail(10);
 $account = $businessUnit->getAccountByName('会議費');
 
-$subAccount = $account->addCustomSubAccount('定例会議');
+$subAccount = $account->addCustomSubAccount('定例会議', $user);
 ```
 
 ## 注意点

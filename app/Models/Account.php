@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Contracts\ResolvesBusinessUnit;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Account extends Model implements ResolvesBusinessUnit
 {
+    use AuthorizesBusinessUnitAccess;
     use HasFactory;
 
     // 勘定科目の5分類（type）
@@ -73,8 +75,10 @@ class Account extends Model implements ResolvesBusinessUnit
         );
     }
 
-    public function createSubAccount(array $attributes): SubAccount
+    public function createSubAccount(array $attributes, User $actor): SubAccount
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この勘定科目に補助科目を追加する権限がありません。');
+
         if (empty($attributes['name'])) {
             throw new \InvalidArgumentException('name は必須です。');
         }
@@ -82,10 +86,10 @@ class Account extends Model implements ResolvesBusinessUnit
         return $this->subAccounts()->create($attributes);
     }
 
-    public function addCustomSubAccount(string $subAccountName): SubAccount
+    public function addCustomSubAccount(string $subAccountName, User $actor): SubAccount
     {
         return $this->createSubAccount([
             'name' => $subAccountName,
-        ]);
+        ], $actor);
     }
 }

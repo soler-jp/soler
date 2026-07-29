@@ -37,9 +37,7 @@ class GeneralBusinessInitializer
 
         if (isset($inputs['revenue_sub_accounts']) && $revenueAccount) {
             foreach ($inputs['revenue_sub_accounts'] as $subAccount) {
-                $revenueAccount->subAccounts()->create([
-                    'name' => $subAccount['name'],
-                ]);
+                $revenueAccount->addCustomSubAccount($subAccount['name'], $user);
             }
         }
 

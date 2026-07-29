@@ -398,9 +398,9 @@ class JournalEntryTest extends TestCase
             ->where('name', 'その他の預金')
             ->firstOrFail();
 
-        $subA = $account->createSubAccount(['name' => '口座A']);
-        $subB = $account->createSubAccount(['name' => '口座B']);
-        $subC = $account->createSubAccount(['name' => '口座C']);
+        $subA = $account->createSubAccount(['name' => '口座A'], $user);
+        $subB = $account->createSubAccount(['name' => '口座B'], $user);
+        $subC = $account->createSubAccount(['name' => '口座C'], $user);
 
         $equitySubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query) {

@@ -238,13 +238,14 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
     {
         return \DB::transaction(function () use ($attributes) {
             $account = $this->accounts()->create($attributes);
+            $user = $account->businessUnit->user;
 
             if (isset(self::$defaultSubAccounts[$account->name])) {
                 foreach (self::$defaultSubAccounts[$account->name] as $subAccountName) {
-                    $account->addCustomSubAccount($subAccountName);
+                    $account->addCustomSubAccount($subAccountName, $user);
                 }
             } else {
-                $account->addCustomSubAccount($account->name);
+                $account->addCustomSubAccount($account->name, $user);
             }
 
             return $account;
@@ -265,8 +266,9 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
                 'name' => $accountName,
                 'type' => $type,
             ]);
+            $user = $account->businessUnit->user;
 
-            $account->addCustomSubAccount($subAccountName ?? $accountName);
+            $account->addCustomSubAccount($subAccountName ?? $accountName, $user);
 
             return $account->refresh();
         });

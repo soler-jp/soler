@@ -567,11 +567,11 @@ class BusinessUnitTest extends TestCase
         $privateAccount = $businessUnit->getAccountByName('事業主借');
         $liabilityAccount = $businessUnit->getAccountByName('未払金');
 
-        $cashAccount?->createSubAccount(['name' => '金庫現金']);
-        $bankA = $bankAccount?->createSubAccount(['name' => 'XX銀行']);
-        $bankB = $bankAccount?->createSubAccount(['name' => 'OO銀行']);
-        $privateAccount?->createSubAccount(['name' => '家族立替']);
-        $cardLiability = $liabilityAccount?->createSubAccount(['name' => 'Amex Business']);
+        $cashAccount?->createSubAccount(['name' => '金庫現金'], $user);
+        $bankA = $bankAccount?->createSubAccount(['name' => 'XX銀行'], $user);
+        $bankB = $bankAccount?->createSubAccount(['name' => 'OO銀行'], $user);
+        $privateAccount?->createSubAccount(['name' => '家族立替'], $user);
+        $cardLiability = $liabilityAccount?->createSubAccount(['name' => 'Amex Business'], $user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-01-15',
@@ -690,7 +690,7 @@ class BusinessUnitTest extends TestCase
         ]);
 
         $cashAccount = $businessUnit->getAccountByName('現金');
-        $cashSubAccount = $cashAccount?->createSubAccount(['name' => '金庫現金']);
+        $cashSubAccount = $cashAccount?->createSubAccount(['name' => '金庫現金'], $user);
 
         $sources = $businessUnit->availableCreditSources();
 
@@ -711,7 +711,7 @@ class BusinessUnitTest extends TestCase
         ]);
 
         $bankAccount = $businessUnit->getAccountByName('その他の預金');
-        $bankSubAccount = $bankAccount?->createSubAccount(['name' => 'XX銀行']);
+        $bankSubAccount = $bankAccount?->createSubAccount(['name' => 'XX銀行'], $user);
 
         $sources = $businessUnit->availableCreditSources();
 
