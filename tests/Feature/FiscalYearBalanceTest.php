@@ -168,7 +168,7 @@ class FiscalYearBalanceTest extends TestCase
         $fiscalYear->registerOpeningEntry([
             ['account_name' => '現金', 'sub_account_name' => '現金', 'amount' => 100000],
             ['account_name' => 'その他の預金', 'sub_account_name' => '普通預金', 'amount' => 300000],
-        ]);
+        ], $user);
 
         $summary = $fiscalYear->calculateBalanceSummary();
 

@@ -45,7 +45,7 @@ class FiscalYearCloserTest extends TestCase
                 'sub_account_name' => '棚卸資産',
                 'amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $assetAccount = $unit->getAccountByName('車両運搬具');
 

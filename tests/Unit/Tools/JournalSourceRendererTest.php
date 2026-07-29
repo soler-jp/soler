@@ -27,7 +27,7 @@ class JournalSourceRendererTest extends TestCase
                         'sub_account_name' => '現金',
                         'amount' => 100_000,
                     ],
-                ]);
+                ], $user);
 
                 (new TransactionRegistrar)->register($fiscalYear, [
                     'date' => '2025-06-10',

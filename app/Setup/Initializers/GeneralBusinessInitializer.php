@@ -31,7 +31,7 @@ class GeneralBusinessInitializer
             'is_tax_exclusive' => $inputs['is_tax_exclusive'],
         ]);
 
-        app(OpeningEntryRegistrar::class)->register($fiscalYear, $inputs['opening_entries'] ?? []);
+        app(OpeningEntryRegistrar::class)->register($fiscalYear, $inputs['opening_entries'] ?? [], $user);
 
         $revenueAccount = $unit->getAccountByName('売上高');
 

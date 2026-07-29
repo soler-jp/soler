@@ -40,7 +40,7 @@ class FiscalYearRolloverTest extends TestCase
                 'sub_account_name' => '現金',
                 'amount' => 100_000,
             ],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-04-10',
@@ -152,7 +152,7 @@ class FiscalYearRolloverTest extends TestCase
                 'sub_account_name' => '現金',
                 'amount' => 50_000,
             ],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-04-10',
@@ -247,7 +247,7 @@ class FiscalYearRolloverTest extends TestCase
                 'sub_account_name' => '現金',
                 'amount' => 500_000,
             ],
-        ]);
+        ], $user);
 
         // 青色申告特別控除前の所得金額 300,000 - 100,000 = 200,000
         (new TransactionRegistrar)->register($closedYear, [
@@ -427,7 +427,7 @@ class FiscalYearRolloverTest extends TestCase
                 'sub_account_name' => '現金',
                 'amount' => 1_000,
             ],
-        ]);
+        ], $user);
 
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('繰越先の会計年度にはすでに期首仕訳があります。');

@@ -28,8 +28,10 @@ class OpeningEntryRegistrar
         '棚卸資産',
     ];
 
-    public function register(FiscalYear $fiscalYear, array $entries): ?Transaction
+    public function register(FiscalYear $fiscalYear, array $entries, User $actor): ?Transaction
     {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度に期首仕訳を登録する権限がありません。');
+
         if ($entries === []) {
             return null;
         }

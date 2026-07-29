@@ -249,9 +249,9 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
         return app(FiscalYearRolloverDataCalculator::class)->calculate($this);
     }
 
-    public function registerOpeningEntry(array $entries): ?Transaction
+    public function registerOpeningEntry(array $entries, User $actor): ?Transaction
     {
-        return app(OpeningEntryRegistrar::class)->register($this, $entries);
+        return app(OpeningEntryRegistrar::class)->register($this, $entries, $actor);
     }
 
     public function closedBy()

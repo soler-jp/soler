@@ -37,7 +37,7 @@ class InventoryClosingServiceTest extends TestCase
         }
 
         if ($entries !== []) {
-            $fiscalYear->registerOpeningEntry($entries);
+            $fiscalYear->registerOpeningEntry($entries, $user);
         }
 
         return $fiscalYear;

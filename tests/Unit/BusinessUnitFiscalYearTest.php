@@ -208,7 +208,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'sub_account_name' => '現金',
                 'amount' => 100000,
             ],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-10',
@@ -300,7 +300,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'sub_account_name' => 'その他の預金',
                 'amount' => 50000,
             ],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-10',
@@ -363,7 +363,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'sub_account_name' => 'その他の預金',
                 'amount' => 50000,
             ],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-10',

@@ -76,7 +76,7 @@ class BusinessFlowScenarioTest extends TestCase
         $fiscalYear = $unit->createFiscalYear(2026, $user);
         $this->assertDatabaseCount('transactions', 0);
 
-        $emptyResult = $fiscalYear->registerOpeningEntry([]);
+        $emptyResult = $fiscalYear->registerOpeningEntry([], $user);
         $this->assertNull($emptyResult);
         $this->assertDatabaseCount('transactions', 0);
 
@@ -86,7 +86,7 @@ class BusinessFlowScenarioTest extends TestCase
                 'sub_account_name' => 'レジ現金',
                 'amount' => 50000,
             ],
-        ]);
+        ], $user);
 
         $this->assertNotNull($openingTransaction);
         $this->assertDatabaseHas('transactions', [
