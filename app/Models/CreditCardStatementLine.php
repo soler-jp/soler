@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use App\Services\CreditCardStatementLineRegistrar;
 use Database\Factories\CreditCardStatementLineFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CreditCardStatementLine extends Model
+class CreditCardStatementLine extends Model implements ResolvesBusinessUnit
 {
     public const STATUS_UNREVIEWED = 'unreviewed';
 
@@ -62,6 +63,13 @@ class CreditCardStatementLine extends Model
     public function statement(): BelongsTo
     {
         return $this->belongsTo(CreditCardStatement::class, 'credit_card_statement_id');
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('statement.creditCard.businessUnit');
+
+        return $this->statement->creditCard->businessUnit;
     }
 
     public function importBatch(): BelongsTo

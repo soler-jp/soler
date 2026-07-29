@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-class Transaction extends Model
+class Transaction extends Model implements ResolvesBusinessUnit
 {
     use HasFactory;
 
@@ -64,6 +65,13 @@ class Transaction extends Model
     public function fiscalYear(): BelongsTo
     {
         return $this->belongsTo(FiscalYear::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('fiscalYear.businessUnit');
+
+        return $this->fiscalYear->businessUnit;
     }
 
     /**

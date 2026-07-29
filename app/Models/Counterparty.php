@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use App\Services\CounterpartySummaryCalculator;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use InvalidArgumentException;
 
-class Counterparty extends Model
+class Counterparty extends Model implements ResolvesBusinessUnit
 {
     use HasFactory;
 
@@ -59,6 +60,13 @@ class Counterparty extends Model
     public function businessUnit(): BelongsTo
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('businessUnit');
+
+        return $this->businessUnit;
     }
 
     public function qualificationEvents(): HasMany

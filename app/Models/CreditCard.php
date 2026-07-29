@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use Database\Factories\CreditCardFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class CreditCard extends Model
+class CreditCard extends Model implements ResolvesBusinessUnit
 {
     public const OWNERSHIP_TYPE_BUSINESS = 'business';
 
@@ -54,6 +55,13 @@ class CreditCard extends Model
     public function businessUnit(): BelongsTo
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('businessUnit');
+
+        return $this->businessUnit;
     }
 
     public function liabilitySubAccount(): BelongsTo

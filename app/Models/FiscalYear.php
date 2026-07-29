@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use App\Services\BlueReturnInputRegistrar;
 use App\Services\BlueReturnPdf\BlueReturnStatementPdfGenerator;
 use App\Services\BlueReturnStatementCalculator;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
-class FiscalYear extends Model
+class FiscalYear extends Model implements ResolvesBusinessUnit
 {
     use HasFactory;
 
@@ -57,6 +58,13 @@ class FiscalYear extends Model
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('businessUnit');
+
+        return $this->businessUnit;
     }
 
     public function transactions()

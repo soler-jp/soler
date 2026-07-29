@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use Database\Factories\CreditCardImportBatchFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
-class CreditCardImportBatch extends Model
+class CreditCardImportBatch extends Model implements ResolvesBusinessUnit
 {
     public const STATUS_PROCESSING = 'processing';
 
@@ -59,6 +60,13 @@ class CreditCardImportBatch extends Model
     public function statement(): BelongsTo
     {
         return $this->belongsTo(CreditCardStatement::class, 'credit_card_statement_id');
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('statement.creditCard.businessUnit');
+
+        return $this->statement->creditCard->businessUnit;
     }
 
     public function uploader(): BelongsTo

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use App\Services\DepreciationService;
 use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
 
-class BusinessUnit extends Model
+class BusinessUnit extends Model implements ResolvesBusinessUnit
 {
     use HasFactory;
 
@@ -81,6 +82,11 @@ class BusinessUnit extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        return $this;
     }
 
     public function fiscalYears()

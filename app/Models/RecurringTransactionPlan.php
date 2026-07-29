@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use App\Services\PlannedTransactionConfirmer;
 use App\Services\TransactionRegistrar;
 use Database\Factories\RecurringTransactionPlanFactory;
@@ -15,7 +16,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
-class RecurringTransactionPlan extends Model
+class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
 {
     /** @use HasFactory<RecurringTransactionPlanFactory> */
     use HasFactory;
@@ -54,6 +55,13 @@ class RecurringTransactionPlan extends Model
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('businessUnit');
+
+        return $this->businessUnit;
     }
 
     public function transactions(): HasMany

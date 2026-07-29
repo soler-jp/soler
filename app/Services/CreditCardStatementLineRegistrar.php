@@ -116,7 +116,7 @@ class CreditCardStatementLineRegistrar
             return;
         }
 
-        $businessUnit = $line->statement?->creditCard?->businessUnit;
+        $businessUnit = $line->resolveBusinessUnit();
 
         if ($businessUnit === null || $businessUnit->user_id !== $user->id) {
             throw new AuthorizationException('このクレジットカード明細を操作する権限がありません。');

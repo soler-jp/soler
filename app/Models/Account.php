@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
-class Account extends Model
+class Account extends Model implements ResolvesBusinessUnit
 {
     use HasFactory;
 
@@ -45,6 +46,13 @@ class Account extends Model
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('businessUnit');
+
+        return $this->businessUnit;
     }
 
     public function subAccounts()

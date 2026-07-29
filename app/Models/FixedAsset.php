@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class FixedAsset extends Model
+class FixedAsset extends Model implements ResolvesBusinessUnit
 {
     use HasFactory;
 
@@ -62,6 +63,13 @@ class FixedAsset extends Model
     public function businessUnit(): BelongsTo
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('businessUnit');
+
+        return $this->businessUnit;
     }
 
     // 資産計上された勘定科目（例: 器具備品）
