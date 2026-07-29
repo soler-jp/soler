@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\Account;
 use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
@@ -9,7 +10,6 @@ use App\Models\JournalEntry;
 use App\Models\SubAccount;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Services\Concerns\AuthorizesBusinessUnitAccess;
 use App\Validators\JournalEntryValidator;
 use App\Validators\TransactionValidator;
 use Illuminate\Support\Carbon;

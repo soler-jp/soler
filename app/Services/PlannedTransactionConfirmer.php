@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Services\Concerns\AuthorizesBusinessUnitAccess;
 use App\Validators\JournalEntryValidator;
 use App\Validators\TransactionValidator;
 use Illuminate\Support\Facades\DB;

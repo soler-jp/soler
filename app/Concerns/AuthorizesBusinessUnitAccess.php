@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Concerns;
+namespace App\Concerns;
 
 use App\Contracts\ResolvesBusinessUnit;
 use App\Models\User;

@@ -2,12 +2,12 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\CreditCardStatementLine;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Services\Concerns\AuthorizesBusinessUnitAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;

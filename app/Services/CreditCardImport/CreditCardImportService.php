@@ -2,6 +2,7 @@
 
 namespace App\Services\CreditCardImport;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Data\ParsedCreditCardStatement;
 use App\Data\ParsedCreditCardStatementLine;
 use App\Models\CreditCard;
@@ -9,7 +10,6 @@ use App\Models\CreditCardImportBatch;
 use App\Models\CreditCardStatement;
 use App\Models\CreditCardStatementLine;
 use App\Models\User;
-use App\Services\Concerns\AuthorizesBusinessUnitAccess;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
