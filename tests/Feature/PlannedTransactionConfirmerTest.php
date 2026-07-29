@@ -35,7 +35,7 @@ class PlannedTransactionConfirmerTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $debit->id,
             'credit_sub_account_id' => $credit->id,
-        ]);
+        ], $user);
 
         $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
 

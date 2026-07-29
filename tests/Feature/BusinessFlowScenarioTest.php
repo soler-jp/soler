@@ -208,7 +208,7 @@ class BusinessFlowScenarioTest extends TestCase
             'credit_sub_account_id' => $paymentSubAccount->id,
             'amount' => 3000,
             'tax_amount' => 0,
-        ]);
+        ], $user);
 
         $plannedTransactions = $unit->generatePlannedTransactionsForPlan($fixedCostPlan, $fiscalYear, $user);
         $this->assertCount(12, $plannedTransactions);

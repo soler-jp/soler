@@ -364,8 +364,10 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             ->values();
     }
 
-    public function createRecurringTransactionPlan(array $attributes): RecurringTransactionPlan
+    public function createRecurringTransactionPlan(array $attributes, User $actor): RecurringTransactionPlan
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体に定期取引を追加する権限がありません。');
+
         $attributes['business_unit_id'] = $this->id;
 
         $validated = RecurringTransactionPlan::validate($attributes);

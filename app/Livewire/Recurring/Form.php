@@ -68,6 +68,7 @@ class Form extends Component
         try {
             \DB::transaction(function () use ($unit, $validated) {
                 $form = $validated['form'];
+                $actor = auth()->user();
 
                 $plan = $unit->createRecurringTransactionPlan([
                     'name' => $form['name'],
@@ -84,12 +85,12 @@ class Form extends Component
                     'start_month' => $form['interval'] === 'bimonthly'
                         ? ($form['start_month_type'] === 'odd' ? 1 : 2)
                         : null,
-                ]);
+                ], $actor);
 
                 $unit->generatePlannedTransactionsForPlan(
                     $plan,
                     $unit->currentFiscalYear,
-                    auth()->user(),
+                    $actor,
                 );
             });
 

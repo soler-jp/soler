@@ -2075,7 +2075,7 @@ class TransactionRegistrarTest extends TestCase
             'tax_amount' => 500,
             'tax_type' => 'taxable_purchases_10',
             'is_income' => false,
-        ]);
+        ], $user);
 
         $registrar = new TransactionRegistrar;
 

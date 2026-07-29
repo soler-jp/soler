@@ -45,7 +45,7 @@ class RecurringTransactionPlanTest extends TestCase
             'tax_type' => 'taxable_10',
         ];
 
-        $plan = $unit->createRecurringTransactionPlan($data);
+        $plan = $unit->createRecurringTransactionPlan($data, $user);
 
         $this->assertDatabaseHas('recurring_transaction_plans', $data);
         $this->assertSame(4400, $plan->gross_amount);
@@ -80,7 +80,7 @@ class RecurringTransactionPlanTest extends TestCase
             'amount' => 5678,
             'tax_amount' => 0,
             'business_ratio' => 60,
-        ]);
+        ], $user);
 
         $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
 
@@ -118,7 +118,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $unit->createRecurringTransactionPlan([]);
+        $unit->createRecurringTransactionPlan([], $user);
     }
 
     #[Test]
@@ -141,7 +141,7 @@ class RecurringTransactionPlanTest extends TestCase
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 30000,
-        ]);
+        ], $user);
 
         $this->assertTrue($plan->is_income);
         $this->assertTrue($plan->is_active);
@@ -167,9 +167,35 @@ class RecurringTransactionPlanTest extends TestCase
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 50000,
-        ]);
+        ], $user);
 
         $this->assertEquals($unit->id, $plan->businessUnit->id);
+    }
+
+    #[Test]
+    public function 他ユーザーは定期取引プランを作成できない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => '認可テスト事業',
+        ]);
+
+        $subAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $this->expectException(AuthorizationException::class);
+
+        $unit->createRecurringTransactionPlan([
+            'name' => '他ユーザー作成',
+            'interval' => 'monthly',
+            'day_of_month' => 1,
+            'is_income' => false,
+            'debit_sub_account_id' => $subAccount->id,
+            'credit_sub_account_id' => $subAccount->id,
+            'amount' => 1000,
+        ], $otherUser);
     }
 
     // バリデーションテスト
@@ -254,7 +280,7 @@ class RecurringTransactionPlanTest extends TestCase
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 1000,
-        ]);
+        ], $user);
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('【重複チェック】はすでに使われているので使用できません');
@@ -295,7 +321,7 @@ class RecurringTransactionPlanTest extends TestCase
             'debit_sub_account_id' => $sub1->id,
             'credit_sub_account_id' => $sub1->id,
             'amount' => 1000,
-        ]);
+        ], $user);
         $this->assertNotNull($plan1);
 
         // 異なる事業単位で同じnameを使用してもエラーにならないことを確認
@@ -308,7 +334,7 @@ class RecurringTransactionPlanTest extends TestCase
             'debit_sub_account_id' => $sub2->id,
             'credit_sub_account_id' => $sub2->id,
             'amount' => 1000,
-        ]);
+        ], $user);
         $this->assertNotNull($plan2);
     }
 
@@ -333,7 +359,7 @@ class RecurringTransactionPlanTest extends TestCase
             'amount' => 10000,
             'tax_amount' => 1000,
             'tax_type' => 'taxable_purchases_10',
-        ]);
+        ], $user);
 
         $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
 
@@ -367,7 +393,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $sub->id,
             'amount' => 10000,
             'tax_amount' => 1000,
-        ]);
+        ], $user);
 
         $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
 
@@ -398,7 +424,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $sub->id,
             'amount' => 5000,
             'tax_amount' => 500,
-        ]);
+        ], $user);
 
         $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
 
@@ -435,7 +461,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $sub->id,
             'amount' => 5000,
             'tax_amount' => 500,
-        ]);
+        ], $user);
 
         $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
 
@@ -466,7 +492,7 @@ class RecurringTransactionPlanTest extends TestCase
             'amount' => 3000,
             'tax_amount' => 300,
             'is_active' => false,
-        ]);
+        ], $user);
 
         $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
 
@@ -490,7 +516,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $sub->id,
             'amount' => 8000,
             'tax_amount' => 800,
-        ]);
+        ], $user);
 
         $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
 
@@ -520,7 +546,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $sub->id,
             'amount' => 3000,
             'tax_amount' => 300,
-        ]);
+        ], $user);
 
         $this->expectException(AuthorizationException::class);
 
@@ -545,7 +571,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $sub->id,
             'amount' => 5000,
             'tax_amount' => 500,
-        ]);
+        ], $user);
 
         // 初回：すべて作成される（12件）
         $firstRun = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
@@ -582,7 +608,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $sub->id,
             'amount' => 3000,
             'tax_amount' => 300,
-        ]);
+        ], $user);
 
         $plan2 = $unit->createRecurringTransactionPlan([
             'name' => 'プランB',
@@ -593,7 +619,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $sub->id,
             'amount' => 7000,
             'tax_amount' => 700,
-        ]);
+        ], $user);
 
         // 両方のプランで生成
         $transactions1 = $unit->generatePlannedTransactionsForPlan($plan1, $fiscalYear, $user);
@@ -635,7 +661,7 @@ class RecurringTransactionPlanTest extends TestCase
             'amount' => 6000,
             'tax_amount' => 600,
             'start_month' => 1, // 1月から開始
-        ]);
+        ], $user);
 
         $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
 
@@ -671,7 +697,7 @@ class RecurringTransactionPlanTest extends TestCase
             'amount' => 6000,
             'tax_amount' => 600,
             'start_month' => 2, // 2月から開始
-        ]);
+        ], $user);
 
         $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
 
@@ -707,7 +733,7 @@ class RecurringTransactionPlanTest extends TestCase
             'amount' => 6000,
             'tax_amount' => 600,
             'start_month' => null, // start_month が null
-        ]);
+        ], $user);
 
         $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
 
@@ -746,7 +772,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $creditSubAccount->id,
             'amount' => 1100,
             'tax_amount' => 0,
-        ]);
+        ], $user);
 
         $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
 
@@ -797,7 +823,7 @@ class RecurringTransactionPlanTest extends TestCase
             'tax_amount' => 0,
             'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             'business_ratio' => 60,
-        ]);
+        ], $user);
 
         $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
         $householdSubAccount = $unit->getSubAccountByName('事業主貸', '家事按分');
@@ -829,7 +855,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $creditSubAccount->id,
             'amount' => 10000,
             'tax_amount' => 0,
-        ]);
+        ], $user);
 
         $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
         $debitEntry = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
@@ -860,7 +886,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $originalCreditSubAccount->id,
             'amount' => 1100,
             'tax_amount' => 0,
-        ]);
+        ], $user);
 
         $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
 
@@ -909,7 +935,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 1100,
             'tax_amount' => 0,
-        ]);
+        ], $user);
 
         $plan2 = $unit->createRecurringTransactionPlan([
             'name' => 'プランB',
@@ -920,7 +946,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 2200,
             'tax_amount' => 0,
-        ]);
+        ], $user);
 
         $transaction = $unit->generatePlannedTransactionsForPlan($plan2, $fiscalYear, $user)->firstOrFail();
 
@@ -961,7 +987,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $creditSubAccount->id,
             'amount' => 1100,
             'tax_amount' => 0,
-        ]);
+        ], $user);
 
         $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
 
@@ -1009,7 +1035,7 @@ class RecurringTransactionPlanTest extends TestCase
             'credit_sub_account_id' => $creditSubAccount->id,
             'amount' => 1100,
             'tax_amount' => 0,
-        ]);
+        ], $user);
 
         $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
         $fiscalYear->update(['is_closed' => true]);

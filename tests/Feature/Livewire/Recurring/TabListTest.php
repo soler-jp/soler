@@ -28,7 +28,7 @@ class TabListTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $unit->subAccounts()->first()->id,
             'credit_sub_account_id' => $unit->subAccounts()->first()->id,
-        ]);
+        ], $user);
 
         $unit->createRecurringTransactionPlan([
             'name' => 'ソフトウェア使用料',
@@ -39,7 +39,7 @@ class TabListTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $unit->subAccounts()->first()->id,
             'credit_sub_account_id' => $unit->subAccounts()->first()->id,
-        ]);
+        ], $user);
 
         Livewire::actingAs($user)
             ->test(TabList::class)
@@ -70,7 +70,7 @@ class TabListTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
-        ]);
+        ], $user);
 
         $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
 
@@ -142,7 +142,7 @@ class TabListTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
-        ]);
+        ], $user);
 
         $tx = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
 
@@ -176,7 +176,7 @@ class TabListTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $otherDebit->id,
             'credit_sub_account_id' => $otherCredit->id,
-        ]);
+        ], $otherUser);
 
         $otherTx = $otherUnit->generatePlannedTransactionsForPlan($plan, $otherFiscalYear, $otherUser)->first();
         $ownCredit = $unit->getAccountByName('事業主借')->subAccounts()->first();
@@ -230,7 +230,7 @@ class TabListTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
-        ]);
+        ], $user);
 
         $tx = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->first();
 

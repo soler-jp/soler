@@ -82,7 +82,7 @@ class BusinessUnitResolutionTest extends TestCase
             'credit_sub_account_id' => $cashSubAccount->id,
             'amount' => 1000,
             'tax_amount' => 0,
-        ]);
+        ], $user);
 
         // 決算書入力
         $blueReturnInput = $fiscalYear->saveBlueReturnInput(BlueReturnInput::KEY_RENT_EXPENSES, [
