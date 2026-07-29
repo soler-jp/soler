@@ -20,11 +20,11 @@ class PlannedTransactionConfirmer
 
     public function confirm(
         Transaction $transaction,
-        ?User $user = null,
+        User $actor,
         array $overrides = [],
         array $journalEntriesData = [],
     ): Transaction {
-        $this->authorizeBusinessUnitAccess($transaction, $user, 'この予定取引を確定する権限がありません。');
+        $this->authorizeBusinessUnitAccess($transaction, $actor, 'この予定取引を確定する権限がありません。');
 
         return DB::transaction(function () use ($transaction, $overrides, $journalEntriesData): Transaction {
             $lockedTransaction = Transaction::query()

@@ -60,8 +60,8 @@ class PlannedTransactionConfirmerTest extends TestCase
         $user = User::factory()->create();
         [, $transaction] = $this->makePlannedTransaction($user);
 
-        $this->expectException(AuthorizationException::class);
+        $this->expectException(\TypeError::class);
 
-        app(PlannedTransactionConfirmer::class)->confirm($transaction);
+        app(PlannedTransactionConfirmer::class)->confirm($transaction, null);
     }
 }
