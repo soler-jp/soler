@@ -8,6 +8,7 @@ use App\Models\CreditCard;
 use App\Models\FixedAsset;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
@@ -454,7 +455,7 @@ class BusinessUnitTest extends TestCase
         $account = $businessUnit->createAccount([
             'name' => '仮払金',
             'type' => 'asset',
-        ]);
+        ], $businessUnit->user);
 
         $this->assertDatabaseHas('accounts', [
             'id' => $account->id,
@@ -474,12 +475,30 @@ class BusinessUnitTest extends TestCase
             'name' => 'カスタム勘定科目テスト事業所',
         ]);
 
-        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費');
+        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $user);
 
         $this->assertSame('会議費', $account->name);
         $this->assertSame(Account::TYPE_EXPENSE, $account->type);
         $this->assertCount(1, $account->subAccounts);
         $this->assertSame('会議費', $account->subAccounts->first()->name);
+    }
+
+    #[Test]
+    public function create_accountは他人の事業体には追加できない(): void
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $businessUnit = $owner->createBusinessUnitWithDefaults([
+            'name' => '認可テスト事業所',
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+
+        $businessUnit->createAccount([
+            'name' => '会議費',
+            'type' => Account::TYPE_EXPENSE,
+        ], $otherUser);
     }
 
     #[Test]
@@ -490,7 +509,7 @@ class BusinessUnitTest extends TestCase
             'name' => 'カスタム補助科目テスト事業所',
         ]);
 
-        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', '役員会議');
+        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', '役員会議', $user);
 
         $this->assertSame('会議費', $account->name);
         $this->assertCount(1, $account->subAccounts);
@@ -505,12 +524,40 @@ class BusinessUnitTest extends TestCase
             'name' => '重複勘定科目テスト事業所',
         ]);
 
-        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費');
+        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $user);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('同名の勘定科目は既に存在します。');
 
-        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費');
+        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $user);
+    }
+
+    #[Test]
+    public function add_custom_accountは他人の事業体には追加できない(): void
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $businessUnit = $owner->createBusinessUnitWithDefaults([
+            'name' => '認可テスト事業所',
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+
+        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $otherUser);
+    }
+
+    #[Test]
+    public function add_custom_accountはnullを渡すと同名の補助科目を作成する(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'null補助科目テスト事業所',
+        ]);
+
+        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $user);
+
+        $this->assertSame('会議費', $account->subAccounts->first()->name);
     }
 
     #[Test]

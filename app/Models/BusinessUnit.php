@@ -224,7 +224,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             ], $attributes));
 
             foreach (self::$defaultAccounts as $account) {
-                $businessUnit->createAccount($account);
+                $businessUnit->createAccount($account, $businessUnit->user);
             }
 
             return $businessUnit;
@@ -234,11 +234,12 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
     /**
      * BusinessUnitに紐づくアカウントを作成するヘルパーメソッド
      */
-    public function createAccount(array $attributes): Account
+    public function createAccount(array $attributes, User $user): Account
     {
-        return \DB::transaction(function () use ($attributes) {
+        $this->authorizeBusinessUnitAccess($this, $user, 'この事業体に勘定科目を追加する権限がありません。');
+
+        return \DB::transaction(function () use ($attributes, $user) {
             $account = $this->accounts()->create($attributes);
-            $user = $account->businessUnit->user;
 
             if (isset(self::$defaultSubAccounts[$account->name])) {
                 foreach (self::$defaultSubAccounts[$account->name] as $subAccountName) {
@@ -255,18 +256,20 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
     public function addCustomAccount(
         string $type,
         string $accountName,
-        ?string $subAccountName = null,
+        ?string $subAccountName,
+        User $user,
     ): Account {
+        $this->authorizeBusinessUnitAccess($this, $user, 'この事業体に勘定科目を追加する権限がありません。');
+
         if ($this->getAccountByName($accountName) !== null) {
             throw new \InvalidArgumentException('同名の勘定科目は既に存在します。');
         }
 
-        return DB::transaction(function () use ($type, $accountName, $subAccountName): Account {
+        return DB::transaction(function () use ($type, $accountName, $subAccountName, $user): Account {
             $account = $this->accounts()->create([
                 'name' => $accountName,
                 'type' => $type,
             ]);
-            $user = $account->businessUnit->user;
 
             $account->addCustomSubAccount($subAccountName ?? $accountName, $user);
 

@@ -28,7 +28,7 @@ class FiscalYearTransactionTest extends TestCase
         $account = $unit->createAccount([
             'name' => 'テスト科目',
             'type' => 'asset',
-        ]);
+        ], $unit->user);
 
         return [$fiscalYear, $account->subAccounts->first()];
     }

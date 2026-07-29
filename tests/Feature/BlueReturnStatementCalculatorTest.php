@@ -325,14 +325,14 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $meetingExpense = $businessUnit->createAccount([
             'name' => '会議費',
             'type' => Account::TYPE_EXPENSE,
-        ])
+        ], $businessUnit->user)
             ->subAccounts()
             ->firstOrFail();
 
         $bookExpense = $businessUnit->createAccount([
             'name' => '新聞図書費',
             'type' => Account::TYPE_EXPENSE,
-        ])
+        ], $businessUnit->user)
             ->subAccounts()
             ->firstOrFail();
 
@@ -434,7 +434,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
             $expenseSubAccount = $businessUnit->createAccount([
                 'name' => "追加費用{$index}",
                 'type' => Account::TYPE_EXPENSE,
-            ])
+            ], $businessUnit->user)
                 ->subAccounts()
                 ->firstOrFail();
 
