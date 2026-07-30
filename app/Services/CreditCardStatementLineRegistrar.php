@@ -21,7 +21,8 @@ class CreditCardStatementLineRegistrar
         private readonly TransactionRegistrar $transactionRegistrar,
     ) {}
 
-    public function register(CreditCardStatementLine $line, ?User $user, array $attributes): Transaction
+    // TODO(actor-authorization): $user は操作主体なので、別コミットで $actor にリネームする。
+    public function register(CreditCardStatementLine $line, User $user, array $attributes): Transaction
     {
         $validated = $this->validateRegisterAttributes($attributes);
 
@@ -46,7 +47,7 @@ class CreditCardStatementLineRegistrar
             $lockedLine->forceFill([
                 'transaction_id' => $transaction->id,
                 'status' => CreditCardStatementLine::STATUS_REGISTERED,
-                'reviewed_by' => $user?->id,
+                'reviewed_by' => $user->id,
                 'reviewed_at' => now(),
                 'memo' => $validated['memo'] ?? $lockedLine->memo,
             ])->save();
@@ -55,7 +56,7 @@ class CreditCardStatementLineRegistrar
         }, attempts: 5);
     }
 
-    public function cancelRegistration(CreditCardStatementLine $line, ?User $user, ?string $reason = null): void
+    public function cancelRegistration(CreditCardStatementLine $line, User $user, ?string $reason = null): void
     {
         DB::transaction(function () use ($line, $user, $reason): void {
             $lockedLine = CreditCardStatementLine::query()
@@ -73,7 +74,7 @@ class CreditCardStatementLineRegistrar
             $payload = [
                 'transaction_id' => null,
                 'status' => CreditCardStatementLine::STATUS_UNREVIEWED,
-                'reviewed_by' => $user?->id,
+                'reviewed_by' => $user->id,
                 'reviewed_at' => now(),
             ];
 
@@ -112,7 +113,7 @@ class CreditCardStatementLineRegistrar
         ])->validate();
     }
 
-    protected function authorizeUser(CreditCardStatementLine $line, ?User $user): void
+    protected function authorizeUser(CreditCardStatementLine $line, User $user): void
     {
         $this->authorizeBusinessUnitAccess(
             $line,
@@ -236,7 +237,7 @@ class CreditCardStatementLineRegistrar
      */
     protected function buildTransactionData(
         CreditCardStatementLine $line,
-        ?User $user,
+        User $user,
         array $validated,
         Carbon $transactionDate,
     ): array {
@@ -254,7 +255,7 @@ class CreditCardStatementLineRegistrar
             'date' => $transactionDate->toDateString(),
             'description' => $description,
             'remarks' => $this->normalizeOptionalString($validated['remarks'] ?? null) ?? $this->buildDefaultRemarks($line),
-            'created_by' => $user?->id,
+            'created_by' => $user->id,
             'credit_card_import_batch_id' => $line->credit_card_import_batch_id,
         ];
 

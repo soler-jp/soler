@@ -262,6 +262,23 @@ class CreditCardStatementLineRegistrarTest extends TestCase
         ], $otherUser);
     }
 
+    #[Test]
+    public function 未所属ユーザーは明細の登録取消ができない(): void
+    {
+        [$user, $line, $expenseSubAccount] = $this->createRegisterableLine();
+
+        $line->registerTransaction([
+            'debit_sub_account_id' => $expenseSubAccount->id,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+        ], $user);
+
+        $otherUser = User::factory()->create();
+
+        $this->expectException(AuthorizationException::class);
+
+        $line->cancelTransactionRegistration($otherUser);
+    }
+
     private function createRegisterableLine(
         array $lineOverrides = [],
         string $ownershipType = CreditCard::OWNERSHIP_TYPE_BUSINESS,
