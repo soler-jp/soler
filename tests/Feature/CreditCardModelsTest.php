@@ -267,6 +267,7 @@ class CreditCardModelsTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'バッチ無効化テスト',
         ]);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
         $creditCard = CreditCard::factory()->create([
             'business_unit_id' => $businessUnit->id,
         ]);
@@ -277,6 +278,7 @@ class CreditCardModelsTest extends TestCase
             'credit_card_statement_id' => $statement->id,
         ]);
         $transaction = Transaction::factory()->create([
+            'fiscal_year_id' => $fiscalYear->id,
             'credit_card_import_batch_id' => $batch->id,
         ]);
         $line = CreditCardStatementLine::factory()->create([

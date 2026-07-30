@@ -272,7 +272,7 @@ class InventoryClosingServiceTest extends TestCase
         $subAccountId = $this->inventorySubAccountId($fiscalYear, '棚卸資産');
         $first = app(InventoryClosingService::class)->registerFor($fiscalYear, [$subAccountId => 500], $user);
 
-        $first->deactivate(null, '決算整理仕訳の修正');
+        $first->deactivate($user, '決算整理仕訳の修正');
 
         $second = app(InventoryClosingService::class)->registerFor($fiscalYear, [$subAccountId => 600], $user);
 

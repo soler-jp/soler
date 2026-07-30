@@ -91,8 +91,10 @@ CSV;
     public function 同月の再importで旧batchと関連line_transactionを無効化する(): void
     {
         $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '再取込テスト事業']);
+        $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
         $creditCard = CreditCard::factory()->create([
-            'business_unit_id' => $user->createBusinessUnitWithDefaults(['name' => '再取込テスト事業'])->id,
+            'business_unit_id' => $businessUnit->id,
             'parser_key' => 'orico_csv_v1',
         ]);
 
@@ -100,6 +102,7 @@ CSV;
         $firstBatch = $service->import($creditCard, $this->fixture('orico-visa.csv'), 'orico-visa.csv', $user);
 
         $transaction = Transaction::factory()->create([
+            'fiscal_year_id' => $fiscalYear->id,
             'credit_card_import_batch_id' => $firstBatch->id,
         ]);
 

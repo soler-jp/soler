@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Contracts\ResolvesBusinessUnit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 
 class Transaction extends Model implements ResolvesBusinessUnit
 {
+    use AuthorizesBusinessUnitAccess;
     use HasFactory;
 
     public const BUSINESS_RATIO_STATE_NOT_ALLOCATED = 'not_allocated';
@@ -215,8 +217,11 @@ class Transaction extends Model implements ResolvesBusinessUnit
         return self::BUSINESS_RATIO_STATE_MIXED;
     }
 
-    public function deactivate(?User $user = null, ?string $reason = null): void
+    // TODO(actor-authorization): $user は操作主体なので、別コミットで $actor にリネームする。
+    public function deactivate(User $user, ?string $reason = null): void
     {
+        $this->authorizeBusinessUnitAccess($this, $user, 'この取引を無効化する権限がありません。');
+
         if (! $this->is_active) {
             return;
         }
@@ -229,7 +234,7 @@ class Transaction extends Model implements ResolvesBusinessUnit
             $this->forceFill([
                 'is_active' => false,
                 'deactivated_at' => now(),
-                'deactivated_by' => $user?->id,
+                'deactivated_by' => $user->id,
                 'deactivation_reason' => $reason,
             ])->save();
         });
