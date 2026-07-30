@@ -7,6 +7,7 @@ use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\InventoryClosingService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
@@ -18,13 +19,14 @@ class InventoryClosingServiceTest extends TestCase
 
     /**
      * @param  array<string, int>  $openingBySubAccountName  [棚卸資産SubAccount名 => 期首残高]
+     * @return array{0: User, 1: FiscalYear}
      */
-    private function makeFiscalYearWithOpeningInventory(array $openingBySubAccountName): FiscalYear
+    private function makeFiscalYearWithOpeningInventory(array $openingBySubAccountName): array
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
-        ]);
+        ], $user);
         $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $entries = [];
@@ -40,7 +42,7 @@ class InventoryClosingServiceTest extends TestCase
             $fiscalYear->registerOpeningEntry($entries, $user);
         }
 
-        return $fiscalYear;
+        return [$user, $fiscalYear];
     }
 
     private function inventorySubAccountId(FiscalYear $fiscalYear, string $subAccountName): int
@@ -79,11 +81,11 @@ class InventoryClosingServiceTest extends TestCase
     #[Test]
     public function 単一の棚卸資産_sub_accountで期首と期末を振り替えられる()
     {
-        $fiscalYear = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
+        [$user, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
 
         $transaction = app(InventoryClosingService::class)->registerFor($fiscalYear, [
             $this->inventorySubAccountId($fiscalYear, '棚卸資産') => 500,
-        ]);
+        ], $user);
 
         $this->assertNotNull($transaction);
         $this->assertTrue($transaction->is_adjusting_entry);
@@ -109,15 +111,29 @@ class InventoryClosingServiceTest extends TestCase
     }
 
     #[Test]
+    public function 他ユーザーは棚卸の決算整理仕訳を登録できない()
+    {
+        [, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
+        $otherUser = User::factory()->create();
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この会計年度に棚卸の決算整理仕訳を登録する権限がありません。');
+
+        app(InventoryClosingService::class)->registerFor($fiscalYear, [
+            $this->inventorySubAccountId($fiscalYear, '棚卸資産') => 500,
+        ], $otherUser);
+    }
+
+    #[Test]
     public function sub_accountを分離している場合は_sub_account単位で振り替える()
     {
-        $fiscalYear = $this->makeFiscalYearWithOpeningInventory(['商品' => 300, '製品' => 100]);
+        [$user, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory(['商品' => 300, '製品' => 100]);
 
         $transaction = app(InventoryClosingService::class)->registerFor($fiscalYear, [
             $this->inventorySubAccountId($fiscalYear, '棚卸資産') => 0,
             $this->inventorySubAccountId($fiscalYear, '商品') => 500,
             $this->inventorySubAccountId($fiscalYear, '製品') => 150,
-        ]);
+        ], $user);
 
         $this->assertNotNull($transaction);
 
@@ -149,24 +165,24 @@ class InventoryClosingServiceTest extends TestCase
     #[Test]
     public function 期末棚卸高を指定しない_sub_accountがあると例外になる()
     {
-        $fiscalYear = $this->makeFiscalYearWithOpeningInventory(['商品' => 300, '製品' => 100]);
+        [$user, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory(['商品' => 300, '製品' => 100]);
 
         $this->expectException(\InvalidArgumentException::class);
 
         app(InventoryClosingService::class)->registerFor($fiscalYear, [
             $this->inventorySubAccountId($fiscalYear, '棚卸資産') => 0,
             $this->inventorySubAccountId($fiscalYear, '商品') => 500,
-        ]);
+        ], $user);
     }
 
     #[Test]
     public function 期首棚卸高がない場合は期末分だけ登録される()
     {
-        $fiscalYear = $this->makeFiscalYearWithOpeningInventory([]);
+        [$user, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory([]);
 
         $transaction = app(InventoryClosingService::class)->registerFor($fiscalYear, [
             $this->inventorySubAccountId($fiscalYear, '棚卸資産') => 500,
-        ]);
+        ], $user);
 
         $this->assertNotNull($transaction);
         $this->assertCount(2, $transaction->journalEntries);
@@ -177,11 +193,11 @@ class InventoryClosingServiceTest extends TestCase
     #[Test]
     public function 期首も期末も0なら登録せずnullを返す()
     {
-        $fiscalYear = $this->makeFiscalYearWithOpeningInventory([]);
+        [$user, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory([]);
 
         $transaction = app(InventoryClosingService::class)->registerFor($fiscalYear, [
             $this->inventorySubAccountId($fiscalYear, '棚卸資産') => 0,
-        ]);
+        ], $user);
 
         $this->assertNull($transaction);
         $this->assertDatabaseMissing('transactions', [
@@ -193,72 +209,72 @@ class InventoryClosingServiceTest extends TestCase
     #[Test]
     public function 期末棚卸高は単一_sub_accountでも0を含めて指定が必要である()
     {
-        $fiscalYear = $this->makeFiscalYearWithOpeningInventory([]);
+        [$user, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory([]);
 
         $this->expectException(\InvalidArgumentException::class);
 
-        app(InventoryClosingService::class)->registerFor($fiscalYear, []);
+        app(InventoryClosingService::class)->registerFor($fiscalYear, [], $user);
     }
 
     #[Test]
     public function 棚卸資産以外の_sub_accountを指定すると例外になる()
     {
-        $fiscalYear = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
+        [$user, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
         $cashSubAccountId = $fiscalYear->businessUnit->getSubAccountByName('現金', '現金')->id;
 
         $this->expectException(\InvalidArgumentException::class);
 
         app(InventoryClosingService::class)->registerFor($fiscalYear, [
             $cashSubAccountId => 500,
-        ]);
+        ], $user);
     }
 
     #[Test]
     public function 期末棚卸高が負数なら例外になる()
     {
-        $fiscalYear = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
+        [$user, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
 
         $this->expectException(\InvalidArgumentException::class);
 
         app(InventoryClosingService::class)->registerFor($fiscalYear, [
             $this->inventorySubAccountId($fiscalYear, '棚卸資産') => -1,
-        ]);
+        ], $user);
     }
 
     #[Test]
     public function 期末棚卸高が整数でない値なら例外になる()
     {
-        $fiscalYear = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
+        [$user, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
 
         $this->expectException(\InvalidArgumentException::class);
 
         app(InventoryClosingService::class)->registerFor($fiscalYear, [
             $this->inventorySubAccountId($fiscalYear, '棚卸資産') => '1.5',
-        ]);
+        ], $user);
     }
 
     #[Test]
     public function すでに棚卸の決算整理仕訳がある年度には二重登録できない()
     {
-        $fiscalYear = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
+        [$user, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
         $subAccountId = $this->inventorySubAccountId($fiscalYear, '棚卸資産');
-        app(InventoryClosingService::class)->registerFor($fiscalYear, [$subAccountId => 500]);
+        app(InventoryClosingService::class)->registerFor($fiscalYear, [$subAccountId => 500], $user);
 
         $this->expectException(\InvalidArgumentException::class);
 
-        app(InventoryClosingService::class)->registerFor($fiscalYear, [$subAccountId => 600]);
+        app(InventoryClosingService::class)->registerFor($fiscalYear, [$subAccountId => 600], $user);
     }
 
     #[Test]
     public function 無効化した棚卸仕訳がある場合は登録し直せる()
     {
-        $fiscalYear = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
+        [$user, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
         $subAccountId = $this->inventorySubAccountId($fiscalYear, '棚卸資産');
-        $first = app(InventoryClosingService::class)->registerFor($fiscalYear, [$subAccountId => 500]);
+        $first = app(InventoryClosingService::class)->registerFor($fiscalYear, [$subAccountId => 500], $user);
 
         $first->deactivate(null, '決算整理仕訳の修正');
 
-        $second = app(InventoryClosingService::class)->registerFor($fiscalYear, [$subAccountId => 600]);
+        $second = app(InventoryClosingService::class)->registerFor($fiscalYear, [$subAccountId => 600], $user);
 
         $this->assertNotNull($second);
         $this->assertNotSame($first->id, $second->id);
@@ -269,12 +285,12 @@ class InventoryClosingServiceTest extends TestCase
     #[Test]
     public function 決算済みの年度には登録できない()
     {
-        $fiscalYear = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
+        [$user, $fiscalYear] = $this->makeFiscalYearWithOpeningInventory(['棚卸資産' => 400]);
         $subAccountId = $this->inventorySubAccountId($fiscalYear, '棚卸資産');
         $fiscalYear->update(['is_closed' => true]);
 
         $this->expectException(ValidationException::class);
 
-        app(InventoryClosingService::class)->registerFor($fiscalYear, [$subAccountId => 500]);
+        app(InventoryClosingService::class)->registerFor($fiscalYear, [$subAccountId => 500], $user);
     }
 }
