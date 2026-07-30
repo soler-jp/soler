@@ -2,17 +2,21 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\DepreciationEntry;
 use App\Models\FiscalYear;
 use App\Models\FixedAsset;
 use App\Models\JournalEntry;
 use App\Models\SubAccount;
 use App\Models\Transaction;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class DepreciationService
 {
+    use AuthorizesBusinessUnitAccess;
+
     public function __construct(
         private readonly TransactionRegistrar $transactionRegistrar
     ) {}
@@ -369,8 +373,10 @@ class DepreciationService
         }
     }
 
-    public function registerTransactionFor(DepreciationEntry $entry): void
+    public function registerTransactionFor(DepreciationEntry $entry, User $actor): void
     {
+        $this->authorizeBusinessUnitAccess($entry, $actor, 'この減価償却明細を記帳する権限がありません。');
+
         $entry->loadMissing('fiscalYear.businessUnit', 'fixedAsset.account');
 
         if (! $entry->isUnposted()) {

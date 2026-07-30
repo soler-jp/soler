@@ -241,7 +241,7 @@ class BusinessFlowScenarioTest extends TestCase
 
         $this->assertNull($entry->transaction_id);
 
-        app(DepreciationService::class)->registerTransactionFor($entry);
+        app(DepreciationService::class)->registerTransactionFor($entry, $user);
 
         $entry->refresh();
         $this->assertNotNull($entry->transaction_id);

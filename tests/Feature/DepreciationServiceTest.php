@@ -8,6 +8,7 @@ use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\DepreciationService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -1004,7 +1005,7 @@ class DepreciationServiceTest extends TestCase
 
         $entry = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->firstOrFail();
 
-        app(DepreciationService::class)->registerTransactionFor($entry);
+        app(DepreciationService::class)->registerTransactionFor($entry, $user);
 
         $entry->refresh();
 
@@ -1040,6 +1041,45 @@ class DepreciationServiceTest extends TestCase
     }
 
     #[Test]
+    public function register_transaction_forは他ユーザーのentryを記帳できない()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
+
+        $assetSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', '機械装置'))
+            ->firstOrFail();
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerFixedAsset(
+            $fiscalYear2025,
+            $assetSubAccount,
+            $paymentSubAccount,
+            [
+                'name' => '認可テスト資産',
+                'asset_category' => 'machinery',
+                'acquisition_date' => '2025-01-01',
+                'taxable_amount' => 120_000,
+                'tax_amount' => 0,
+                'depreciation_method' => 'straight_line',
+                'useful_life' => 60,
+            ],
+            ['date' => '2025-01-01', 'description' => '認可テスト資産購入'],
+        );
+
+        $entry = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->firstOrFail();
+        $otherUser = User::factory()->create();
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この減価償却明細を記帳する権限がありません。');
+
+        app(DepreciationService::class)->registerTransactionFor($entry, $otherUser);
+    }
+
+    #[Test]
     public function register_transaction_forは記帳済みentryを再記帳できない()
     {
         $user = User::factory()->create();
@@ -1072,11 +1112,11 @@ class DepreciationServiceTest extends TestCase
         $entry = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->firstOrFail();
         $service = app(DepreciationService::class);
 
-        $service->registerTransactionFor($entry);
+        $service->registerTransactionFor($entry, $user);
 
         $this->expectException(\InvalidArgumentException::class);
 
-        $service->registerTransactionFor($entry->fresh());
+        $service->registerTransactionFor($entry->fresh(), $user);
     }
 
     // 後回し

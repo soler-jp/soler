@@ -746,7 +746,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         );
 
         $entry = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->firstOrFail();
-        app(DepreciationService::class)->registerTransactionFor($entry);
+        app(DepreciationService::class)->registerTransactionFor($entry, $user);
 
         $statement = app(BlueReturnStatementCalculator::class)->calculate($fiscalYear, 0);
         $depreciation = $statement['depreciation_calculation'];
@@ -863,8 +863,8 @@ class BlueReturnStatementCalculatorTest extends TestCase
             ->where('fiscal_year_id', $fiscalYear2024->id)
             ->firstOrFail();
 
-        app(DepreciationService::class)->registerTransactionFor($currentYearEntry);
-        app(DepreciationService::class)->registerTransactionFor($pastYearEntry);
+        app(DepreciationService::class)->registerTransactionFor($currentYearEntry, $user);
+        app(DepreciationService::class)->registerTransactionFor($pastYearEntry, $user);
 
         $statement = app(BlueReturnStatementCalculator::class)->calculate($fiscalYear2024, 0);
         $depreciation = $statement['depreciation_calculation'];
