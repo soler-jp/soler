@@ -95,7 +95,7 @@ class BusinessUnitResolutionTest extends TestCase
                     'deductible_amount' => 90_000,
                 ],
             ],
-        ]);
+        ], $user);
 
         // クレジットカードと明細取込（statement / batch / line）
         $creditCard = $unit->createCreditCard([

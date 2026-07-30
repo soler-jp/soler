@@ -209,17 +209,17 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
      * @param  array<string, array<string, mixed>>  $inputs
      * @return Collection<int, BlueReturnInput>
      */
-    public function saveBlueReturnInputs(array $inputs): Collection
+    public function saveBlueReturnInputs(array $inputs, User $actor): Collection
     {
-        return app(BlueReturnInputRegistrar::class)->saveMany($this, $inputs);
+        return app(BlueReturnInputRegistrar::class)->saveMany($this, $inputs, $actor);
     }
 
     /**
      * @param  array<string, mixed>  $value
      */
-    public function saveBlueReturnInput(string $key, array $value): BlueReturnInput
+    public function saveBlueReturnInput(string $key, array $value, User $actor): BlueReturnInput
     {
-        return app(BlueReturnInputRegistrar::class)->save($this, $key, $value);
+        return app(BlueReturnInputRegistrar::class)->save($this, $key, $value, $actor);
     }
 
     public function blueReturnInput(string $key): ?BlueReturnInput
