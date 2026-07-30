@@ -1,25 +1,29 @@
 # 定期取引を登録する
 
-定期取引は、`RecurringTransactionPlan` を作成して、そこから `is_planned = true` の取引を生成する仕組みです。
+定期取引は、`RecurringTransactionPlan` を作成し、そこから `is_planned = true` の予定取引を生成する仕組みです。
 
-固定費のように毎月・隔月・毎年発生する取引は、この手順で登録します。
+毎月・隔月・毎年発生する支出だけでなく、定期収入や源泉徴収付き収入もモデル/API で扱えます。
+
+詳しい技術仕様は [`docs/recurring-transaction-design.md`](../docs/recurring-transaction-design.md) を参照してください。
 
 ## 前提
 
 - 事業体が作成済みであること
 - 現在の `FiscalYear` があること
-- 借方と貸方に使う補助科目が事業体に属していること
+- 借方・貸方に使う補助科目が対象事業体に属していること
 
-## 定期取引計画を作るには
+## 定期取引計画を作る
 
-定期取引計画は `BusinessUnit::createRecurringTransactionPlan()` で作ります。
+計画の作成には `BusinessUnit::createRecurringTransactionPlan()` を使います。
 
-### code例
+### 支出の例
 
 ```php
 use App\Models\JournalEntry;
+use App\Models\RecurringTransactionPlan;
 
-$businessUnit = auth()->user()->selectedBusinessUnit;
+$actor = auth()->user();
+$businessUnit = $actor->selectedBusinessUnitOrFail();
 
 $debitSubAccount = $businessUnit->getAccountByName('通信費')->subAccounts()->firstOrFail();
 $creditSubAccount = $businessUnit->getAccountByName('普通預金')->subAccounts()->firstOrFail();
@@ -28,183 +32,227 @@ $plan = $businessUnit->createRecurringTransactionPlan([
     'name' => 'ひかり回線利用料',
     'interval' => 'monthly',
     'day_of_month' => 10,
-    'is_income' => false,
+    'type' => RecurringTransactionPlan::TYPE_EXPENSE,
     'debit_sub_account_id' => $debitSubAccount->id,
     'credit_sub_account_id' => $creditSubAccount->id,
     'amount' => 5000,
     'tax_amount' => 500,
     'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
-]);
+], $actor);
 ```
 
-返り値は作成された `RecurringTransactionPlan` です。
+支出では、借方に経費科目、貸方に支払元を指定します。
 
-### 非課税の定期取引の例
-
-例えば、年1回の損害保険料は非課税として登録できます。
+### 収入の例
 
 ```php
 use App\Models\JournalEntry;
+use App\Models\RecurringTransactionPlan;
 
-$businessUnit = auth()->user()->selectedBusinessUnit;
-
-$debitSubAccount = $businessUnit->getAccountByName('損害保険料')->subAccounts()->firstOrFail();
-$creditSubAccount = $businessUnit->getAccountByName('普通預金')->subAccounts()->firstOrFail();
+$depositSubAccount = $businessUnit->getAccountByName('その他の預金')->subAccounts()->firstOrFail();
+$salesSubAccount = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
 
 $plan = $businessUnit->createRecurringTransactionPlan([
-    'name' => '火災保険料',
-    'interval' => 'yearly',
-    'month_of_year' => 4,
-    'day_of_month' => 1,
-    'is_income' => false,
-    'debit_sub_account_id' => $debitSubAccount->id,
-    'credit_sub_account_id' => $creditSubAccount->id,
-    'amount' => 20000,
-    'tax_amount' => 0,
-    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
-]);
+    'name' => '月額保守料',
+    'interval' => 'monthly',
+    'day_of_month' => 31,
+    'type' => RecurringTransactionPlan::TYPE_INCOME,
+    'debit_sub_account_id' => $depositSubAccount->id,
+    'credit_sub_account_id' => $salesSubAccount->id,
+    'amount' => 100_000,
+    'tax_amount' => 10_000,
+    'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+], $actor);
 ```
 
-### 家事按分つきの定期取引
+収入では、借方に入金先、貸方に売上科目を指定します。
 
-定期取引計画でも、借方の経費行に `business_ratio` を指定すると家事按分を使えます。
+### 源泉徴収付き収入の例
+
+```php
+use App\Models\RecurringTransactionPlan;
+
+$depositSubAccount = $businessUnit->getAccountByName('その他の預金')->subAccounts()->firstOrFail();
+$salesSubAccount = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+$withholdingSubAccount = $businessUnit
+    ->getSubAccountByName('事業主貸', '源泉徴収');
+
+$plan = $businessUnit->createRecurringTransactionPlan([
+    'name' => '月次報酬',
+    'interval' => 'monthly',
+    'day_of_month' => 25,
+    'type' => RecurringTransactionPlan::TYPE_INCOME,
+    'is_withholding' => true,
+    'debit_sub_account_id' => $depositSubAccount->id,
+    'credit_sub_account_id' => $salesSubAccount->id,
+    'amount' => 100_000,
+    'tax_amount' => 0,
+    'withholding_tax_amount' => 10_210,
+    'withholding_sub_account_id' => $withholdingSubAccount->id,
+], $actor);
+```
+
+この場合、予定取引は次の形で生成されます。
+
+- 借方: 入金額
+- 借方: 源泉徴収税
+- 貸方: 売上
+
+### 家事按分つき支出
+
+支出計画では、借方の経費行に `business_ratio` を指定できます。
 
 ```php
 use App\Models\JournalEntry;
+use App\Models\RecurringTransactionPlan;
 
 $plan = $businessUnit->createRecurringTransactionPlan([
     'name' => '通信費',
     'interval' => 'monthly',
     'day_of_month' => 10,
-    'is_income' => false,
+    'type' => RecurringTransactionPlan::TYPE_EXPENSE,
     'debit_sub_account_id' => $debitSubAccount->id,
     'credit_sub_account_id' => $creditSubAccount->id,
     'amount' => 10_000,
     'tax_amount' => 0,
-    'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
     'business_ratio' => 60,
-]);
+], $actor);
 ```
 
-この設定で生成される予定取引は、登録時と同じルールで事業分と家事分に分割されます。  
-`business_ratio` を省略した場合は、全額事業分として扱われます。
+`business_ratio` を省略した場合は全額事業分として扱われます。  
+収入計画では `business_ratio` は指定できません。
 
-## 予定取引を生成するには
+## 主な入力項目
 
-定期取引計画から、その年度に属する予定取引を生成するには `BusinessUnit::generatePlannedTransactionsForPlan()` を使います。
+- `interval`
+  - `monthly`
+  - `bimonthly`
+  - `yearly`
+- `type`
+  - `RecurringTransactionPlan::TYPE_EXPENSE`
+  - `RecurringTransactionPlan::TYPE_INCOME`
+- `day_of_month`
+  - 対象月に存在しない日は月末日に丸められます
+- `month_of_year`
+  - `yearly` の対象月
+- `start_month`
+  - `bimonthly` の開始月
+  - `1` なら奇数月、`2` なら偶数月
+- `is_withholding`
+  - 源泉徴収付き収入かどうか
+- `withholding_tax_amount`
+  - 源泉徴収税額
+- `withholding_sub_account_id`
+  - 源泉徴収税の借方補助科目
 
-### code例
+## バリデーション上の注意
+
+- `type = expense` のとき `is_withholding = true` は指定できません
+- `type = income` のとき `business_ratio` は指定できません
+- `is_withholding = true` のとき `withholding_tax_amount > 0` と `withholding_sub_account_id` が必須です
+- `is_withholding = true` のとき `withholding_tax_amount < amount + tax_amount` が必要です
+- `is_withholding = false` のとき源泉カラムは空にしてください
+
+## 予定取引を生成する
+
+その年度に属する予定取引の生成には `BusinessUnit::generatePlannedTransactionsForPlan()` を使います。
 
 ```php
-$fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
-$transactions = $businessUnit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+$fiscalYear = $businessUnit->currentFiscalYear;
+$transactions = $businessUnit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $actor);
 ```
 
-このとき生成される取引は `is_planned = true` になります。  
-また、`recurring_transaction_plan_id` に元の計画IDが入ります。
+生成された取引は `is_planned = true` になり、`recurring_transaction_plan_id` に元の計画IDが入ります。
 
-### 月次プランの例
+### 月次
 
-`interval = monthly` の場合は、年度内の各月に1件ずつ予定取引が生成されます。
+`interval = monthly` なら、年度内の各月に 1 件ずつ生成されます。
 
-```php
-$transactions = $businessUnit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
-```
+### 隔月
 
-`day_of_month = 10` の月次プランでは、各月の10日に予定取引が生成されます。
+`interval = bimonthly` なら、`start_month` に応じて奇数月または偶数月に生成されます。
 
-### 隔月プランの例
+- `start_month = 1`
+  - 1, 3, 5, 7, 9, 11 月
+- `start_month = 2`
+  - 2, 4, 6, 8, 10, 12 月
+- `start_month = null`
+  - 1 月開始として扱われます
 
-`interval = bimonthly` の場合は、`start_month` に応じて奇数月または偶数月に予定取引を生成します。
+### 毎年
 
-```php
-$plan = $businessUnit->createRecurringTransactionPlan([
-    'name' => '隔月プラン',
-    'interval' => 'bimonthly',
-    'day_of_month' => 15,
-    'is_income' => false,
-    'debit_sub_account_id' => $debitSubAccount->id,
-    'credit_sub_account_id' => $creditSubAccount->id,
-    'amount' => 5000,
-    'tax_amount' => 500,
-    'start_month' => 1,
-]);
-```
+`interval = yearly` なら、`month_of_year` と `day_of_month` に従って年 1 件だけ生成されます。
 
-`start_month = 1` の場合は、次の月に生成されます。
+## 予定取引を確定する
 
-- `2025-01-15`
-- `2025-03-15`
-- `2025-05-15`
-- `2025-07-15`
-- `2025-09-15`
-- `2025-11-15`
-
-`start_month = 2` の場合は、偶数月に生成されます。
-
-## 予定取引を確定するには
-
-生成済みの予定取引は、`RecurringTransactionPlan::confirmTransaction()` で本登録に変更できます。
-
-生成された予定取引のうち、特定の日付のものを取り出して確定する場合は、`transactions()` から取得できます。
-
-### code例
+生成済みの予定取引は `RecurringTransactionPlan::confirmTransaction()` で本登録に変更できます。
 
 ```php
 $transaction = $plan->transactions()
     ->where('is_planned', true)
     ->whereDate('date', '2025-12-10')
     ->firstOrFail();
-
-$confirmed = $plan->confirmTransaction($transaction->id, [
-    'date' => '2025-12-10',
-    'amount' => 1400,
-    'credit_sub_account_id' => $newCreditSubAccount->id,
-]);
 ```
 
-確定すると、次のように変わります。
-
-- `is_planned` が `false` になる
-- 仕訳の `net_amount` が指定金額に更新される
-- 貸方補助科目を変更できる
-- 日付も指定した値に更新できる
-
-### 事業割合を変更して確定する例
-
-予定取引の確定時に `business_ratio` を渡すと、事業割合も上書きできます。
+### 支出を確定する例
 
 ```php
 $confirmed = $plan->confirmTransaction($transaction->id, [
     'date' => '2025-12-10',
-    'amount' => 10_000,
+    'amount' => 1400,
+    'credit_sub_account_id' => $newCreditSubAccount->id,
     'business_ratio' => 80,
-]);
+], $actor);
 ```
 
-この場合は、借方の経費行が 80% で再計算されます。家事分があるときは、その割合で分割されます。
+支出計画では次を上書きできます。
 
-## `is_income` について
+- `date`
+- `amount`
+- `credit_sub_account_id`
+- `business_ratio`
 
-定期取引計画は `is_income` で収入と支出を分けます。
+### 収入を確定する例
 
-- `is_income = false`
-  - 固定費などの支出
-- `is_income = true`
-  - 定期収入
+```php
+$confirmed = $plan->confirmTransaction($transaction->id, [
+    'date' => '2025-12-10',
+    'amount' => 22_000,
+    'debit_sub_account_id' => $newDepositSubAccount->id,
+], $actor);
+```
 
-現状の manual では、固定費の登録を主な用途として扱います。
+収入計画では次を上書きできます。
+
+- `date`
+- `amount`
+- `debit_sub_account_id`
+
+課税収入では、確定後も貸方の売上税区分と税額が保持されます。
+
+### 源泉徴収付き収入を確定する例
+
+```php
+$confirmed = $plan->confirmTransaction($transaction->id, [
+    'date' => '2025-12-10',
+    'amount' => 100_000,
+    'debit_sub_account_id' => $newDepositSubAccount->id,
+], $actor);
+```
+
+この場合も、借方 2 行は維持されます。  
+また、確定時に `amount` を変更する場合でも、`amount` は `withholding_tax_amount` より大きい必要があります。
 
 ## 補足
 
 - `is_active = false` の計画は予定取引を生成しません
-- 同じ日付に別のプランがあっても、別プランなら生成されます
-- 同じプランで同じ日付の予定取引が既にある場合は、新規生成されません
+- 同じプラン・同じ日付の予定取引が既にある場合は再生成されません
+- 同じ日付でも別プランなら生成されます
+- `day_of_month = 31` のように対象月に存在しない日を指定した場合は月末日に丸められます
+- 現在の UI コンポーネントは主に支出向けで、収入用 UI は別途実装対象です
 
 ## 参考
 
-- `app/Models/RecurringTransactionPlan.php`
-- `app/Models/BusinessUnit.php`
-- `app/Livewire/Recurring/Form.php`
-- `app/Livewire/Recurring/TabList.php`
-- `tests/Feature/RecurringTransactionPlanTest.php`
+- [`docs/recurring-transaction-design.md`](../docs/recurring-transaction-design.md)
+- [`docs/transaction-registration.md`](../docs/transaction-registration.md)

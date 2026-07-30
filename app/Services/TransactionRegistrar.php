@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
+use App\Models\RecurringTransactionPlan;
 use App\Models\SubAccount;
 use App\Models\Transaction;
 use App\Models\User;
@@ -128,40 +129,84 @@ class TransactionRegistrar
 
     public function buildPlannedJournalEntries(Transaction $transaction, array $overrides = []): array
     {
-        $transaction->loadMissing('journalEntries');
-
-        $debitEntry = $transaction->journalEntries->first(function (JournalEntry $entry): bool {
-            return $entry->type === JournalEntry::TYPE_DEBIT && $entry->business_ratio !== null;
-        }) ?? $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+        $transaction->loadMissing('journalEntries', 'recurringTransactionPlan');
 
         $creditEntry = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+        $plan = $transaction->recurringTransactionPlan;
 
-        if ($debitEntry === null || $creditEntry === null) {
+        if ($creditEntry === null) {
             return [];
         }
 
-        $grossAmount = (int) ($overrides['amount'] ?? $creditEntry->net_amount);
-        $businessRatio = $overrides['business_ratio'] ?? $debitEntry->business_ratio;
+        $grossAmount = (int) ($overrides['amount'] ?? ((int) $creditEntry->net_amount + (int) $creditEntry->tax_amount));
 
-        $debitPlannedEntry = [
-            'sub_account_id' => $debitEntry->sub_account_id,
-            'type' => JournalEntry::TYPE_DEBIT,
-            'gross_amount' => $grossAmount,
-            'tax_type' => $debitEntry->tax_type,
-        ];
+        if (! $plan instanceof RecurringTransactionPlan || $plan->type === RecurringTransactionPlan::TYPE_EXPENSE) {
+            $debitEntry = $transaction->journalEntries->first(function (JournalEntry $entry): bool {
+                return $entry->type === JournalEntry::TYPE_DEBIT && $entry->business_ratio !== null;
+            }) ?? $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
 
-        if ($businessRatio !== null) {
-            $debitPlannedEntry['business_ratio'] = $businessRatio;
+            if ($debitEntry === null) {
+                return [];
+            }
+
+            $businessRatio = $overrides['business_ratio'] ?? $debitEntry->business_ratio;
+
+            $debitPlannedEntry = [
+                'sub_account_id' => $debitEntry->sub_account_id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => $grossAmount,
+                'tax_type' => $debitEntry->tax_type,
+            ];
+
+            if ($businessRatio !== null) {
+                $debitPlannedEntry['business_ratio'] = $businessRatio;
+            }
+
+            return [
+                $debitPlannedEntry,
+                [
+                    'sub_account_id' => $overrides['credit_sub_account_id'] ?? $creditEntry->sub_account_id,
+                    'type' => JournalEntry::TYPE_CREDIT,
+                    'net_amount' => $grossAmount,
+                ],
+            ];
         }
 
-        return [
-            $debitPlannedEntry,
+        $primaryDebitEntry = $transaction->journalEntries
+            ->where('type', JournalEntry::TYPE_DEBIT)
+            ->firstWhere('sub_account_id', '!=', $plan->withholding_sub_account_id)
+            ?? $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+
+        if ($primaryDebitEntry === null) {
+            return [];
+        }
+
+        $entries = [
             [
-                'sub_account_id' => $overrides['credit_sub_account_id'] ?? $creditEntry->sub_account_id,
-                'type' => JournalEntry::TYPE_CREDIT,
-                'net_amount' => $grossAmount,
+                'sub_account_id' => $overrides['debit_sub_account_id'] ?? $primaryDebitEntry->sub_account_id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => $plan->is_withholding
+                    ? $grossAmount - (int) $plan->withholding_tax_amount
+                    : $grossAmount,
             ],
         ];
+
+        if ($plan->is_withholding) {
+            $entries[] = [
+                'sub_account_id' => $plan->withholding_sub_account_id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => (int) $plan->withholding_tax_amount,
+            ];
+        }
+
+        $entries[] = [
+            'sub_account_id' => $creditEntry->sub_account_id,
+            'type' => JournalEntry::TYPE_CREDIT,
+            'gross_amount' => $grossAmount,
+            'tax_type' => $creditEntry->tax_type,
+        ];
+
+        return $entries;
     }
 
     public function confirmPlanned(Transaction $transaction, User $actor): Transaction
