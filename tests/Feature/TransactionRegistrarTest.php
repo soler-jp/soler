@@ -1901,7 +1901,7 @@ class TransactionRegistrarTest extends TestCase
         $transaction->description = '本登録済み';
         $transaction->date = '2025-04-02';
 
-        $confirmed = $registrar->confirmPlanned($transaction);
+        $confirmed = $registrar->confirmPlanned($transaction, $user);
 
         $this->assertFalse($confirmed->is_planned);
         $this->assertSame('本登録済み', $confirmed->description);
@@ -1953,7 +1953,7 @@ class TransactionRegistrarTest extends TestCase
         $credit->net_amount = 2200;
         $credit->sub_account_id = $liability->id;
 
-        $confirmed = $registrar->confirmPlanned($transaction);
+        $confirmed = $registrar->confirmPlanned($transaction, $user);
 
         $this->assertFalse($confirmed->is_planned);
         $this->assertSame('本登録済み（仕訳変更）', $confirmed->description);
@@ -2003,7 +2003,7 @@ class TransactionRegistrarTest extends TestCase
 
         $transaction->description = '取消予定取引（取消）';
 
-        $cancelled = $registrar->confirmPlanned($transaction);
+        $cancelled = $registrar->confirmPlanned($transaction, $user);
 
         $this->assertFalse($cancelled->is_planned);
         $this->assertSame('取消予定取引（取消）', $cancelled->description);

@@ -162,7 +162,7 @@ class TransactionRegistrar
         ];
     }
 
-    public function confirmPlanned(Transaction $transaction): Transaction
+    public function confirmPlanned(Transaction $transaction, User $actor): Transaction
     {
         if (! $transaction->is_planned) {
             throw new \InvalidArgumentException('この取引は既に本登録されています。');
@@ -172,7 +172,7 @@ class TransactionRegistrar
 
         return app(PlannedTransactionConfirmer::class)->confirm(
             $transaction,
-            auth()->user(),
+            $actor,
             $overrides,
             $this->buildPlannedJournalEntries($transaction, $overrides),
         );
