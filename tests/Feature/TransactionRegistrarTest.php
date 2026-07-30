@@ -108,7 +108,7 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $registrar = new TransactionRegistrar;
-        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
 
         $this->assertDatabaseHas('transactions', [
             'id' => $transaction->id,
@@ -139,7 +139,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertSame(1000, $transaction->journalEntries()->where('type', 'debit')->first()->net_amount);
         $this->assertDatabaseHas('journal_entries', [
@@ -172,7 +172,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $this->assertSame('ABC商店', $transaction->counterparty->name);
         $this->assertSame('T1234567890123', $transaction->counterparty->registration_number);
@@ -203,7 +203,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $this->assertSame('ABC商店', $transaction->counterparty->name);
         $this->assertSame('T1234567890123', $transaction->counterparty->registration_number);
@@ -232,7 +232,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $this->assertSame('XYZストア', $transaction->counterparty->name);
         $this->assertNull($transaction->counterparty->registration_number);
@@ -262,7 +262,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $second = (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-06-15',
@@ -279,7 +279,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $this->assertSame($first->counterparty_id, $second->counterparty_id);
         $this->assertDatabaseCount('counterparties', 1);
@@ -312,7 +312,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
     }
 
     #[Test]
@@ -341,7 +341,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
     }
 
     #[Test]
@@ -377,7 +377,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
     }
 
     #[Test]
@@ -402,7 +402,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertNull($transaction->counterparty_id);
     }
@@ -436,7 +436,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $this->assertTrue($transaction->counterparty->is($counterparty));
         $this->assertSame('XYZストア', $transaction->counterparty->name);
@@ -475,7 +475,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
     }
 
     #[Test]
@@ -483,6 +483,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $this->expectException(ValidationException::class);
 
+        $actor = User::factory()->create();
         $fiscalYear = FiscalYear::factory()->create();
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
         $registrar = new TransactionRegistrar;
@@ -504,7 +505,7 @@ class TransactionRegistrarTest extends TestCase
                 'net_amount' => 1000,
             ],
         ];
-        $registrar->register(null, $transactionData, $journalEntriesData);
+        $registrar->register(null, $transactionData, $journalEntriesData, $actor);
     }
 
     #[Test]
@@ -535,7 +536,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ];
 
-        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -561,7 +562,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -593,7 +594,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('仕訳の金額がバランスしていません（借方: 1000 / 貸方: 800 / 差額: +200）');
 
-        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -614,7 +615,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -634,7 +635,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'net_amount' => 1000],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -655,7 +656,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 900],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -676,7 +677,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 500],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -697,7 +698,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 0],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -718,7 +719,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -735,7 +736,7 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntriesData = [];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -756,7 +757,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'net_amount' => 1000],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -789,7 +790,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ];
 
-        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
 
         $this->assertDatabaseHas('transactions', [
             'id' => $transaction->id,
@@ -830,7 +831,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('仕訳の金額がバランスしていません');
 
-        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -866,7 +867,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('消費税額');
 
-        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -903,7 +904,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ];
 
-        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
 
         $this->assertDatabaseHas('transactions', [
             'id' => $transaction->id,
@@ -941,7 +942,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ];
 
-        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
 
         $this->assertDatabaseHas('transactions', [
             'id' => $transaction->id,
@@ -977,7 +978,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ];
 
-        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
 
         $this->assertDatabaseHas('transactions', [
             'id' => $transaction->id,
@@ -1007,7 +1008,7 @@ class TransactionRegistrarTest extends TestCase
                 'net_amount' => 3000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertSame(0, $transaction->journalEntries()->where('type', 'debit')->first()->tax_amount);
         $this->assertSame(0, $transaction->journalEntries()->where('type', 'credit')->first()->tax_amount);
@@ -1037,7 +1038,7 @@ class TransactionRegistrarTest extends TestCase
                 'tax_amount' => 0,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertSame(
             JournalEntry::TAX_AMOUNT_SOURCE_USER_INPUT,
@@ -1073,7 +1074,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $debit = $transaction->journalEntries()->where('type', 'debit')->firstOrFail();
         $credit = $transaction->journalEntries()->where('type', 'credit')->firstOrFail();
@@ -1116,7 +1117,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1000,
                 'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertTrue($transaction->journalEntries->every(function ($entry) {
             return $entry->net_amount === 1000
@@ -1153,7 +1154,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 10000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertCount(3, $transaction->journalEntries);
         $this->assertSame(60, $transaction->business_ratio);
@@ -1197,7 +1198,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 10000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertCount(2, $transaction->journalEntries);
         $this->assertSame(100, $transaction->business_ratio);
@@ -1236,7 +1237,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 10000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertCount(2, $transaction->journalEntries);
 
@@ -1276,7 +1277,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 10000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1308,7 +1309,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 10000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1336,7 +1337,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $debit = $transaction->journalEntries()->where('type', 'debit')->firstOrFail();
         $credit = $transaction->journalEntries()->where('type', 'credit')->firstOrFail();
@@ -1379,7 +1380,7 @@ class TransactionRegistrarTest extends TestCase
                 'net_amount' => 1000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1410,7 +1411,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1438,7 +1439,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1000,
                 'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertTrue($transaction->journalEntries->every(function ($entry) {
             return $entry->net_amount === 1000
@@ -1473,7 +1474,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1000,
                 'tax_type' => JournalEntry::TAX_TYPE_ZERO_RATED,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $credit = $transaction->journalEntries()->where('type', 'credit')->firstOrFail();
 
@@ -1805,7 +1806,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1836,7 +1837,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1868,7 +1869,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]

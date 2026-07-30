@@ -155,7 +155,7 @@ class BusinessFlowScenarioTest extends TestCase
                 'type' => JournalEntry::TYPE_DEBIT,
                 'net_amount' => 12000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-04-02',
@@ -171,7 +171,7 @@ class BusinessFlowScenarioTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 4000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summaryAfterDaily = $fiscalYear->calculateSummary();
         $this->assertSame(12000, $summaryAfterDaily['actual']['total_income']);

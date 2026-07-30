@@ -224,7 +224,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 30000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-05-10',
@@ -240,7 +240,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 5000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $fiscalYear->close($user);
 
@@ -316,7 +316,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 10000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $fiscalYear->close($user);
 
@@ -379,7 +379,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 50000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $fiscalYear->close($user);
 

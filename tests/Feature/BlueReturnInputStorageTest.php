@@ -50,7 +50,7 @@ class BlueReturnInputStorageTest extends TestCase
                 'net_amount' => 1_200_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         $savedInputs = $fiscalYear->saveBlueReturnInputs([
             BlueReturnInput::KEY_FAMILY_EMPLOYEE_SALARIES => [
@@ -159,7 +159,7 @@ class BlueReturnInputStorageTest extends TestCase
                 'net_amount' => 1_200_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         try {
             $fiscalYear->saveBlueReturnInput(BlueReturnInput::KEY_FAMILY_EMPLOYEE_SALARIES, [

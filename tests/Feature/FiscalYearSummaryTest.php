@@ -41,7 +41,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 10000],
             ['sub_account_id' => $asset->id,   'type' => 'debit',  'net_amount' => 10000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         // 経費 5,000円
         $registrar->register($fiscalYear, [
@@ -50,7 +50,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $expense->id,   'type' => 'debit',  'net_amount' => 5000],
             ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 5000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summary = $fiscalYear->calculateSummary()['actual'];
 
@@ -90,7 +90,7 @@ class FiscalYearSummaryTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 11000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         // 経費 6,000 + 消費税 600
         $registrar->register($fiscalYear, [
@@ -109,7 +109,7 @@ class FiscalYearSummaryTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 6600,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summary = $fiscalYear->calculateSummary()['actual'];
 
@@ -139,7 +139,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 10000],
             ['sub_account_id' => $asset->id,   'type' => 'debit',  'net_amount' => 10000],
-        ]);
+        ], $fy2025->businessUnit->user);
 
         // 2026年度の売上
         $registrar->register($fy2026, [
@@ -148,7 +148,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 20000],
             ['sub_account_id' => $asset->id,   'type' => 'debit',  'net_amount' => 20000],
-        ]);
+        ], $fy2026->businessUnit->user);
 
         $summary = $fy2025->calculateSummary()['actual'];
 
@@ -175,7 +175,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 15000],
             ['sub_account_id' => $asset->id,   'type' => 'debit',  'net_amount' => 15000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summary = $fiscalYear->calculateSummary()['actual'];
 
@@ -202,7 +202,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $expense->id,   'type' => 'debit',  'net_amount' => 8000],
             ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 8000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summary = $fiscalYear->calculateSummary()['actual'];
 
@@ -246,7 +246,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 10000],
             ['sub_account_id' => $asset->id, 'type' => 'debit', 'net_amount' => 10000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-04-02',
@@ -254,7 +254,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $revenue->id, 'type' => 'debit', 'net_amount' => 2000],
             ['sub_account_id' => $asset->id, 'type' => 'credit', 'net_amount' => 2000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-04-03',
@@ -262,7 +262,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $expense->id, 'type' => 'debit', 'net_amount' => 5000],
             ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 5000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-04-04',
@@ -270,7 +270,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $expense->id, 'type' => 'credit', 'net_amount' => 1500],
             ['sub_account_id' => $liability->id, 'type' => 'debit', 'net_amount' => 1500],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summary = $fiscalYear->calculateSummary()['actual'];
         $amountSummary = $fiscalYear->calculateAmountSummary()['actual'];
@@ -311,7 +311,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $openingInventory->id, 'type' => 'debit', 'net_amount' => 1000],
             ['sub_account_id' => $inventoryAsset->id, 'type' => 'credit', 'net_amount' => 1000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-12-31',
@@ -319,7 +319,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $inventoryAsset->id, 'type' => 'debit', 'net_amount' => 400],
             ['sub_account_id' => $closingInventory->id, 'type' => 'credit', 'net_amount' => 400],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summary = $fiscalYear->calculateSummary()['actual'];
         $amountSummary = $fiscalYear->calculateAmountSummary()['actual'];
@@ -356,7 +356,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 10000],
             ['sub_account_id' => $asset->id,   'type' => 'debit',  'net_amount' => 10000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         // 実績経費 5,000円
         $registrar->register($fiscalYear, [
@@ -365,7 +365,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $expense->id,   'type' => 'debit',  'net_amount' => 5000],
             ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 5000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         // 予定売上 20,000円
         $registrar->register($fiscalYear, [
@@ -375,7 +375,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 20000],
             ['sub_account_id' => $asset->id,   'type' => 'debit',  'net_amount' => 20000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         // 予定経費 3,000円
         $registrar->register($fiscalYear, [
@@ -385,7 +385,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $expense->id,   'type' => 'debit',  'net_amount' => 3000],
             ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 3000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summary = $fiscalYear->calculateSummary();
 
@@ -428,7 +428,7 @@ class FiscalYearSummaryTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 11000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-04-03',
@@ -446,7 +446,7 @@ class FiscalYearSummaryTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 5500,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-04-02',
@@ -464,7 +464,7 @@ class FiscalYearSummaryTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 6600,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-04-04',
@@ -482,7 +482,7 @@ class FiscalYearSummaryTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 2200,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-05-01',
@@ -501,7 +501,7 @@ class FiscalYearSummaryTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 22000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-05-03',
@@ -520,7 +520,7 @@ class FiscalYearSummaryTest extends TestCase
                 'type' => 'debit',
                 'net_amount' => 4400,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-05-02',
@@ -539,7 +539,7 @@ class FiscalYearSummaryTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 3300,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-05-04',
@@ -558,7 +558,7 @@ class FiscalYearSummaryTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1100,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summary = $fiscalYear->calculateAmountSummary();
 
@@ -604,7 +604,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 10000],
             ['sub_account_id' => $asset->id, 'type' => 'debit', 'net_amount' => 10000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $inactiveExpense = $registrar->register($fiscalYear, [
             'date' => '2025-04-02',
@@ -612,7 +612,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $expense->id, 'type' => 'debit', 'net_amount' => 5000],
             ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 5000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $inactiveExpense->deactivate($user, '誤登録');
 
@@ -652,7 +652,7 @@ class FiscalYearSummaryTest extends TestCase
                 'tax_type' => 'taxable_sales_10',
             ],
             ['sub_account_id' => $asset->id, 'type' => 'debit', 'net_amount' => 22000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $inactivePlannedExpense = $registrar->register($fiscalYear, [
             'date' => '2025-05-02',
@@ -667,7 +667,7 @@ class FiscalYearSummaryTest extends TestCase
                 'tax_type' => 'taxable_purchases_10',
             ],
             ['sub_account_id' => $liability->id, 'type' => 'credit', 'net_amount' => 3300],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $inactivePlannedExpense->deactivate($user, '取消');
 
@@ -704,7 +704,7 @@ class FiscalYearSummaryTest extends TestCase
         ], [
             ['sub_account_id' => $revenue->id, 'type' => 'credit', 'net_amount' => 10000],
             ['sub_account_id' => $asset->id, 'type' => 'debit', 'net_amount' => 10000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $executedQueries = [];
 

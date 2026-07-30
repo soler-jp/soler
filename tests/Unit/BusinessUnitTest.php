@@ -649,7 +649,7 @@ class BusinessUnitTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-01-20',
@@ -665,7 +665,7 @@ class BusinessUnitTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 2000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $businessCard = CreditCard::factory()->create([
             'business_unit_id' => $businessUnit->id,

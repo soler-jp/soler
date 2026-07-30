@@ -139,7 +139,7 @@ class FreelancerBookTest extends TestCase
                 ],
             ];
 
-            $transaction = $registrar->register($this->fiscalYear, $transactionData, $journalEntriesData);
+            $transaction = $registrar->register($this->fiscalYear, $transactionData, $journalEntriesData, $this->fiscalYear->businessUnit->user);
 
             $this->assertDatabaseHas('transactions', [
                 'id' => $transaction->id,
@@ -182,6 +182,6 @@ class FreelancerBookTest extends TestCase
             ],
         ];
 
-        $registrar->register($this->fiscalYear, $transactionData, $journalEntriesData);
+        $registrar->register($this->fiscalYear, $transactionData, $journalEntriesData, $this->fiscalYear->businessUnit->user);
     }
 }

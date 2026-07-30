@@ -58,7 +58,7 @@ class FiscalYearBalanceTest extends TestCase
         ], [
             ['sub_account_id' => $cash->id, 'type' => 'debit', 'gross_amount' => 1100],
             ['sub_account_id' => $ownerLoan->id, 'type' => 'credit', 'gross_amount' => 1100],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-04-02',
@@ -66,7 +66,7 @@ class FiscalYearBalanceTest extends TestCase
         ], [
             ['sub_account_id' => $deposit->id, 'type' => 'debit', 'gross_amount' => 2200],
             ['sub_account_id' => $ownerLoan->id, 'type' => 'credit', 'gross_amount' => 2200],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-04-03',
@@ -74,7 +74,7 @@ class FiscalYearBalanceTest extends TestCase
         ], [
             ['sub_account_id' => $ownerDraw->id, 'type' => 'debit', 'gross_amount' => 500],
             ['sub_account_id' => $cash->id, 'type' => 'credit', 'gross_amount' => 500],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summary = $fiscalYear->calculateBalanceSummary();
 
@@ -119,7 +119,7 @@ class FiscalYearBalanceTest extends TestCase
         ], [
             ['sub_account_id' => $cash->id, 'type' => 'debit', 'gross_amount' => 1000],
             ['sub_account_id' => $ownerLoan->id, 'type' => 'credit', 'gross_amount' => 1000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $planned = $registrar->register($fiscalYear, [
             'date' => '2025-04-02',
@@ -128,7 +128,7 @@ class FiscalYearBalanceTest extends TestCase
         ], [
             ['sub_account_id' => $cash->id, 'type' => 'debit', 'gross_amount' => 2000],
             ['sub_account_id' => $ownerLoan->id, 'type' => 'credit', 'gross_amount' => 2000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $inactive = $registrar->register($fiscalYear, [
             'date' => '2025-04-03',
@@ -136,7 +136,7 @@ class FiscalYearBalanceTest extends TestCase
         ], [
             ['sub_account_id' => $ownerDraw->id, 'type' => 'debit', 'gross_amount' => 700],
             ['sub_account_id' => $cash->id, 'type' => 'credit', 'gross_amount' => 700],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $inactive->deactivate($user, '誤登録');
 
@@ -204,7 +204,7 @@ class FiscalYearBalanceTest extends TestCase
         ], [
             ['sub_account_id' => $cash->id, 'type' => 'debit', 'gross_amount' => 3000],
             ['sub_account_id' => $loan->id, 'type' => 'credit', 'gross_amount' => 3000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summary = $fiscalYear->calculateBalanceSummary();
 
@@ -236,7 +236,7 @@ class FiscalYearBalanceTest extends TestCase
         ], [
             ['sub_account_id' => $openingInventory->id, 'type' => 'debit', 'gross_amount' => 1000],
             ['sub_account_id' => $inventoryAsset->id, 'type' => 'credit', 'gross_amount' => 1000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-12-31',
@@ -244,7 +244,7 @@ class FiscalYearBalanceTest extends TestCase
         ], [
             ['sub_account_id' => $inventoryAsset->id, 'type' => 'debit', 'gross_amount' => 400],
             ['sub_account_id' => $closingInventory->id, 'type' => 'credit', 'gross_amount' => 400],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summary = $fiscalYear->calculateBalanceSummary();
 

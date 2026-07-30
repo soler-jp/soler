@@ -89,7 +89,7 @@ class ScenarioRulesTest extends TestCase
                     'net_amount' => 1000,
                     'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
-            ]);
+            ], $fiscalYear->businessUnit->user);
 
             $this->fail('Expected ValidationException was not thrown.');
         } catch (ValidationException $exception) {
@@ -140,7 +140,7 @@ class ScenarioRulesTest extends TestCase
                     'gross_amount' => 1100,
                     'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
-            ]);
+            ], $fiscalYear->businessUnit->user);
 
             $this->fail('Expected ValidationException was not thrown.');
         } catch (ValidationException $exception) {

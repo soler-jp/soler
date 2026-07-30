@@ -56,7 +56,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 20_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-05-10',
@@ -72,7 +72,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 30_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-06-10',
@@ -88,7 +88,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 10_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         $closedYear->close($user);
 
@@ -168,7 +168,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 200_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-05-10',
@@ -184,7 +184,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 240_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         $closedYear->close($user);
 
@@ -264,7 +264,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 300_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-05-10',
@@ -280,7 +280,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 100_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         // 期末の事業主借 60,000
         (new TransactionRegistrar)->register($closedYear, [
@@ -297,7 +297,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 60_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         // 期末の事業主貸 80,000
         (new TransactionRegistrar)->register($closedYear, [
@@ -314,7 +314,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 80_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         $closedYear->close($user);
 

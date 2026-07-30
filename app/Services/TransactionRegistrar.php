@@ -27,11 +27,9 @@ class TransactionRegistrar
      * @param  array  $transactionData  取引情報（例: fiscal_year_id, date, description）
      * @param  array  $journalEntriesData  仕訳情報（複数）（例: sub_account_id, type, net_amount, ...）
      *
-     * TODO(actor-authorization): 直接呼び出し更新後に $actor を必須にする。
-     *
      * @throws ValidationException
      */
-    public function register(?FiscalYear $fiscalYear, array $transactionData, array $journalEntriesData, ?User $actor = null): Transaction
+    public function register(?FiscalYear $fiscalYear, array $transactionData, array $journalEntriesData, User $actor): Transaction
     {
         // fiscalYear がnullの場合はバリデーションエラー
         if (is_null($fiscalYear)) {
@@ -40,9 +38,7 @@ class TransactionRegistrar
             ]);
         }
 
-        if ($actor !== null) {
-            $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度に取引を登録する権限がありません。');
-        }
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度に取引を登録する権限がありません。');
 
         if ($fiscalYear->is_closed) {
             throw ValidationException::withMessages([

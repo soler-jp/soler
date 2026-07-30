@@ -34,32 +34,28 @@ class TransactionRevisorTest extends TestCase
             'name' => '改訂前取引先',
         ]);
 
-        $transaction = app(TransactionRegistrar::class)->register(
-            $fiscalYear,
+        $transaction = app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '文房具購入',
+            'remarks' => '改訂前備考',
+            'counterparty_id' => $counterparty->id,
+            'created_by' => $user->id,
+        ], [
             [
-                'date' => '2025-04-01',
-                'description' => '文房具購入',
-                'remarks' => '改訂前備考',
-                'counterparty_id' => $counterparty->id,
-                'created_by' => $user->id,
+                'sub_account_id' => $originalExpense->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 1000,
+                'tax_amount' => 100,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
             ],
             [
-                [
-                    'sub_account_id' => $originalExpense->id,
-                    'type' => JournalEntry::TYPE_DEBIT,
-                    'net_amount' => 1000,
-                    'tax_amount' => 100,
-                    'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
-                ],
-                [
-                    'sub_account_id' => $originalCredit->id,
-                    'type' => JournalEntry::TYPE_CREDIT,
-                    'net_amount' => 1100,
-                    'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
-                ],
+                'sub_account_id' => $originalCredit->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 1100,
+                'tax_amount' => 0,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        );
+        ], $fiscalYear->businessUnit->user, );
 
         $revised = app(TransactionRevisor::class)->revise($transaction, $user, [
             'transaction' => [
@@ -138,30 +134,26 @@ class TransactionRevisorTest extends TestCase
             'is_active' => true,
         ]);
 
-        $transaction = app(TransactionRegistrar::class)->register(
-            $fiscalYear,
+        $transaction = app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '定期取引由来',
+            'recurring_transaction_plan_id' => $plan->id,
+        ], [
             [
-                'date' => '2025-04-01',
-                'description' => '定期取引由来',
-                'recurring_transaction_plan_id' => $plan->id,
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 1000,
+                'tax_amount' => 100,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
             ],
             [
-                [
-                    'sub_account_id' => $debitSubAccount->id,
-                    'type' => JournalEntry::TYPE_DEBIT,
-                    'net_amount' => 1000,
-                    'tax_amount' => 100,
-                    'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
-                ],
-                [
-                    'sub_account_id' => $creditSubAccount->id,
-                    'type' => JournalEntry::TYPE_CREDIT,
-                    'net_amount' => 1100,
-                    'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
-                ],
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 1100,
+                'tax_amount' => 0,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        );
+        ], $fiscalYear->businessUnit->user, );
 
         app(TransactionRevisor::class)->revise($transaction, $user, [
             'transaction' => [
@@ -199,29 +191,25 @@ class TransactionRevisorTest extends TestCase
         $expense = $unit->getAccountByName('通信費')->subAccounts()->firstOrFail();
         $credit = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
 
-        $transaction = app(TransactionRegistrar::class)->register(
-            $fiscalYear,
+        $transaction = app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '元取引',
+        ], [
             [
-                'date' => '2025-04-01',
-                'description' => '元取引',
+                'sub_account_id' => $expense->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 1000,
+                'tax_amount' => 100,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
             ],
             [
-                [
-                    'sub_account_id' => $expense->id,
-                    'type' => JournalEntry::TYPE_DEBIT,
-                    'net_amount' => 1000,
-                    'tax_amount' => 100,
-                    'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
-                ],
-                [
-                    'sub_account_id' => $credit->id,
-                    'type' => JournalEntry::TYPE_CREDIT,
-                    'net_amount' => 1100,
-                    'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
-                ],
+                'sub_account_id' => $credit->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 1100,
+                'tax_amount' => 0,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        );
+        ], $fiscalYear->businessUnit->user, );
 
         $revisor = app(TransactionRevisor::class);
 
@@ -280,29 +268,25 @@ class TransactionRevisorTest extends TestCase
         $expense = $unit->getAccountByName('通信費')->subAccounts()->firstOrFail();
         $credit = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
 
-        $transaction = app(TransactionRegistrar::class)->register(
-            $fiscalYear,
+        $transaction = app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '決算前取引',
+        ], [
             [
-                'date' => '2025-04-01',
-                'description' => '決算前取引',
+                'sub_account_id' => $expense->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 1000,
+                'tax_amount' => 100,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
             ],
             [
-                [
-                    'sub_account_id' => $expense->id,
-                    'type' => JournalEntry::TYPE_DEBIT,
-                    'net_amount' => 1000,
-                    'tax_amount' => 100,
-                    'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
-                ],
-                [
-                    'sub_account_id' => $credit->id,
-                    'type' => JournalEntry::TYPE_CREDIT,
-                    'net_amount' => 1100,
-                    'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
-                ],
+                'sub_account_id' => $credit->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 1100,
+                'tax_amount' => 0,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        );
+        ], $fiscalYear->businessUnit->user, );
 
         $fiscalYear->forceFill([
             'is_closed' => true,
@@ -358,7 +342,7 @@ class TransactionRevisorTest extends TestCase
         ], [
             ['sub_account_id' => $debit->id, 'type' => JournalEntry::TYPE_DEBIT, 'net_amount' => 1000],
             ['sub_account_id' => $credit->id, 'type' => JournalEntry::TYPE_CREDIT, 'net_amount' => 1000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->expectException(AuthorizationException::class);
 

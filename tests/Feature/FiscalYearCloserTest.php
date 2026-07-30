@@ -37,7 +37,7 @@ class FiscalYearCloserTest extends TestCase
         ], [
             ['sub_account_id' => $cash->id, 'type' => JournalEntry::TYPE_DEBIT, 'net_amount' => 1000],
             ['sub_account_id' => $ownerLoan->id, 'type' => JournalEntry::TYPE_CREDIT, 'net_amount' => 1000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $fiscalYear->registerOpeningEntry([
             [
@@ -127,7 +127,7 @@ class FiscalYearCloserTest extends TestCase
         ], [
             ['sub_account_id' => $cash->id, 'type' => JournalEntry::TYPE_DEBIT, 'net_amount' => 1000],
             ['sub_account_id' => $ownerLoan->id, 'type' => JournalEntry::TYPE_CREDIT, 'net_amount' => 1000],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->expectException(ValidationException::class);
 
