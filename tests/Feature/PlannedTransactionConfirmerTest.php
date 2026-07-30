@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\BusinessUnit;
+use App\Models\RecurringTransactionPlan;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\PlannedTransactionConfirmer;
@@ -32,7 +33,7 @@ class PlannedTransactionConfirmerTest extends TestCase
             'day_of_month' => 10,
             'amount' => 1100,
             'tax_amount' => 0,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debit->id,
             'credit_sub_account_id' => $credit->id,
         ], $user);

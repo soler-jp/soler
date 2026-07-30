@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\DepreciationEntry;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
+use App\Models\RecurringTransactionPlan;
 use App\Models\User;
 use App\Services\DepreciationService;
 use App\Services\TransactionRegistrar;
@@ -203,7 +204,7 @@ class BusinessFlowScenarioTest extends TestCase
             'name' => 'サーバー費',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $expenseSubAccount->id,
             'credit_sub_account_id' => $paymentSubAccount->id,
             'amount' => 3000,

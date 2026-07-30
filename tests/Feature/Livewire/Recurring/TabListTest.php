@@ -3,6 +3,7 @@
 namespace Tests\Feature\Livewire\Recurring;
 
 use App\Livewire\Recurring\TabList;
+use App\Models\RecurringTransactionPlan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -25,7 +26,7 @@ class TabListTest extends TestCase
             'amount' => 1100,
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $unit->subAccounts()->first()->id,
             'credit_sub_account_id' => $unit->subAccounts()->first()->id,
         ], $user);
@@ -36,7 +37,7 @@ class TabListTest extends TestCase
             'interval' => 'bimonthly',
             'day_of_month' => 15,
             'start_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $unit->subAccounts()->first()->id,
             'credit_sub_account_id' => $unit->subAccounts()->first()->id,
         ], $user);
@@ -67,7 +68,7 @@ class TabListTest extends TestCase
             'day_of_month' => 10,
             'amount' => 1100,
             'tax_amount' => 0,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
         ], $user);
@@ -139,7 +140,7 @@ class TabListTest extends TestCase
             'amount' => 5678,
             'tax_amount' => 0,
             'business_ratio' => 60,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
         ], $user);
@@ -173,7 +174,7 @@ class TabListTest extends TestCase
             'day_of_month' => 10,
             'amount' => 1100,
             'tax_amount' => 0,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $otherDebit->id,
             'credit_sub_account_id' => $otherCredit->id,
         ], $otherUser);
@@ -227,7 +228,7 @@ class TabListTest extends TestCase
             'day_of_month' => 10,
             'amount' => 1100,
             'tax_amount' => 0,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
         ], $user);

@@ -22,6 +22,15 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
     /** @use HasFactory<RecurringTransactionPlanFactory> */
     use AuthorizesBusinessUnitAccess, HasFactory;
 
+    public const TYPE_EXPENSE = 'expense';
+
+    public const TYPE_INCOME = 'income';
+
+    public const TYPES = [
+        self::TYPE_EXPENSE,
+        self::TYPE_INCOME,
+    ];
+
     protected $fillable = [
         'business_unit_id',
         'name',
@@ -29,7 +38,7 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
         'month_of_year', // for 'yearly' interval
         'start_month', // for 'bimonthly' interval
         'day_of_month',
-        'is_income',
+        'type',
         'debit_sub_account_id',
         'credit_sub_account_id',
         'amount',
@@ -41,7 +50,7 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
 
     protected $casts = [
         'is_active' => 'boolean',
-        'is_income' => 'boolean',
+        'type' => 'string',
         'day_of_month' => 'integer',
         'amount' => 'integer',
         'tax_amount' => 'integer',
@@ -84,7 +93,7 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
                 'day_of_month' => ['required', 'integer', 'min:1', 'max:31'],
                 'month_of_year' => ['nullable', 'integer', 'min:1', 'max:12'],
                 'start_month' => ['nullable', 'integer', 'min:1', 'max:12'],
-                'is_income' => ['required', 'boolean'],
+                'type' => ['required', 'in:'.implode(',', self::TYPES)],
                 'debit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
                 'credit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
                 'amount' => ['required', 'integer', 'min:1'],

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Recurring;
 
+use App\Models\RecurringTransactionPlan;
 use App\Models\Transaction;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -58,7 +59,7 @@ class TabList extends Component
 
         $plan = $transaction->recurringTransactionPlan;
 
-        if (! $plan || $plan->business_unit_id !== $unit->id || $plan->is_income) {
+        if (! $plan || $plan->business_unit_id !== $unit->id || $plan->type !== RecurringTransactionPlan::TYPE_EXPENSE) {
             return;
         }
 
@@ -97,7 +98,7 @@ class TabList extends Component
         $fiscalYear = $unit->currentFiscalYear;
 
         $plans = $unit->recurringTransactionPlans()
-            ->where('is_income', false)
+            ->where('type', RecurringTransactionPlan::TYPE_EXPENSE)
             ->orderBy('day_of_month')
             ->get();
 
