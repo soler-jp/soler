@@ -47,6 +47,33 @@ class TransactionRegistrarTest extends TestCase
     }
 
     #[Test]
+    public function actorが会計年度の事業体にアクセスできない場合は取引登録を拒否する(): void
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+        $otherUser = User::factory()->create();
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この会計年度に取引を登録する権限がありません。');
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-01-01',
+            'description' => '権限なし登録',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ], $otherUser);
+    }
+
+    #[Test]
     public function 単一仕訳で取引が登録できる()
     {
         $fiscalYear = FiscalYear::factory()->create();

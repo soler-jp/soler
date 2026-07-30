@@ -421,7 +421,8 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             $transaction = app(TransactionRegistrar::class)->register(
                 $fiscalYear,
                 $data['transaction'],
-                $data['entries']
+                $data['entries'],
+                $actor,
             );
 
             $transactions->push($transaction);

@@ -44,7 +44,8 @@ class DashboardExpenseInput extends Component
 
     public function submit()
     {
-        $unit = auth()->user()->selectedBusinessUnitOrFail();
+        $user = auth()->user();
+        $unit = $user->selectedBusinessUnitOrFail();
 
         $this->validate([
             'date' => ['required', 'date'],
@@ -57,21 +58,26 @@ class DashboardExpenseInput extends Component
         $fiscalYear = $unit->currentFiscalYear;
 
         try {
-            app(TransactionRegistrar::class)->register($fiscalYear, [
-                'date' => $this->date,
-                'description' => $this->description,
-            ], [
+            app(TransactionRegistrar::class)->register(
+                $fiscalYear,
                 [
-                    'sub_account_id' => $this->debit_sub_account_id,
-                    'type' => 'debit',
-                    'net_amount' => $this->amount,
+                    'date' => $this->date,
+                    'description' => $this->description,
                 ],
                 [
-                    'sub_account_id' => $this->credit_sub_account_id,
-                    'type' => 'credit',
-                    'net_amount' => $this->amount,
+                    [
+                        'sub_account_id' => $this->debit_sub_account_id,
+                        'type' => 'debit',
+                        'net_amount' => $this->amount,
+                    ],
+                    [
+                        'sub_account_id' => $this->credit_sub_account_id,
+                        'type' => 'credit',
+                        'net_amount' => $this->amount,
+                    ],
                 ],
-            ]);
+                $user,
+            );
 
             // 初期化 & 確認メッセージ
             $this->reset(['description', 'amount', 'debit_sub_account_id', 'credit_sub_account_id']);

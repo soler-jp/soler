@@ -27,7 +27,8 @@ class DashboardRevenueInput extends Component
 
     public function save()
     {
-        $unit = auth()->user()->selectedBusinessUnitOrFail();
+        $user = auth()->user();
+        $unit = $user->selectedBusinessUnitOrFail();
 
         $this->validate([
             'date' => ['required', 'date'],
@@ -79,7 +80,8 @@ class DashboardRevenueInput extends Component
                     'date' => $this->date,
                     'description' => $this->description,
                 ],
-                $journalEntries
+                $journalEntries,
+                $user,
             );
 
             session()->flash('message', '売上を登録しました');

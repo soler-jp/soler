@@ -61,6 +61,7 @@ class TransactionRevisor
                 $lockedTransaction->fiscalYear,
                 $revisedTransactionData,
                 $validated['journal_entries'],
+                $user,
             );
 
             $lockedTransaction->deactivate($user, '修正による改訂');

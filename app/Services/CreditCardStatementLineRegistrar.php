@@ -42,6 +42,7 @@ class CreditCardStatementLineRegistrar
                 $fiscalYear,
                 $this->buildTransactionData($lockedLine, $user, $validated, $transactionDate),
                 $this->buildJournalEntriesData($lockedLine, $validated),
+                $user,
             );
 
             $lockedLine->forceFill([

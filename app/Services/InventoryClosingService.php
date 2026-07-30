@@ -114,6 +114,7 @@ class InventoryClosingService
                 'adjusting_entry_type' => Transaction::ADJUSTING_ENTRY_TYPE_INVENTORY_CLOSING,
             ],
             $journalEntries,
+            $actor,
         );
     }
 

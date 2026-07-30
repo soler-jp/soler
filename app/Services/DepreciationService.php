@@ -410,6 +410,7 @@ class DepreciationService
                     'tax_amount' => 0,
                 ],
             ],
+            $actor,
         );
 
         $entry->forceFill([

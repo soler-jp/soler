@@ -96,7 +96,7 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
     ): Transaction {
         $registrar ??= app(TransactionRegistrar::class);
 
-        return $registrar->register($this, $transactionData, $journalEntriesData);
+        return $registrar->register($this, $transactionData, $journalEntriesData, $actor);
     }
 
     public function calculateSummary(): array
