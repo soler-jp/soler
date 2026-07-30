@@ -264,7 +264,15 @@ class CreditCardModelsTest extends TestCase
     public function バッチを無効化すると関連明細行と取引も無効化される(): void
     {
         $user = User::factory()->create();
-        $statement = CreditCardStatement::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'バッチ無効化テスト',
+        ]);
+        $creditCard = CreditCard::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+        ]);
+        $statement = CreditCardStatement::factory()->create([
+            'credit_card_id' => $creditCard->id,
+        ]);
         $batch = CreditCardImportBatch::factory()->create([
             'credit_card_statement_id' => $statement->id,
         ]);
@@ -285,6 +293,30 @@ class CreditCardModelsTest extends TestCase
         $this->assertFalse($transaction->fresh()->is_active);
         $this->assertSame($user->id, $batch->fresh()->deactivated_by);
         $this->assertSame('CSV修正版を再アップロード', $transaction->fresh()->deactivation_reason);
+    }
+
+    #[Test]
+    public function 他ユーザーはバッチを無効化できない(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'バッチ認可テスト',
+        ]);
+        $creditCard = CreditCard::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+        ]);
+        $statement = CreditCardStatement::factory()->create([
+            'credit_card_id' => $creditCard->id,
+        ]);
+        $batch = CreditCardImportBatch::factory()->create([
+            'credit_card_statement_id' => $statement->id,
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('このクレジットカード取込バッチを無効化する権限がありません。');
+
+        $batch->deactivate($otherUser, '不正な無効化');
     }
 
     #[Test]

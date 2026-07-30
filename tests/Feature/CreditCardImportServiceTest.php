@@ -344,9 +344,8 @@ CSV;
             'parser_key' => 'rakuten_csv_v1',
         ]);
 
-        $this->expectException(AuthorizationException::class);
+        $this->expectException(\TypeError::class);
 
-        // 認可は parse より前に走るため、CSV 内容の妥当性までは問われない
         $this->app->make(CreditCardImportService::class)->import(
             $creditCard,
             'dummy',

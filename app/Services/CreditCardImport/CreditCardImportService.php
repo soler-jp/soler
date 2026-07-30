@@ -35,7 +35,7 @@ class CreditCardImportService
         CreditCard $creditCard,
         string $csvContents,
         string $sourceFilename,
-        ?User $uploadedBy = null,
+        User $uploadedBy,
         array $overrides = [],
     ): CreditCardImportBatch {
         $this->authorizeBusinessUnitAccess($creditCard, $uploadedBy, 'このクレジットカードに明細を取り込む権限がありません。');
@@ -58,7 +58,7 @@ class CreditCardImportService
                 ->each(fn (CreditCardImportBatch $batch) => $batch->deactivate($uploadedBy, 'CSVを再取り込みしました。'));
 
             $batch = $statement->importBatches()->create([
-                'uploaded_by' => $uploadedBy?->id,
+                'uploaded_by' => $uploadedBy->id,
                 'source_filename' => $sourceFilename,
                 'source_hash' => hash('sha256', $csvContents),
                 'parser_key' => $parser->key(),

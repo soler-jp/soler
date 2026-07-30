@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Contracts\ResolvesBusinessUnit;
 use Database\Factories\CreditCardImportBatchFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 class CreditCardImportBatch extends Model implements ResolvesBusinessUnit
 {
+    use AuthorizesBusinessUnitAccess;
+
     public const STATUS_PROCESSING = 'processing';
 
     public const STATUS_COMPLETED = 'completed';
@@ -107,8 +110,11 @@ class CreditCardImportBatch extends Model implements ResolvesBusinessUnit
         ], true);
     }
 
-    public function deactivate(?User $user = null, ?string $reason = null): void
+    // TODO(actor-authorization): $user は操作主体なので、別コミットで $actor にリネームする。
+    public function deactivate(User $user, ?string $reason = null): void
     {
+        $this->authorizeBusinessUnitAccess($this, $user, 'このクレジットカード取込バッチを無効化する権限がありません。');
+
         if (! $this->is_active) {
             return;
         }
@@ -117,7 +123,7 @@ class CreditCardImportBatch extends Model implements ResolvesBusinessUnit
             $this->forceFill([
                 'is_active' => false,
                 'deactivated_at' => now(),
-                'deactivated_by' => $user?->id,
+                'deactivated_by' => $user->id,
                 'deactivation_reason' => $reason,
             ])->save();
 
