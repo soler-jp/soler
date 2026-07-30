@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Contracts\ResolvesBusinessUnit;
 use App\Services\CounterpartySummaryCalculator;
 use Carbon\Carbon;
@@ -13,6 +14,7 @@ use InvalidArgumentException;
 
 class Counterparty extends Model implements ResolvesBusinessUnit
 {
+    use AuthorizesBusinessUnitAccess;
     use HasFactory;
 
     public const QUALIFICATION_STATUS_UNKNOWN = 'unknown';
@@ -107,8 +109,10 @@ class Counterparty extends Model implements ResolvesBusinessUnit
         return app(CounterpartySummaryCalculator::class)->calculateForFiscalYear($this, $fiscalYear);
     }
 
-    public function setQualificationStatus(string $qualificationStatus, ?Carbon $effectiveFrom = null): void
+    public function setQualificationStatus(string $qualificationStatus, User $actor, ?Carbon $effectiveFrom = null): void
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この取引先の適格判定状態を変更する権限がありません。');
+
         if (! in_array($qualificationStatus, self::MUTABLE_QUALIFICATION_STATUSES, true)) {
             throw new InvalidArgumentException('unknown には変更できません。');
         }

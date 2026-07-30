@@ -53,7 +53,7 @@ class BusinessUnitResolutionTest extends TestCase
 
         // 取引先と適格判定イベント
         $counterparty = $unit->counterparties()->firstOrFail();
-        $counterparty->setQualificationStatus(Counterparty::QUALIFICATION_STATUS_QUALIFIED);
+        $counterparty->setQualificationStatus(Counterparty::QUALIFICATION_STATUS_QUALIFIED, $user);
         $qualificationEvent = $counterparty->qualificationEvents()->firstOrFail();
 
         // 固定資産と減価償却エントリ

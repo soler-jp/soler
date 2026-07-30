@@ -6,6 +6,7 @@ use App\Models\Counterparty;
 use App\Models\Transaction;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
@@ -94,17 +95,20 @@ class CounterpartyTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-01-04 09:00:00'));
 
         try {
-            $counterparty = Counterparty::factory()->create();
+            $user = User::factory()->create();
+            $counterparty = $this->createCounterpartyForUser($user);
 
             Carbon::setTestNow(Carbon::parse('2026-01-10 09:00:00'));
             $counterparty->setQualificationStatus(
                 Counterparty::QUALIFICATION_STATUS_QUALIFIED,
+                $user,
                 Carbon::parse('2026-01-10 00:00:00'),
             );
 
             Carbon::setTestNow(Carbon::parse('2026-10-01 09:00:00'));
             $counterparty->setQualificationStatus(
                 Counterparty::QUALIFICATION_STATUS_NON_QUALIFIED,
+                $user,
                 Carbon::parse('2026-10-01 00:00:00'),
             );
 
@@ -156,10 +160,12 @@ class CounterpartyTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-01-03 09:00:00'));
 
         try {
-            $counterparty = Counterparty::factory()->create();
+            $user = User::factory()->create();
+            $counterparty = $this->createCounterpartyForUser($user);
 
             $counterparty->setQualificationStatus(
                 $qualificationStatus,
+                $user,
                 Carbon::parse('2026-01-03 00:00:00'),
             );
 
@@ -183,12 +189,13 @@ class CounterpartyTest extends TestCase
     #[Test]
     public function unknownには変更できない()
     {
-        $counterparty = Counterparty::factory()->create([
+        $user = User::factory()->create();
+        $counterparty = $this->createCounterpartyForUser($user, [
             'qualification_status' => Counterparty::QUALIFICATION_STATUS_QUALIFIED,
         ]);
 
         try {
-            $counterparty->setQualificationStatus(Counterparty::QUALIFICATION_STATUS_UNKNOWN);
+            $counterparty->setQualificationStatus(Counterparty::QUALIFICATION_STATUS_UNKNOWN, $user);
 
             $this->fail('Expected InvalidArgumentException was not thrown.');
         } catch (InvalidArgumentException $exception) {
@@ -196,5 +203,30 @@ class CounterpartyTest extends TestCase
             $this->assertSame(Counterparty::QUALIFICATION_STATUS_QUALIFIED, $counterparty->refresh()->qualification_status);
             $this->assertCount(1, $counterparty->qualificationEvents);
         }
+    }
+
+    #[Test]
+    public function 他ユーザーはqualification_statusを変更できない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $counterparty = $this->createCounterpartyForUser($user);
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この取引先の適格判定状態を変更する権限がありません。');
+
+        $counterparty->setQualificationStatus(Counterparty::QUALIFICATION_STATUS_QUALIFIED, $otherUser);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function createCounterpartyForUser(User $user, array $attributes = []): Counterparty
+    {
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先認可テスト事業体']);
+
+        return Counterparty::factory()->create($attributes + [
+            'business_unit_id' => $unit->id,
+        ]);
     }
 }
