@@ -489,7 +489,7 @@ class TransactionRegistrar
      * is_planned は true のまま残すことで、定期取引の再生成をブロックする
      * （BusinessUnit::generatePlannedTransactionsForPlan の存在チェックは is_active を見ない）。
      */
-    public function cancelPlanned(Transaction $transaction, ?User $user = null): Transaction
+    public function cancelPlanned(Transaction $transaction, User $user): Transaction
     {
         $this->authorizeBusinessUnitAccess($transaction, $user, 'この予定取引を取消する権限がありません。');
 
