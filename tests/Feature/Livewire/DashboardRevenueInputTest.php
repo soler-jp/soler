@@ -319,7 +319,7 @@ class DashboardRevenueInputTest extends TestCase
         ]);
 
         $fy = $unit->createFiscalYear(2025, $user);
-        $unit->setCurrentFiscalYear($fy);
+        $unit->setCurrentFiscalYear($fy, $user);
 
         $revenueSubAccount = $unit->getSubAccountByName('売上高', '売上高');
         $cashSubAccount = $unit->getSubAccountByName('現金', '現金');

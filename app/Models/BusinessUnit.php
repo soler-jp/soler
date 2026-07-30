@@ -284,7 +284,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
     {
         $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体に会計年度を追加する権限がありません。');
 
-        return DB::transaction(function () use ($year): FiscalYear {
+        return DB::transaction(function () use ($year, $actor): FiscalYear {
             $hasActive = $this->fiscalYears()->where('is_active', true)->exists();
 
             $fiscalYear = $this->fiscalYears()->create([
@@ -295,7 +295,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
                 'is_active' => ! $hasActive,  // まだなければtrueにする
             ]);
 
-            $this->setCurrentFiscalYearIfNotSet($fiscalYear);
+            $this->setCurrentFiscalYearIfNotSet($fiscalYear, $actor);
 
             app(DepreciationService::class)->prepareEntriesFor($fiscalYear);
 
@@ -448,8 +448,10 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         return $this->belongsTo(FiscalYear::class, 'current_fiscal_year_id');
     }
 
-    public function setCurrentFiscalYear(FiscalYear $fiscalYear): void
+    public function setCurrentFiscalYear(FiscalYear $fiscalYear, User $actor): void
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体の現在の会計年度を変更する権限がありません。');
+
         if ($fiscalYear->business_unit_id !== $this->id) {
             throw new \InvalidArgumentException('他の事業体の年度は選択できません。');
         }
@@ -457,10 +459,10 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         $this->update(['current_fiscal_year_id' => $fiscalYear->id]);
     }
 
-    public function setCurrentFiscalYearIfNotSet(FiscalYear $fiscalYear): void
+    public function setCurrentFiscalYearIfNotSet(FiscalYear $fiscalYear, User $actor): void
     {
         if (is_null($this->current_fiscal_year_id)) {
-            $this->setCurrentFiscalYear($fiscalYear);
+            $this->setCurrentFiscalYear($fiscalYear, $actor);
         }
     }
 

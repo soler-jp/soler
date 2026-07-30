@@ -344,7 +344,7 @@ class BusinessUnitTest extends TestCase
 
         $fiscalYear2025 = $businessUnit->createFiscalYear(2025, $user);
 
-        $businessUnit->setCurrentFiscalYear($fiscalYear2025);
+        $businessUnit->setCurrentFiscalYear($fiscalYear2025, $user);
 
         $this->assertEquals($fiscalYear2025->id, $businessUnit->current_fiscal_year_id);
         $this->assertTrue($businessUnit->currentFiscalYear->is($fiscalYear2025));
@@ -369,7 +369,21 @@ class BusinessUnitTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
 
-        $unitA->setCurrentFiscalYear($foreignFiscalYear);
+        $unitA->setCurrentFiscalYear($foreignFiscalYear, $userA);
+    }
+
+    #[Test]
+    public function 他ユーザーはcurrent_fiscal_yearを設定できない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '年度選択認可テスト']);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この事業体の現在の会計年度を変更する権限がありません。');
+
+        $businessUnit->setCurrentFiscalYear($fiscalYear, $otherUser);
     }
 
     #[Test]
@@ -392,7 +406,7 @@ class BusinessUnitTest extends TestCase
         $fiscal2024 = $unit->createFiscalYear(2024, $user);
 
         // 既にcurrentFiscalYearが設定されている
-        $unit->setCurrentFiscalYear($fiscal2024);
+        $unit->setCurrentFiscalYear($fiscal2024, $user);
 
         // 新しい年度を作成してもcurrentFiscalYearは変わらない
         $unit->createFiscalYear(2025, $user);
