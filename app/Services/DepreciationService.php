@@ -22,16 +22,32 @@ class DepreciationService
     ) {}
 
     private const NEW_STANDARD_CAR_PRESET = [
-        'asset_category' => '新車-普通車',
+        'asset_category' => FixedAsset::ASSET_CATEGORY_NEW_STANDARD_CAR,
         'useful_life' => 72,
         'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
     ];
 
     private const NEW_LIGHT_CAR_PRESET = [
-        'asset_category' => '新車-軽自動車',
+        'asset_category' => FixedAsset::ASSET_CATEGORY_NEW_LIGHT_CAR,
         'useful_life' => 48,
         'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
     ];
+
+    private const USED_STANDARD_CAR_PRESET = [
+        'asset_category' => FixedAsset::ASSET_CATEGORY_USED_STANDARD_CAR,
+        'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
+    ];
+
+    private const USED_LIGHT_CAR_PRESET = [
+        'asset_category' => FixedAsset::ASSET_CATEGORY_USED_LIGHT_CAR,
+        'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
+    ];
+
+    private const STANDARD_CAR_STATUTORY_USEFUL_LIFE_MONTHS = 72;
+
+    private const LIGHT_CAR_STATUTORY_USEFUL_LIFE_MONTHS = 48;
+
+    private const MINIMUM_USED_ASSET_USEFUL_LIFE_MONTHS = 24;
 
     public function registerNewStandardCar(
         FiscalYear $fiscalYear,
@@ -66,6 +82,62 @@ class DepreciationService
             $assetSubAccount,
             $paymentSubAccount,
             array_merge($fixedAssetData, self::NEW_LIGHT_CAR_PRESET),
+            $transactionData,
+            $allowRegistration,
+        );
+    }
+
+    public function registerUsedStandardCar(
+        FiscalYear $fiscalYear,
+        SubAccount $paymentSubAccount,
+        array $fixedAssetData,
+        array $transactionData,
+        bool $allowRegistration = false
+    ): FixedAsset {
+        $assetSubAccount = $this->resolveVehicleAssetSubAccount($fiscalYear);
+
+        return $this->registerFixedAsset(
+            $fiscalYear,
+            $assetSubAccount,
+            $paymentSubAccount,
+            array_merge(
+                $fixedAssetData,
+                self::USED_STANDARD_CAR_PRESET,
+                [
+                    'useful_life' => $this->calculateUsedVehicleUsefulLife(
+                        $fixedAssetData,
+                        self::STANDARD_CAR_STATUTORY_USEFUL_LIFE_MONTHS,
+                    ),
+                ],
+            ),
+            $transactionData,
+            $allowRegistration,
+        );
+    }
+
+    public function registerUsedLightCar(
+        FiscalYear $fiscalYear,
+        SubAccount $paymentSubAccount,
+        array $fixedAssetData,
+        array $transactionData,
+        bool $allowRegistration = false
+    ): FixedAsset {
+        $assetSubAccount = $this->resolveVehicleAssetSubAccount($fiscalYear);
+
+        return $this->registerFixedAsset(
+            $fiscalYear,
+            $assetSubAccount,
+            $paymentSubAccount,
+            array_merge(
+                $fixedAssetData,
+                self::USED_LIGHT_CAR_PRESET,
+                [
+                    'useful_life' => $this->calculateUsedVehicleUsefulLife(
+                        $fixedAssetData,
+                        self::LIGHT_CAR_STATUTORY_USEFUL_LIFE_MONTHS,
+                    ),
+                ],
+            ),
             $transactionData,
             $allowRegistration,
         );
@@ -109,6 +181,7 @@ class DepreciationService
                 'name' => $fixedAssetData['name'],
                 'asset_category' => $fixedAssetData['asset_category'],
                 'acquisition_date' => $acquisitionDate,
+                'first_registration_date' => $fixedAssetData['first_registration_date'] ?? null,
                 'taxable_amount' => $taxableAmount,
                 'tax_amount' => $taxAmount,
                 'useful_life' => $fixedAssetData['useful_life'],
@@ -278,6 +351,51 @@ class DepreciationService
         }
 
         return ceil((12 / $usefulLife) * 1000) / 1000;
+    }
+
+    private function calculateUsedVehicleUsefulLife(array $fixedAssetData, int $statutoryUsefulLifeMonths): int
+    {
+        $firstRegistrationDate = $fixedAssetData['first_registration_date'] ?? null;
+
+        if ($firstRegistrationDate === null) {
+            throw new \InvalidArgumentException('中古車の登録には first_registration_date が必要です。');
+        }
+
+        $acquisitionDate = Carbon::parse($fixedAssetData['acquisition_date']);
+        $firstRegistrationDate = Carbon::parse($firstRegistrationDate);
+
+        if ($firstRegistrationDate->gt($acquisitionDate)) {
+            throw new \InvalidArgumentException('中古車の first_registration_date は acquisition_date 以前の日付を指定してください。');
+        }
+
+        $elapsedMonths = $this->countElapsedMonths($firstRegistrationDate, $acquisitionDate);
+
+        if ($elapsedMonths >= $statutoryUsefulLifeMonths) {
+            return max(
+                self::MINIMUM_USED_ASSET_USEFUL_LIFE_MONTHS,
+                (int) floor(($statutoryUsefulLifeMonths * 0.2) / 12) * 12,
+            );
+        }
+
+        $usefulLifeYears = (int) floor(
+            ($statutoryUsefulLifeMonths - $elapsedMonths + ($elapsedMonths * 0.2)) / 12,
+        );
+
+        return max(
+            self::MINIMUM_USED_ASSET_USEFUL_LIFE_MONTHS,
+            $usefulLifeYears * 12,
+        );
+    }
+
+    private function countElapsedMonths(Carbon $start, Carbon $end): int
+    {
+        $months = ($end->year - $start->year) * 12 + ($end->month - $start->month);
+
+        if ($end->day < $start->day) {
+            $months--;
+        }
+
+        return max(0, $months);
     }
 
     private function resolveVehicleAssetSubAccount(FiscalYear $fiscalYear): SubAccount

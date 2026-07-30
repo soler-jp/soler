@@ -13,6 +13,14 @@ class FixedAsset extends Model implements ResolvesBusinessUnit
 {
     use HasFactory;
 
+    public const ASSET_CATEGORY_NEW_STANDARD_CAR = '新車-普通車';
+
+    public const ASSET_CATEGORY_NEW_LIGHT_CAR = '新車-軽自動車';
+
+    public const ASSET_CATEGORY_USED_STANDARD_CAR = '中古車-普通車';
+
+    public const ASSET_CATEGORY_USED_LIGHT_CAR = '中古車-軽自動車';
+
     public const DEPRECIATION_METHOD_STRAIGHT_LINE = 'straight_line';
 
     protected $fillable = [
@@ -21,6 +29,7 @@ class FixedAsset extends Model implements ResolvesBusinessUnit
         'name',
         'asset_category',
         'acquisition_date',
+        'first_registration_date',
         'taxable_amount',
         'tax_amount',
         'useful_life',
@@ -34,6 +43,7 @@ class FixedAsset extends Model implements ResolvesBusinessUnit
 
     protected $casts = [
         'acquisition_date' => 'date',
+        'first_registration_date' => 'date',
         'disposed_at' => 'date',
         'taxable_amount' => 'integer',
         'tax_amount' => 'integer',
@@ -44,12 +54,22 @@ class FixedAsset extends Model implements ResolvesBusinessUnit
 
     public function isNewStandardCar(): bool
     {
-        return $this->asset_category === '新車-普通車';
+        return $this->asset_category === self::ASSET_CATEGORY_NEW_STANDARD_CAR;
     }
 
     public function isNewLightCar(): bool
     {
-        return $this->asset_category === '新車-軽自動車';
+        return $this->asset_category === self::ASSET_CATEGORY_NEW_LIGHT_CAR;
+    }
+
+    public function isUsedStandardCar(): bool
+    {
+        return $this->asset_category === self::ASSET_CATEGORY_USED_STANDARD_CAR;
+    }
+
+    public function isUsedLightCar(): bool
+    {
+        return $this->asset_category === self::ASSET_CATEGORY_USED_LIGHT_CAR;
     }
 
     public function acquisitionCost(): Attribute

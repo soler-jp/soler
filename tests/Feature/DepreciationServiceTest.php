@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\DepreciationService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -627,6 +628,275 @@ class DepreciationServiceTest extends TestCase
             'asset_category' => '新車-軽自動車',
             'useful_life' => 48,
             'depreciation_method' => 'straight_line',
+        ]);
+    }
+
+    #[Test]
+    #[DataProvider('usedVehicleUsefulLifeCases')]
+    public function 中古車カテゴリで登録すると簡便法で耐用年数が設定される(
+        string $registrationMethod,
+        string $assetCategory,
+        string $firstRegistrationDate,
+        int $expectedUsefulLifeMonths,
+    ): void {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query): void {
+                $query->where('name', 'その他の預金');
+            })
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->{$registrationMethod}(
+            $fiscalYear,
+            $paymentSubAccount,
+            [
+                'name' => '中古車',
+                'first_registration_date' => $firstRegistrationDate,
+                'acquisition_date' => '2025-10-03',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 0,
+            ],
+            [
+                'date' => '2025-10-03',
+                'description' => '中古車を購入',
+            ],
+        );
+
+        $this->assertDatabaseHas('fixed_assets', [
+            'id' => $fixedAsset->id,
+            'asset_category' => $assetCategory,
+            'useful_life' => $expectedUsefulLifeMonths,
+            'depreciation_method' => FixedAsset::DEPRECIATION_METHOD_STRAIGHT_LINE,
+        ]);
+        $this->assertSame($firstRegistrationDate, $fixedAsset->first_registration_date->toDateString());
+    }
+
+    #[Test]
+    public function 中古車の初度登録日が取得日より後なら登録しない(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query): void {
+                $query->where('name', 'その他の預金');
+            })
+            ->firstOrFail();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('中古車の first_registration_date は acquisition_date 以前の日付を指定してください。');
+
+        app(DepreciationService::class)->registerUsedStandardCar(
+            $fiscalYear,
+            $paymentSubAccount,
+            [
+                'name' => '未来登録の中古車',
+                'first_registration_date' => '2025-10-04',
+                'acquisition_date' => '2025-10-03',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 0,
+            ],
+            [
+                'date' => '2025-10-03',
+                'description' => '未来登録の中古車を購入',
+            ],
+        );
+    }
+
+    #[Test]
+    public function 中古車の初度登録日がなければ登録しない(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query): void {
+                $query->where('name', 'その他の預金');
+            })
+            ->firstOrFail();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('中古車の登録には first_registration_date が必要です。');
+
+        app(DepreciationService::class)->registerUsedLightCar(
+            $fiscalYear,
+            $paymentSubAccount,
+            [
+                'name' => '初度登録日なしの中古車',
+                'acquisition_date' => '2025-10-03',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 0,
+            ],
+            [
+                'date' => '2025-10-03',
+                'description' => '初度登録日なしの中古車を購入',
+            ],
+        );
+    }
+
+    #[Test]
+    public function 耐用年数を経過した中古車は24ヶ月で償却予定が作成される(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業体',
+        ]);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', function ($query): void {
+                $query->where('name', 'その他の預金');
+            })
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerUsedLightCar(
+            $fiscalYear,
+            $paymentSubAccount,
+            [
+                'name' => '10年落ちの軽自動車',
+                'first_registration_date' => '2015-10-03',
+                'acquisition_date' => '2025-10-03',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 0,
+            ],
+            [
+                'date' => '2025-10-03',
+                'description' => '10年落ちの軽自動車を購入',
+            ],
+        );
+
+        $entry = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->firstOrFail();
+
+        $this->assertSame(24, $fixedAsset->useful_life);
+        $this->assertSame(3, $entry->months);
+        $this->assertSame(150_000, $entry->ordinary_amount);
+        $this->assertSame(150_000, $entry->total_amount);
+        $this->assertSame(150_000, $entry->deductible_amount);
+    }
+
+    public static function usedVehicleUsefulLifeCases(): array
+    {
+        return [
+            '普通車_経過なし' => [
+                'registerUsedStandardCar',
+                FixedAsset::ASSET_CATEGORY_USED_STANDARD_CAR,
+                '2025-10-03',
+                72,
+            ],
+            '普通車_2年落ち' => [
+                'registerUsedStandardCar',
+                FixedAsset::ASSET_CATEGORY_USED_STANDARD_CAR,
+                '2023-10-03',
+                48,
+            ],
+            '普通車_3年落ち' => [
+                'registerUsedStandardCar',
+                FixedAsset::ASSET_CATEGORY_USED_STANDARD_CAR,
+                '2022-10-03',
+                36,
+            ],
+            '普通車_1年6ヶ月落ち' => [
+                'registerUsedStandardCar',
+                FixedAsset::ASSET_CATEGORY_USED_STANDARD_CAR,
+                '2024-04-03',
+                48,
+            ],
+            '普通車_2年未満の端数月は切り捨て' => [
+                'registerUsedStandardCar',
+                FixedAsset::ASSET_CATEGORY_USED_STANDARD_CAR,
+                '2023-10-20',
+                48,
+            ],
+            '普通車_10年落ち' => [
+                'registerUsedStandardCar',
+                FixedAsset::ASSET_CATEGORY_USED_STANDARD_CAR,
+                '2015-10-03',
+                24,
+            ],
+            '軽自動車_1年落ち' => [
+                'registerUsedLightCar',
+                FixedAsset::ASSET_CATEGORY_USED_LIGHT_CAR,
+                '2024-10-03',
+                36,
+            ],
+            '軽自動車_2年落ち' => [
+                'registerUsedLightCar',
+                FixedAsset::ASSET_CATEGORY_USED_LIGHT_CAR,
+                '2023-10-03',
+                24,
+            ],
+            '軽自動車_10年落ち' => [
+                'registerUsedLightCar',
+                FixedAsset::ASSET_CATEGORY_USED_LIGHT_CAR,
+                '2015-10-03',
+                24,
+            ],
+        ];
+    }
+
+    #[Test]
+    public function 過去年度取得の中古車を登録年度で登録すると簡便法耐用年数で当年度分の_entryだけ作成される()
+    {
+        // 2022年初度登録の中古普通車を2025年に50万円で購入し、
+        // 2025年度は Soler 管理外（別処理）で、2026年度から Soler で記帳するケース。
+        // 取得仕訳は当年度外なので作られず、簡便法耐用年数(36ヶ月)で2026年度分だけ作成される。
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+
+        // 2025年度は DB に作成しない（別処理を想定）
+        $fiscalYear2026 = $unit->createFiscalYear(2026, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($q) => $q->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerUsedStandardCar(
+            $fiscalYear2026,
+            $paymentSubAccount,
+            [
+                'name' => '中古の営業車',
+                'first_registration_date' => '2022-06-15',
+                'acquisition_date' => '2025-06-15',
+                'taxable_amount' => 500_000,
+                'tax_amount' => 0,
+            ],
+            ['date' => '2025-06-15', 'description' => '中古の営業車を購入（過去年度）'],
+            true,
+        );
+
+        // 簡便法: 経過36ヶ月 → (72 - 36 + 36 * 0.2) / 12 = 3.6 → 3年 = 36ヶ月
+        $this->assertSame(36, $fixedAsset->useful_life);
+
+        // 取得日(2025)が登録年度(2026)外なので取得仕訳は作られない
+        $this->assertSame(0, $fixedAsset->businessUnit->fiscalYears()
+            ->where('year', 2026)
+            ->first()
+            ->transactions()
+            ->count());
+
+        // 2025年度は DB に存在しないため、当年度(2026)分の Entry のみ
+        $this->assertSame(1, DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->count());
+
+        // 償却率 = ceil((12 / 36) * 1000) / 1000 = 0.334
+        // 年額 = round(500_000 * 0.334) = 167_000、2026年は12ヶ月
+        $this->assertDatabaseHas('depreciation_entries', [
+            'fixed_asset_id' => $fixedAsset->id,
+            'fiscal_year_id' => $fiscalYear2026->id,
+            'months' => 12,
+            'ordinary_amount' => 167_000,
+            'total_amount' => 167_000,
+            'deductible_amount' => 167_000,
         ]);
     }
 
