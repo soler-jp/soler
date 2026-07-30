@@ -217,10 +217,9 @@ class Transaction extends Model implements ResolvesBusinessUnit
         return self::BUSINESS_RATIO_STATE_MIXED;
     }
 
-    // TODO(actor-authorization): $user は操作主体なので、別コミットで $actor にリネームする。
-    public function deactivate(User $user, ?string $reason = null): void
+    public function deactivate(User $actor, ?string $reason = null): void
     {
-        $this->authorizeBusinessUnitAccess($this, $user, 'この取引を無効化する権限がありません。');
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この取引を無効化する権限がありません。');
 
         if (! $this->is_active) {
             return;
@@ -230,11 +229,11 @@ class Transaction extends Model implements ResolvesBusinessUnit
             throw new \InvalidArgumentException('決算済みの会計年度に属する取引は無効化できません。');
         }
 
-        DB::transaction(function () use ($user, $reason) {
+        DB::transaction(function () use ($actor, $reason) {
             $this->forceFill([
                 'is_active' => false,
                 'deactivated_at' => now(),
-                'deactivated_by' => $user->id,
+                'deactivated_by' => $actor->id,
                 'deactivation_reason' => $reason,
             ])->save();
         });

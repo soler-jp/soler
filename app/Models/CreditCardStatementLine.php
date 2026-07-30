@@ -117,13 +117,12 @@ class CreditCardStatementLine extends Model implements ResolvesBusinessUnit
         return $this->status === self::STATUS_UNREVIEWED;
     }
 
-    // TODO(actor-authorization): $user は操作主体なので、別コミットで $actor にリネームする。
     public function registerTransaction(
         array $attributes,
-        User $user,
+        User $actor,
     ): Transaction {
         $transaction = app(CreditCardStatementLineRegistrar::class)
-            ->register($this, $user, $attributes);
+            ->register($this, $actor, $attributes);
 
         $this->refresh();
 
@@ -131,11 +130,11 @@ class CreditCardStatementLine extends Model implements ResolvesBusinessUnit
     }
 
     public function cancelTransactionRegistration(
-        User $user,
+        User $actor,
         ?string $reason = null,
     ): void {
         app(CreditCardStatementLineRegistrar::class)
-            ->cancelRegistration($this, $user, $reason);
+            ->cancelRegistration($this, $actor, $reason);
 
         $this->refresh();
     }

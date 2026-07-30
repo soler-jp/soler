@@ -21,18 +21,17 @@ class CreditCardStatementLineRegistrar
         private readonly TransactionRegistrar $transactionRegistrar,
     ) {}
 
-    // TODO(actor-authorization): $user は操作主体なので、別コミットで $actor にリネームする。
-    public function register(CreditCardStatementLine $line, User $user, array $attributes): Transaction
+    public function register(CreditCardStatementLine $line, User $actor, array $attributes): Transaction
     {
         $validated = $this->validateRegisterAttributes($attributes);
 
-        return DB::transaction(function () use ($line, $user, $validated): Transaction {
+        return DB::transaction(function () use ($line, $actor, $validated): Transaction {
             $lockedLine = CreditCardStatementLine::query()
                 ->with(['statement.creditCard.businessUnit', 'importBatch'])
                 ->lockForUpdate()
                 ->findOrFail($line->getKey());
 
-            $this->authorizeUser($lockedLine, $user);
+            $this->authorizeActor($lockedLine, $actor);
             $this->ensureLineCanBeRegistered($lockedLine);
 
             $transactionDate = $this->resolveTransactionDate($lockedLine);
@@ -40,15 +39,15 @@ class CreditCardStatementLineRegistrar
 
             $transaction = $this->transactionRegistrar->register(
                 $fiscalYear,
-                $this->buildTransactionData($lockedLine, $user, $validated, $transactionDate),
+                $this->buildTransactionData($lockedLine, $actor, $validated, $transactionDate),
                 $this->buildJournalEntriesData($lockedLine, $validated),
-                $user,
+                $actor,
             );
 
             $lockedLine->forceFill([
                 'transaction_id' => $transaction->id,
                 'status' => CreditCardStatementLine::STATUS_REGISTERED,
-                'reviewed_by' => $user->id,
+                'reviewed_by' => $actor->id,
                 'reviewed_at' => now(),
                 'memo' => $validated['memo'] ?? $lockedLine->memo,
             ])->save();
@@ -57,25 +56,25 @@ class CreditCardStatementLineRegistrar
         }, attempts: 5);
     }
 
-    public function cancelRegistration(CreditCardStatementLine $line, User $user, ?string $reason = null): void
+    public function cancelRegistration(CreditCardStatementLine $line, User $actor, ?string $reason = null): void
     {
-        DB::transaction(function () use ($line, $user, $reason): void {
+        DB::transaction(function () use ($line, $actor, $reason): void {
             $lockedLine = CreditCardStatementLine::query()
                 ->with(['statement.creditCard.businessUnit', 'transaction.fiscalYear'])
                 ->lockForUpdate()
                 ->findOrFail($line->getKey());
 
-            $this->authorizeUser($lockedLine, $user);
+            $this->authorizeActor($lockedLine, $actor);
             $this->ensureLineCanBeCancelled($lockedLine);
 
             $cancelReason = $this->normalizeOptionalString($reason) ?? 'クレジットカード明細の登録取消';
 
-            $lockedLine->transaction->deactivate($user, $cancelReason);
+            $lockedLine->transaction->deactivate($actor, $cancelReason);
 
             $payload = [
                 'transaction_id' => null,
                 'status' => CreditCardStatementLine::STATUS_UNREVIEWED,
-                'reviewed_by' => $user->id,
+                'reviewed_by' => $actor->id,
                 'reviewed_at' => now(),
             ];
 
@@ -114,11 +113,11 @@ class CreditCardStatementLineRegistrar
         ])->validate();
     }
 
-    protected function authorizeUser(CreditCardStatementLine $line, User $user): void
+    protected function authorizeActor(CreditCardStatementLine $line, User $actor): void
     {
         $this->authorizeBusinessUnitAccess(
             $line,
-            $user,
+            $actor,
             'このクレジットカード明細を操作する権限がありません。',
         );
     }
