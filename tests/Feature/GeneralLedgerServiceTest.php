@@ -22,32 +22,28 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debitSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $creditSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         $registrar = new TransactionRegistrar;
 
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-10',
-                'description' => '開業資金の預け入れ',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-10',
+            'description' => '開業資金の預け入れ',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 100000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $debitSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 100000,
-                ],
-                [
-                    'sub_account_id' => $creditSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 100000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 100000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         $ledger = (new GeneralLedgerService)->generate($debitSubAccount->account, $fiscalYear);
 
@@ -68,7 +64,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
@@ -76,67 +72,55 @@ class GeneralLedgerServiceTest extends TestCase
         $registrar = new TransactionRegistrar;
 
         // 1件目：入金（借方）
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-10',
-                'description' => '資本金の預け入れ',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-10',
+            'description' => '資本金の預け入れ',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 100000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 100000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 100000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 100000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         // 2件目：支払い（貸方）
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-15',
-                'description' => '備品の購入',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-15',
+            'description' => '備品の購入',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 30000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 30000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 30000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 30000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         // 3件目：再入金（借方）
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-20',
-                'description' => '追加出資',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-20',
+            'description' => '追加出資',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 50000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 50000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 50000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 50000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         $ledger = (new GeneralLedgerService)->generate($cashSubAccount->account, $fiscalYear);
 
@@ -167,7 +151,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
@@ -176,46 +160,38 @@ class GeneralLedgerServiceTest extends TestCase
 
         // 2件とも cash/owner を使った複式仕訳
         // 1件目
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-05',
-                'description' => '最初の出資',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-05',
+            'description' => '最初の出資',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 50000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 50000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 50000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 50000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         // 2件目
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-10',
-                'description' => '追加出資',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-10',
+            'description' => '追加出資',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 80000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 80000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 80000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 80000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         // 事業主借のLedgerだけを生成
         $ledger = (new GeneralLedgerService)->generate($ownerSubAccount->account, $fiscalYear);
@@ -242,52 +218,44 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => '無効化元帳テスト',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         $registrar = new TransactionRegistrar;
 
-        $activeTransaction = $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-10',
-                'description' => '有効な取引',
+        $activeTransaction = $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-10',
+            'description' => '有効な取引',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 100000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 100000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 100000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 100000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
-        $inactiveTransaction = $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-15',
-                'description' => '削除済み取引',
+        $inactiveTransaction = $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-15',
+            'description' => '削除済み取引',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 30000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 30000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 30000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 30000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         $inactiveTransaction->deactivate($user, '誤登録');
 
@@ -311,53 +279,45 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => '予定取引元帳テスト',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         $registrar = new TransactionRegistrar;
 
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-10',
-                'description' => '実績の取引',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-10',
+            'description' => '実績の取引',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 100000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 100000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 100000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 100000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-15',
-                'description' => '予定の取引',
-                'is_planned' => true,
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-15',
+            'description' => '予定の取引',
+            'is_planned' => true,
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 30000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 30000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 30000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 30000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         $ledger = (new GeneralLedgerService)->generate($cashSubAccount->account, $fiscalYear);
 
@@ -378,53 +338,45 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => '予定取引補助科目元帳テスト',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         $registrar = new TransactionRegistrar;
 
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-10',
-                'description' => '実績の取引',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-10',
+            'description' => '実績の取引',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 50000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 50000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 50000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 50000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-15',
-                'description' => '予定の取引',
-                'is_planned' => true,
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-15',
+            'description' => '予定の取引',
+            'is_planned' => true,
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 20000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 20000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 20000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 20000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         $ledger = (new GeneralLedgerService)->generateForSubAccount($cashSubAccount, $fiscalYear);
 
@@ -445,53 +397,45 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => '予定取引出納帳テスト',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('現金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         $registrar = new TransactionRegistrar;
 
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-05',
-                'description' => '実績の現金入金',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-05',
+            'description' => '実績の現金入金',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 30000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 30000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 30000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 30000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-10',
-                'description' => '予定の現金支出',
-                'is_planned' => true,
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-10',
+            'description' => '予定の現金支出',
+            'is_planned' => true,
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 10000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 10000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 10000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 10000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         $cashbook = (new GeneralLedgerService)->generateCashbook($fiscalYear);
 
@@ -512,8 +456,8 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $fiscal2024 = $unit->createFiscalYear(2024);
-        $fiscal2025 = $unit->createFiscalYear(2025);
+        $fiscal2024 = $unit->createFiscalYear(2024, $user);
+        $fiscal2025 = $unit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
         $ownerSubAccount = $unit->getAccountByName('事業主借')->subAccounts()->first();
@@ -521,46 +465,38 @@ class GeneralLedgerServiceTest extends TestCase
         $registrar = new TransactionRegistrar;
 
         // 2024年度の取引（含まれないべき）
-        $registrar->register(
-            fiscalYear: $fiscal2024,
-            transactionData: [
-                'date' => '2024-12-31',
-                'description' => '前年の入金',
+        $registrar->register(fiscalYear: $fiscal2024, transactionData: [
+            'date' => '2024-12-31',
+            'description' => '前年の入金',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 10000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 10000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 10000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 10000,
+            ],
+        ], actor: $fiscal2024->businessUnit->user);
 
         // 2025年度の取引（含まれるべき）
-        $registrar->register(
-            fiscalYear: $fiscal2025,
-            transactionData: [
-                'date' => '2025-01-01',
-                'description' => '今年の入金',
+        $registrar->register(fiscalYear: $fiscal2025, transactionData: [
+            'date' => '2025-01-01',
+            'description' => '今年の入金',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 50000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 50000,
-                ],
-                [
-                    'sub_account_id' => $ownerSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 50000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $ownerSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 50000,
+            ],
+        ], actor: $fiscal2025->businessUnit->user);
 
         $ledger = (new GeneralLedgerService)->generate($cashSubAccount->account, $fiscal2025);
 
@@ -581,7 +517,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $subAccount = $unit->getAccountByName('その他の預金')->subAccounts()->first();
 
@@ -599,7 +535,7 @@ class GeneralLedgerServiceTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $account = $unit->getAccountByName('現金');
         $subAccountA = $account->subAccounts()->create(['name' => 'レジ2']);
@@ -610,46 +546,38 @@ class GeneralLedgerServiceTest extends TestCase
         $registrar = new TransactionRegistrar;
 
         // レジ（対象）
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-01',
-                'description' => 'レジに入金',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-01',
+            'description' => 'レジに入金',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $subAccountA->id,
+                'type' => 'debit',
+                'net_amount' => 10000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $subAccountA->id,
-                    'type' => 'debit',
-                    'net_amount' => 10000,
-                ],
-                [
-                    'sub_account_id' => $otherSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 10000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $otherSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 10000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         // 金庫（除外対象）
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-02',
-                'description' => '金庫に入金',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-02',
+            'description' => '金庫に入金',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $subAccountB->id,
+                'type' => 'debit',
+                'net_amount' => 5000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $subAccountB->id,
-                    'type' => 'debit',
-                    'net_amount' => 5000,
-                ],
-                [
-                    'sub_account_id' => $otherSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 5000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $otherSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 5000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         $ledger = (new GeneralLedgerService)->generateForSubAccount($subAccountA, $fiscalYear);
 
@@ -670,7 +598,7 @@ class GeneralLedgerServiceTest extends TestCase
             'name' => 'テスト事業',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashAccount = $unit->getAccountByName('現金');
         $cashSubAccount = $cashAccount->subAccounts()->first();
@@ -680,46 +608,38 @@ class GeneralLedgerServiceTest extends TestCase
         $registrar = new TransactionRegistrar;
 
         // 1. 現金が借方
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-05',
-                'description' => '現金の出資',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-05',
+            'description' => '現金の出資',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 30000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 30000,
-                ],
-                [
-                    'sub_account_id' => $otherSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 30000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $otherSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 30000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         // 2. 現金が貸方
-        $registrar->register(
-            fiscalYear: $fiscalYear,
-            transactionData: [
-                'date' => '2025-01-10',
-                'description' => '現金支出',
+        $registrar->register(fiscalYear: $fiscalYear, transactionData: [
+            'date' => '2025-01-10',
+            'description' => '現金支出',
+        ], journalEntriesData: [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 10000,
             ],
-            journalEntriesData: [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 10000,
-                ],
-                [
-                    'sub_account_id' => $otherSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 10000,
-                ],
-            ]
-        );
+            [
+                'sub_account_id' => $otherSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 10000,
+            ],
+        ], actor: $fiscalYear->businessUnit->user);
 
         $cashbook = (new GeneralLedgerService)->generateCashbook($fiscalYear);
 

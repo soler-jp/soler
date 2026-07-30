@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use Database\Factories\BlueReturnInputFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class BlueReturnInput extends Model
+class BlueReturnInput extends Model implements ResolvesBusinessUnit
 {
     public const KEY_FAMILY_EMPLOYEE_SALARIES = 'family_employee_salaries';
 
@@ -34,6 +35,13 @@ class BlueReturnInput extends Model
     public function fiscalYear(): BelongsTo
     {
         return $this->belongsTo(FiscalYear::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('fiscalYear.businessUnit');
+
+        return $this->fiscalYear->businessUnit;
     }
 
     public function isFamilyEmployeeSalaries(): bool

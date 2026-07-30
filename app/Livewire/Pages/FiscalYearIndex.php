@@ -73,7 +73,7 @@ class FiscalYearIndex extends Component
 
         $fiscalYear = $businessUnit->fiscalYears()->findOrFail($fiscalYearId);
 
-        $businessUnit->activateFiscalYear($fiscalYear);
+        $businessUnit->activateFiscalYear($fiscalYear, auth()->user());
 
         $this->noticeMessage = sprintf('%d年度を表示中に切り替えました。', $fiscalYear->year);
     }
@@ -191,13 +191,14 @@ class FiscalYearIndex extends Component
         try {
             $nextFiscalYear = $businessUnit->createNextFiscalYearFrom(
                 $closedFiscalYear,
+                auth()->user(),
                 isTaxable: $this->nextYearIsTaxable,
                 isTaxExclusive: $this->nextYearIsTaxExclusive,
             );
 
-            app(FiscalYearRollover::class)->rollover($closedFiscalYear->refresh(), $nextFiscalYear);
+            app(FiscalYearRollover::class)->rollover($closedFiscalYear->refresh(), $nextFiscalYear, auth()->user());
 
-            $businessUnit->activateFiscalYear($nextFiscalYear);
+            $businessUnit->activateFiscalYear($nextFiscalYear, auth()->user());
 
             $this->noticeMessage = sprintf(
                 '%d年度を繰越データで作成し、表示中に切り替えました。',

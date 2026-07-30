@@ -17,15 +17,15 @@ class FiscalYearPageTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '年度管理テスト事業']);
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
         $fiscalYear2025->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
         ]);
         $fiscalYear2025->close($user);
 
-        $fiscalYear2024 = $unit->createFiscalYear(2024);
-        $unit->activateFiscalYear($fiscalYear2024);
+        $fiscalYear2024 = $unit->createFiscalYear(2024, $user);
+        $unit->activateFiscalYear($fiscalYear2024, $user);
 
         $response = $this->actingAs($user)->get(route('fiscal-years.index'));
 

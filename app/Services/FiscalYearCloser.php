@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\FiscalYear;
 use App\Models\Transaction;
 use App\Models\User;
@@ -10,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class FiscalYearCloser
 {
+    use AuthorizesBusinessUnitAccess;
+
     /**
      * 会計年度を締める前の検証結果を返す。
      *
@@ -69,6 +72,8 @@ class FiscalYearCloser
 
     public function close(FiscalYear $fiscalYear, User $user): FiscalYear
     {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $user, 'この会計年度を決算する権限がありません。');
+
         return DB::transaction(function () use ($fiscalYear, $user): FiscalYear {
             $lockedFiscalYear = FiscalYear::query()
                 ->with('businessUnit')

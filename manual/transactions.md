@@ -361,6 +361,15 @@ app(TransactionRegistrar::class)->register(
 
 この場合は、8% と 10% の経費を別の仕訳明細として登録します。
 
+## クレジットカード取込由来の取引について
+
+クレジットカード明細CSVの取込は、通常の `Transaction` 登録とは別レイヤーで扱います。
+
+- 明細取込の流れや `CreditCard` / `CreditCardStatement` / parser の使い方は `manual/credit-card-imports.md` を参照してください
+- 明細取込の流れや `CreditCard` / `CreditCardStatement` / parser の使い方は `manual/credit-cards.md` を参照してください
+- クレジットカード取込由来の `Transaction` は、明細レビュー後に作成されます
+- クレジットカード取込由来取引は、この後述の「登録済み仕訳を修正する」対象外です
+
 
 
 ## 登録済み仕訳を修正する

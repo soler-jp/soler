@@ -2,15 +2,19 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\Account;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\Transaction;
+use App\Models\User;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 class OpeningEntryRegistrar
 {
+    use AuthorizesBusinessUnitAccess;
+
     private const DESCRIPTION = '期首残高設定';
 
     /**
@@ -24,8 +28,10 @@ class OpeningEntryRegistrar
         '棚卸資産',
     ];
 
-    public function register(FiscalYear $fiscalYear, array $entries): ?Transaction
+    public function register(FiscalYear $fiscalYear, array $entries, User $actor): ?Transaction
     {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度に期首仕訳を登録する権限がありません。');
+
         if ($entries === []) {
             return null;
         }
@@ -34,7 +40,7 @@ class OpeningEntryRegistrar
             throw new DomainException('この会計年度にはすでに期首仕訳が登録されています。');
         }
 
-        return DB::transaction(function () use ($fiscalYear, $entries): Transaction {
+        return DB::transaction(function () use ($fiscalYear, $entries, $actor): Transaction {
             $transactionData = [
                 'date' => $fiscalYear->start_date,
                 'description' => self::DESCRIPTION,
@@ -64,7 +70,7 @@ class OpeningEntryRegistrar
                 'net_amount' => $totalAmount,
             ];
 
-            return $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
+            return $fiscalYear->registerTransaction($transactionData, $journalEntriesData, $actor);
         });
     }
 
@@ -74,8 +80,10 @@ class OpeningEntryRegistrar
      * @param  array<int, array{account_name: string, sub_account_name: string, amount: int, type: 'debit'|'credit'}>  $entries
      * @param  array{account_name: string, sub_account_name: string, amount: int, type: 'debit'|'credit'}  $capitalEntry
      */
-    public function registerForRollover(FiscalYear $fiscalYear, array $entries, array $capitalEntry): ?Transaction
+    public function registerForRollover(FiscalYear $fiscalYear, array $entries, array $capitalEntry, User $actor): ?Transaction
     {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度に期首仕訳を登録する権限がありません。');
+
         if ($entries === [] && (int) $capitalEntry['amount'] === 0) {
             return null;
         }
@@ -84,7 +92,7 @@ class OpeningEntryRegistrar
             throw new DomainException('この会計年度にはすでに期首仕訳が登録されています。');
         }
 
-        return DB::transaction(function () use ($fiscalYear, $entries, $capitalEntry): Transaction {
+        return DB::transaction(function () use ($fiscalYear, $entries, $capitalEntry, $actor): Transaction {
             $transactionData = [
                 'date' => $fiscalYear->start_date,
                 'description' => self::DESCRIPTION,
@@ -102,7 +110,7 @@ class OpeningEntryRegistrar
                 $journalEntriesData[] = $this->buildCapitalEntry($fiscalYear, $capitalEntry);
             }
 
-            return $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
+            return $fiscalYear->registerTransaction($transactionData, $journalEntriesData, $actor);
         });
     }
 

@@ -28,7 +28,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '青色申告テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $sales = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
@@ -60,7 +60,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 50_000,
                 'tax_amount' => 5_000,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-02-10',
@@ -78,7 +78,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 20_000,
                 'tax_amount' => 2_000,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-03-10',
@@ -96,7 +96,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 30_000,
                 'tax_amount' => 3_000,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-04-01',
@@ -114,7 +114,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 10_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-05-01',
@@ -132,7 +132,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 20_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-06-01',
@@ -150,7 +150,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 5_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-07-01',
@@ -168,7 +168,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 1_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-08-01',
@@ -186,7 +186,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 1_800,
                 'tax_amount' => 200,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-09-01',
@@ -204,7 +204,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 3_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-10-01',
@@ -222,7 +222,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 4_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-11-01',
@@ -240,7 +240,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 5_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-12-01',
@@ -258,7 +258,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 6_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         $plannedTransaction = Transaction::factory()->create([
             'fiscal_year_id' => $fiscalYear->id,
@@ -318,21 +318,21 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '任意科目テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $sales = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
         $meetingExpense = $businessUnit->createAccount([
             'name' => '会議費',
             'type' => Account::TYPE_EXPENSE,
-        ])
+        ], $businessUnit->user)
             ->subAccounts()
             ->firstOrFail();
 
         $bookExpense = $businessUnit->createAccount([
             'name' => '新聞図書費',
             'type' => Account::TYPE_EXPENSE,
-        ])
+        ], $businessUnit->user)
             ->subAccounts()
             ->firstOrFail();
 
@@ -350,7 +350,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'type' => 'credit',
                 'gross_amount' => 50_000,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-02-10',
@@ -366,7 +366,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'type' => 'credit',
                 'gross_amount' => 12_000,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-03-10',
@@ -382,7 +382,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'type' => 'credit',
                 'gross_amount' => 8_000,
             ],
-        ]);
+        ], $user);
 
         $statement = app(BlueReturnStatementCalculator::class)->calculate($fiscalYear, 0);
         $profitAndLoss = $statement['profit_and_loss'];
@@ -409,7 +409,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '任意科目超過テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $sales = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
@@ -428,13 +428,13 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'type' => 'credit',
                 'gross_amount' => 100_000,
             ],
-        ]);
+        ], $user);
 
         for ($index = 1; $index <= 7; $index++) {
             $expenseSubAccount = $businessUnit->createAccount([
                 'name' => "追加費用{$index}",
                 'type' => Account::TYPE_EXPENSE,
-            ])
+            ], $businessUnit->user)
                 ->subAccounts()
                 ->firstOrFail();
 
@@ -452,7 +452,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                     'type' => 'credit',
                     'gross_amount' => 1_000,
                 ],
-            ]);
+            ], $user);
         }
 
         $this->expectException(\RuntimeException::class);
@@ -469,7 +469,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '月別集計テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $sales = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
@@ -493,7 +493,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 10_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-01-20',
@@ -511,7 +511,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 5_000,
                 'tax_amount' => 500,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-01-25',
@@ -529,7 +529,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 1_000,
                 'tax_amount' => 100,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-02-10',
@@ -547,7 +547,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 20_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-02-20',
@@ -565,7 +565,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 3_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-02-28',
@@ -583,7 +583,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 2_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-03-10',
@@ -601,7 +601,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'net_amount' => 40_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         $outOfPeriodTransaction = Transaction::factory()->create([
             'fiscal_year_id' => $fiscalYear->id,
@@ -711,7 +711,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '減価償却明細テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $assetSubAccount = $businessUnit->subAccounts()
             ->whereHas('account', function ($query): void {
@@ -746,7 +746,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         );
 
         $entry = DepreciationEntry::where('fixed_asset_id', $fixedAsset->id)->firstOrFail();
-        app(DepreciationService::class)->registerTransactionFor($entry);
+        app(DepreciationService::class)->registerTransactionFor($entry, $user);
 
         $statement = app(BlueReturnStatementCalculator::class)->calculate($fiscalYear, 0);
         $depreciation = $statement['depreciation_calculation'];
@@ -783,8 +783,8 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '減価償却明細パターンテスト',
         ]);
-        $fiscalYear2023 = $businessUnit->createFiscalYear(2023);
-        $fiscalYear2024 = $businessUnit->createFiscalYear(2024);
+        $fiscalYear2023 = $businessUnit->createFiscalYear(2023, $user);
+        $fiscalYear2024 = $businessUnit->createFiscalYear(2024, $user);
 
         $assetSubAccount = $businessUnit->subAccounts()
             ->whereHas('account', function ($query): void {
@@ -863,8 +863,8 @@ class BlueReturnStatementCalculatorTest extends TestCase
             ->where('fiscal_year_id', $fiscalYear2024->id)
             ->firstOrFail();
 
-        app(DepreciationService::class)->registerTransactionFor($currentYearEntry);
-        app(DepreciationService::class)->registerTransactionFor($pastYearEntry);
+        app(DepreciationService::class)->registerTransactionFor($currentYearEntry, $user);
+        app(DepreciationService::class)->registerTransactionFor($pastYearEntry, $user);
 
         $statement = app(BlueReturnStatementCalculator::class)->calculate($fiscalYear2024, 0);
         $depreciation = $statement['depreciation_calculation'];
@@ -901,7 +901,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '貸借対照表変換テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $deposit = $businessUnit->getAccountByName('その他の預金')->subAccounts()->firstOrFail();
@@ -926,7 +926,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
             'sub_account_name' => '元入金',
             'type' => 'credit',
             'amount' => 70_000,
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-04-01',
@@ -942,7 +942,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'type' => 'credit',
                 'gross_amount' => 1100,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-04-02',
@@ -958,7 +958,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'type' => 'credit',
                 'gross_amount' => 2200,
             ],
-        ]);
+        ], $user);
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-04-03',
@@ -974,7 +974,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                 'type' => 'credit',
                 'gross_amount' => 500,
             ],
-        ]);
+        ], $user);
 
         $statement = app(BlueReturnStatementCalculator::class)->calculate($fiscalYear, 0);
         $balanceSheet = $statement['balance_sheet'];
@@ -1043,7 +1043,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '青果小売業',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
 
@@ -1093,7 +1093,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                     'net_amount' => $amount,
                     'tax_amount' => 0,
                 ],
-            ]);
+            ], $user);
         }
 
         foreach ($debitEntries as $accountName => $amount) {
@@ -1114,7 +1114,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
                     'net_amount' => $amount,
                     'tax_amount' => 0,
                 ],
-            ]);
+            ], $user);
         }
 
         $statement = $fiscalYear->calculateBlueReturnStatement(650_000);
@@ -1174,7 +1174,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => '青色申告テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $this->expectException(\InvalidArgumentException::class);
 

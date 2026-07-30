@@ -8,6 +8,7 @@ use App\Models\CreditCard;
 use App\Models\FixedAsset;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
@@ -228,9 +229,9 @@ class BusinessUnitTest extends TestCase
             'name' => 'テスト事業体',
         ]);
 
-        $fiscal2024 = $unit->createFiscalYear(2024);
+        $fiscal2024 = $unit->createFiscalYear(2024, $user);
 
-        $fiscal2025 = $unit->createFiscalYear(2025);
+        $fiscal2025 = $unit->createFiscalYear(2025, $user);
 
         $unit->update([
             'current_fiscal_year_id' => $fiscal2025->id,
@@ -241,6 +242,48 @@ class BusinessUnitTest extends TestCase
     }
 
     #[Test]
+    public function current_fiscal_yearを保持した事業体も関連取引ごと削除できる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '削除テスト事業体']);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
+
+        $cashSubAccount = $businessUnit->getAccountByName('現金')?->subAccounts()->firstOrFail();
+        $salesSubAccount = $businessUnit->getAccountByName('売上高')?->subAccounts()->firstOrFail();
+
+        $this->assertNotNull($cashSubAccount);
+        $this->assertNotNull($salesSubAccount);
+
+        $transaction = $fiscalYear->registerTransaction(
+            [
+                'date' => '2025-01-01',
+                'description' => '削除連鎖テスト',
+            ],
+            [
+                [
+                    'sub_account_id' => $cashSubAccount->id,
+                    'type' => 'debit',
+                    'net_amount' => 1000,
+                    'tax_amount' => 0,
+                ],
+                [
+                    'sub_account_id' => $salesSubAccount->id,
+                    'type' => 'credit',
+                    'net_amount' => 1000,
+                    'tax_amount' => 0,
+                ],
+            ],
+            $user
+        );
+
+        $businessUnit->delete();
+
+        $this->assertModelMissing($businessUnit);
+        $this->assertModelMissing($fiscalYear);
+        $this->assertModelMissing($transaction);
+    }
+
+    #[Test]
     public function fixed_assetsの一覧と償却中一覧を取得できる(): void
     {
         $user = User::factory()->create();
@@ -248,7 +291,7 @@ class BusinessUnitTest extends TestCase
             'name' => '固定資産テスト事業体',
         ]);
 
-        $unit->createFiscalYear(2031);
+        $unit->createFiscalYear(2031, $user);
 
         $assetAccount = $unit->getAccountByName('車両運搬具');
         $this->assertNotNull($assetAccount);
@@ -280,7 +323,7 @@ class BusinessUnitTest extends TestCase
         ]);
 
         $allFixedAssets = $unit->allFixedAssets();
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
         $depreciatingFixedAssets = $unit->depreciatingFixedAssets($fiscalYear2025);
 
         $this->assertSame(
@@ -299,9 +342,9 @@ class BusinessUnitTest extends TestCase
         $user = User::factory()->create();
         $businessUnit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
 
-        $fiscalYear2025 = $businessUnit->createFiscalYear(2025);
+        $fiscalYear2025 = $businessUnit->createFiscalYear(2025, $user);
 
-        $businessUnit->setCurrentFiscalYear($fiscalYear2025);
+        $businessUnit->setCurrentFiscalYear($fiscalYear2025, $user);
 
         $this->assertEquals($fiscalYear2025->id, $businessUnit->current_fiscal_year_id);
         $this->assertTrue($businessUnit->currentFiscalYear->is($fiscalYear2025));
@@ -312,10 +355,10 @@ class BusinessUnitTest extends TestCase
     {
         $user = User::factory()->create();
         $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '切替テスト事業体']);
-        $fiscalYear2024 = $businessUnit->createFiscalYear(2024);
-        $fiscalYear2025 = $businessUnit->createFiscalYear(2025);
+        $fiscalYear2024 = $businessUnit->createFiscalYear(2024, $user);
+        $fiscalYear2025 = $businessUnit->createFiscalYear(2025, $user);
 
-        $businessUnit->activateFiscalYear($fiscalYear2025);
+        $businessUnit->activateFiscalYear($fiscalYear2025, $user);
 
         $businessUnit->refresh();
 
@@ -329,13 +372,13 @@ class BusinessUnitTest extends TestCase
     {
         $user = User::factory()->create();
         $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '翌年度作成テスト事業体']);
-        $fiscalYear2025 = $businessUnit->createFiscalYear(2025);
+        $fiscalYear2025 = $businessUnit->createFiscalYear(2025, $user);
         $fiscalYear2025->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
         ]);
 
-        $nextFiscalYear = $businessUnit->createNextFiscalYearFrom($fiscalYear2025);
+        $nextFiscalYear = $businessUnit->createNextFiscalYearFrom($fiscalYear2025, $user);
 
         $this->assertSame(2026, $nextFiscalYear->year);
         $this->assertTrue((bool) $nextFiscalYear->is_taxable);
@@ -347,7 +390,7 @@ class BusinessUnitTest extends TestCase
     {
         $user = User::factory()->create();
         $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '翌年度税設定上書きテスト事業体']);
-        $fiscalYear2025 = $businessUnit->createFiscalYear(2025);
+        $fiscalYear2025 = $businessUnit->createFiscalYear(2025, $user);
         $fiscalYear2025->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
@@ -355,6 +398,7 @@ class BusinessUnitTest extends TestCase
 
         $nextFiscalYear = $businessUnit->createNextFiscalYearFrom(
             $fiscalYear2025,
+            $user,
             isTaxable: false,
             isTaxExclusive: false,
         );
@@ -382,7 +426,21 @@ class BusinessUnitTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
 
-        $unitA->setCurrentFiscalYear($foreignFiscalYear);
+        $unitA->setCurrentFiscalYear($foreignFiscalYear, $userA);
+    }
+
+    #[Test]
+    public function 他ユーザーはcurrent_fiscal_yearを設定できない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '年度選択認可テスト']);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この事業体の現在の会計年度を変更する権限がありません。');
+
+        $businessUnit->setCurrentFiscalYear($fiscalYear, $otherUser);
     }
 
     #[Test]
@@ -391,7 +449,7 @@ class BusinessUnitTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '初期事業体']);
 
-        $fiscal = $unit->createFiscalYear(2025);
+        $fiscal = $unit->createFiscalYear(2025, $user);
 
         $this->assertTrue($unit->currentFiscalYear->is($fiscal));
     }
@@ -402,13 +460,13 @@ class BusinessUnitTest extends TestCase
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
 
-        $fiscal2024 = $unit->createFiscalYear(2024);
+        $fiscal2024 = $unit->createFiscalYear(2024, $user);
 
         // 既にcurrentFiscalYearが設定されている
-        $unit->setCurrentFiscalYear($fiscal2024);
+        $unit->setCurrentFiscalYear($fiscal2024, $user);
 
         // 新しい年度を作成してもcurrentFiscalYearは変わらない
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
 
         $this->assertTrue($unit->currentFiscalYear->is($fiscal2024));
     }
@@ -469,7 +527,7 @@ class BusinessUnitTest extends TestCase
         $account = $businessUnit->createAccount([
             'name' => '仮払金',
             'type' => 'asset',
-        ]);
+        ], $businessUnit->user);
 
         $this->assertDatabaseHas('accounts', [
             'id' => $account->id,
@@ -489,12 +547,30 @@ class BusinessUnitTest extends TestCase
             'name' => 'カスタム勘定科目テスト事業所',
         ]);
 
-        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費');
+        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $user);
 
         $this->assertSame('会議費', $account->name);
         $this->assertSame(Account::TYPE_EXPENSE, $account->type);
         $this->assertCount(1, $account->subAccounts);
         $this->assertSame('会議費', $account->subAccounts->first()->name);
+    }
+
+    #[Test]
+    public function create_accountは他人の事業体には追加できない(): void
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $businessUnit = $owner->createBusinessUnitWithDefaults([
+            'name' => '認可テスト事業所',
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+
+        $businessUnit->createAccount([
+            'name' => '会議費',
+            'type' => Account::TYPE_EXPENSE,
+        ], $otherUser);
     }
 
     #[Test]
@@ -505,7 +581,7 @@ class BusinessUnitTest extends TestCase
             'name' => 'カスタム補助科目テスト事業所',
         ]);
 
-        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', '役員会議');
+        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', '役員会議', $user);
 
         $this->assertSame('会議費', $account->name);
         $this->assertCount(1, $account->subAccounts);
@@ -520,12 +596,40 @@ class BusinessUnitTest extends TestCase
             'name' => '重複勘定科目テスト事業所',
         ]);
 
-        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費');
+        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $user);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('同名の勘定科目は既に存在します。');
 
-        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費');
+        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $user);
+    }
+
+    #[Test]
+    public function add_custom_accountは他人の事業体には追加できない(): void
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $businessUnit = $owner->createBusinessUnitWithDefaults([
+            'name' => '認可テスト事業所',
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+
+        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $otherUser);
+    }
+
+    #[Test]
+    public function add_custom_accountはnullを渡すと同名の補助科目を作成する(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'null補助科目テスト事業所',
+        ]);
+
+        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $user);
+
+        $this->assertSame('会議費', $account->subAccounts->first()->name);
     }
 
     #[Test]
@@ -575,18 +679,18 @@ class BusinessUnitTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業所',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cashAccount = $businessUnit->getAccountByName('現金');
         $bankAccount = $businessUnit->getAccountByName('その他の預金');
         $privateAccount = $businessUnit->getAccountByName('事業主借');
         $liabilityAccount = $businessUnit->getAccountByName('未払金');
 
-        $cashAccount?->createSubAccount(['name' => '金庫現金']);
-        $bankA = $bankAccount?->createSubAccount(['name' => 'XX銀行']);
-        $bankB = $bankAccount?->createSubAccount(['name' => 'OO銀行']);
-        $privateAccount?->createSubAccount(['name' => '家族立替']);
-        $cardLiability = $liabilityAccount?->createSubAccount(['name' => 'Amex Business']);
+        $cashAccount?->createSubAccount(['name' => '金庫現金'], $user);
+        $bankA = $bankAccount?->createSubAccount(['name' => 'XX銀行'], $user);
+        $bankB = $bankAccount?->createSubAccount(['name' => 'OO銀行'], $user);
+        $privateAccount?->createSubAccount(['name' => '家族立替'], $user);
+        $cardLiability = $liabilityAccount?->createSubAccount(['name' => 'Amex Business'], $user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-01-15',
@@ -602,7 +706,7 @@ class BusinessUnitTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-01-20',
@@ -618,7 +722,7 @@ class BusinessUnitTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 2000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $businessCard = CreditCard::factory()->create([
             'business_unit_id' => $businessUnit->id,
@@ -705,7 +809,7 @@ class BusinessUnitTest extends TestCase
         ]);
 
         $cashAccount = $businessUnit->getAccountByName('現金');
-        $cashSubAccount = $cashAccount?->createSubAccount(['name' => '金庫現金']);
+        $cashSubAccount = $cashAccount?->createSubAccount(['name' => '金庫現金'], $user);
 
         $sources = $businessUnit->availableCreditSources();
 
@@ -726,7 +830,7 @@ class BusinessUnitTest extends TestCase
         ]);
 
         $bankAccount = $businessUnit->getAccountByName('その他の預金');
-        $bankSubAccount = $bankAccount?->createSubAccount(['name' => 'XX銀行']);
+        $bankSubAccount = $bankAccount?->createSubAccount(['name' => 'XX銀行'], $user);
 
         $sources = $businessUnit->availableCreditSources();
 

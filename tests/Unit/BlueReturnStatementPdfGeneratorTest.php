@@ -13,6 +13,10 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const FROM_2020_SOURCE_PDF_URL = 'https://www.nta.go.jp/taxes/shiraberu/shinkoku/yoshiki/01/shinkokusho/pdf/r03/10.pdf';
+
+    private const TAX_RETURN_FORM_INDEX_URL = 'https://www.nta.go.jp/taxes/shiraberu/shinkoku/yoshiki/01/shinkokusho/r06.htm';
+
     #[Test]
     public function test_blank_pdf_has_four_pages(): void
     {
@@ -21,7 +25,7 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'PDF基盤テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $pdf = $generator->generate($fiscalYear, 650000);
 
@@ -37,7 +41,7 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'PDF基盤テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $pdf = $fiscalYear->generateBlueReturnStatementPdf(650000);
 
@@ -53,7 +57,7 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'PDF基盤テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $pdf = $generator->generate($fiscalYear, 650000, [
             'filing_number' => '12345678',
@@ -78,12 +82,14 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
     #[Test]
     public function test_from2020_template_generates_pdf(): void
     {
+        $this->skipIfFrom2020BackgroundsAreUnavailable();
+
         $generator = app(BlueReturnStatementPdfGenerator::class);
         $user = User::factory()->create();
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'PDF基盤テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2022);
+        $fiscalYear = $businessUnit->createFiscalYear(2022, $user);
 
         $pdf = $generator->generate($fiscalYear, 650000);
 
@@ -100,7 +106,7 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults([
             'name' => 'PDF基盤テスト',
         ]);
-        $fiscalYear = $businessUnit->createFiscalYear(2019);
+        $fiscalYear = $businessUnit->createFiscalYear(2019, $user);
 
         $this->expectException(InvalidArgumentException::class);
 
@@ -119,5 +125,24 @@ class BlueReturnStatementPdfGeneratorTest extends TestCase
         $pdf = $document->Output('', 'S');
 
         $this->assertNotSame('', $pdf);
+    }
+
+    private function skipIfFrom2020BackgroundsAreUnavailable(): void
+    {
+        foreach (range(1, 4) as $page) {
+            $backgroundPath = resource_path("blue-return/templates/from2020/background/page{$page}.png");
+
+            if (is_file($backgroundPath)) {
+                continue;
+            }
+
+            $this->markTestSkipped(
+                'from2020 用の背景 PNG はリポジトリに含めていません。'
+                    .' 国税庁の「所得税青色申告決算書（一般用）〖令和2年分以降用〗」PDF から背景PNGを作成して、'
+                    .' `resources/blue-return/templates/from2020/background/` に配置してください。'
+                    .' 取得元: '.self::FROM_2020_SOURCE_PDF_URL
+                    .' / 一覧ページ: '.self::TAX_RETURN_FORM_INDEX_URL
+            );
+        }
     }
 }

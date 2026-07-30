@@ -36,15 +36,15 @@ class DashboardMonthlyAccountTypePanelTest extends TestCase
                 'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
                 'type' => 'debit',
                 'net_amount' => 11000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $unit->getAccountByName('売上高')->subAccounts()->firstOrFail()->id,
                 'type' => 'credit',
                 'net_amount' => 11000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-02-20',
@@ -54,15 +54,15 @@ class DashboardMonthlyAccountTypePanelTest extends TestCase
                 'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
                 'type' => 'debit',
                 'net_amount' => 22000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $unit->getAccountByName('売上高')->subAccounts()->firstOrFail()->id,
                 'type' => 'credit',
                 'net_amount' => 22000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         Livewire::actingAs($user)
             ->test(MonthlyAccountTypePanel::class, [
@@ -102,15 +102,15 @@ class DashboardMonthlyAccountTypePanelTest extends TestCase
                 'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
                 'type' => 'debit',
                 'net_amount' => 15000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $unit->getAccountByName('売上高')->subAccounts()->firstOrFail()->id,
                 'type' => 'credit',
                 'net_amount' => 15000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         Livewire::actingAs($user)
             ->test(MonthlyTransactionTable::class, [
@@ -123,7 +123,7 @@ class DashboardMonthlyAccountTypePanelTest extends TestCase
             ->assertSee('2025-03-15')
             ->assertSee('15,000')
             ->assertSee('現金')
-            ->assertSee('非課税')
+            ->assertSee('不課税')
             ->assertSee('A社');
     }
 
@@ -146,15 +146,15 @@ class DashboardMonthlyAccountTypePanelTest extends TestCase
                 'sub_account_id' => $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail()->id,
                 'type' => 'debit',
                 'net_amount' => 4200,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
                 'type' => 'credit',
                 'net_amount' => 4200,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         Livewire::actingAs($user)
             ->test(MonthlyTransactionTable::class, [
@@ -167,7 +167,7 @@ class DashboardMonthlyAccountTypePanelTest extends TestCase
             ->assertSee('4,200')
             ->assertSee('消耗品費')
             ->assertSee('現金')
-            ->assertSee('非課税')
+            ->assertSee('不課税')
             ->assertSee('文具店');
     }
 
@@ -191,15 +191,15 @@ class DashboardMonthlyAccountTypePanelTest extends TestCase
                 'type' => 'debit',
                 'gross_amount' => 10000,
                 'business_ratio' => 60,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
                 'type' => 'credit',
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         Livewire::actingAs($user)
             ->test(MonthlyTransactionTable::class, [
@@ -230,15 +230,15 @@ class DashboardMonthlyAccountTypePanelTest extends TestCase
                 'sub_account_id' => $unit->getAccountByName('売上高')->subAccounts()->firstOrFail()->id,
                 'type' => 'credit',
                 'net_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
                 'type' => 'debit',
                 'net_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         Livewire::actingAs($user)
             ->test(MonthlyTransactionTable::class, [
@@ -258,7 +258,7 @@ class DashboardMonthlyAccountTypePanelTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
         $unit->refresh();
 
         return [$user, $unit];

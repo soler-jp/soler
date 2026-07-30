@@ -68,7 +68,7 @@ class DashboardManagementSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
         $unit->refresh();
 
         return [$user, $unit];
@@ -84,15 +84,15 @@ class DashboardManagementSummaryTest extends TestCase
                 'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
                 'type' => JournalEntry::TYPE_DEBIT,
                 'net_amount' => $amount,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $unit->getAccountByName('売上高')->subAccounts()->firstOrFail()->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => $amount,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $unit->user);
     }
 
     private function registerExpense(
@@ -109,14 +109,14 @@ class DashboardManagementSummaryTest extends TestCase
                 'sub_account_id' => $unit->getAccountByName($accountName)->subAccounts()->firstOrFail()->id,
                 'type' => JournalEntry::TYPE_DEBIT,
                 'net_amount' => $amount,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => $amount,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $unit->user);
     }
 }

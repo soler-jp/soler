@@ -6,6 +6,7 @@ use App\Models\BlueReturnInput;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
 use App\Setup\Initializers\GeneralBusinessInitializer;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -49,7 +50,7 @@ class BlueReturnInputStorageTest extends TestCase
                 'net_amount' => 1_200_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         $savedInputs = $fiscalYear->saveBlueReturnInputs([
             BlueReturnInput::KEY_FAMILY_EMPLOYEE_SALARIES => [
@@ -75,7 +76,7 @@ class BlueReturnInputStorageTest extends TestCase
                     ],
                 ],
             ],
-        ]);
+        ], $user);
 
         $this->assertCount(2, $savedInputs);
         $this->assertDatabaseCount('blue_return_inputs', 2);
@@ -104,7 +105,7 @@ class BlueReturnInputStorageTest extends TestCase
                     'deductible_amount' => 100_000,
                 ],
             ],
-        ]);
+        ], $user);
 
         $this->assertSame(BlueReturnInput::KEY_RENT_EXPENSES, $updatedRentInput->key);
         $this->assertDatabaseCount('blue_return_inputs', 2);
@@ -158,7 +159,7 @@ class BlueReturnInputStorageTest extends TestCase
                 'net_amount' => 1_200_000,
                 'tax_amount' => 0,
             ],
-        ]);
+        ], $user);
 
         try {
             $fiscalYear->saveBlueReturnInput(BlueReturnInput::KEY_FAMILY_EMPLOYEE_SALARIES, [
@@ -172,7 +173,7 @@ class BlueReturnInputStorageTest extends TestCase
                         'withheld_tax_amount' => 0,
                     ],
                 ],
-            ]);
+            ], $user);
 
             $this->fail('ValidationException が発生するはずです。');
         } catch (ValidationException $exception) {
@@ -185,5 +186,38 @@ class BlueReturnInputStorageTest extends TestCase
             'fiscal_year_id' => $fiscalYear->id,
             'key' => BlueReturnInput::KEY_FAMILY_EMPLOYEE_SALARIES,
         ]);
+    }
+
+    public function test_other_user_cannot_save_blue_return_input(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $businessUnit = (new GeneralBusinessInitializer)->initialize($user, [
+            'name' => '青色申告認可テスト',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'cash_balance' => null,
+            'bank_accounts' => [],
+            'fixed_assets' => [],
+            'recurring_templates' => [],
+        ]);
+
+        $fiscalYear = $businessUnit->fiscalYears()->firstOrFail();
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この会計年度の決算書入力を保存する権限がありません。');
+
+        $fiscalYear->saveBlueReturnInput(BlueReturnInput::KEY_RENT_EXPENSES, [
+            'rows' => [
+                [
+                    'address' => '東京都千代田区1-1-1',
+                    'name' => '株式会社サンプル',
+                    'rent_amount' => 120_000,
+                    'deductible_amount' => 90_000,
+                ],
+            ],
+        ], $otherUser);
     }
 }

@@ -163,7 +163,7 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
                 'gross_amount' => 10000,
                 'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-03-20',
@@ -181,7 +181,7 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
                 'net_amount' => 12000,
                 'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $groups = $fiscalYear->monthlyAccountTypeTransactionGroups(
             Account::TYPE_EXPENSE,
@@ -344,7 +344,7 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
         $unit->refresh();
 
         return [$user, $unit];
@@ -380,7 +380,7 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
                 'net_amount' => $amount,
                 'tax_type' => $reverse ? JournalEntry::TAX_TYPE_EXEMPT : $taxType,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     private function registerExpense(
@@ -412,6 +412,6 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
                 'net_amount' => $amount,
                 'tax_type' => $reverse ? $taxType : JournalEntry::TAX_TYPE_EXEMPT,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 }

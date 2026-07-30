@@ -20,7 +20,7 @@ class AccountSummaryIndexTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '集計テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $unit->refresh();
 
         $bankAccount = $unit->getAccountByName('その他の預金');
@@ -30,8 +30,8 @@ class AccountSummaryIndexTest extends TestCase
         $expenseAccount = $unit->accounts()->create([
             'name' => '広告宣伝費',
             'type' => Account::TYPE_EXPENSE,
-        ]);
-        $advertising = $expenseAccount->createSubAccount(['name' => 'Web広告']);
+        ], $user);
+        $advertising = $expenseAccount->createSubAccount(['name' => 'Web広告'], $user);
 
         $registrar = new TransactionRegistrar;
 
@@ -49,7 +49,7 @@ class AccountSummaryIndexTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 15000,
             ],
-        ]);
+        ], $user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-02-03',
@@ -65,7 +65,7 @@ class AccountSummaryIndexTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 2000,
             ],
-        ]);
+        ], $user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-01-20',
@@ -81,7 +81,7 @@ class AccountSummaryIndexTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 30000,
             ],
-        ]);
+        ], $user);
 
         $component = Livewire::actingAs($user)
             ->test(AccountSummaryIndex::class)

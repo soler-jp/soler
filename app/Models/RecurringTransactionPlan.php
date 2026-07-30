@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
+use App\Contracts\ResolvesBusinessUnit;
 use App\Services\PlannedTransactionConfirmer;
 use App\Services\TransactionRegistrar;
 use Database\Factories\RecurringTransactionPlanFactory;
@@ -15,10 +17,10 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
-class RecurringTransactionPlan extends Model
+class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
 {
     /** @use HasFactory<RecurringTransactionPlanFactory> */
-    use HasFactory;
+    use AuthorizesBusinessUnitAccess, HasFactory;
 
     protected $fillable = [
         'business_unit_id',
@@ -54,6 +56,13 @@ class RecurringTransactionPlan extends Model
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('businessUnit');
+
+        return $this->businessUnit;
     }
 
     public function transactions(): HasMany
@@ -216,8 +225,10 @@ class RecurringTransactionPlan extends Model
         ];
     }
 
-    public function confirmTransaction(int $transactionId, array $attributes): ?Transaction
+    public function confirmTransaction(int $transactionId, array $attributes, User $actor): ?Transaction
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この定期取引を確定する権限がありません。');
+
         $transaction = $this->transactions()
             ->with('journalEntries')
             ->whereKey($transactionId)
@@ -264,7 +275,7 @@ class RecurringTransactionPlan extends Model
 
         $confirmed = app(PlannedTransactionConfirmer::class)->confirm(
             $transaction,
-            auth()->user(),
+            $actor,
             $overrides,
             app(TransactionRegistrar::class)->buildPlannedJournalEntries($transaction, $overrides),
         );

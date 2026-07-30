@@ -2,16 +2,20 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\FiscalYear;
 use App\Models\Transaction;
+use App\Models\User;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 class FiscalYearRollover
 {
-    public function rollover(FiscalYear $closedYear, FiscalYear $nextYear): Transaction
+    use AuthorizesBusinessUnitAccess;
+
+    public function rollover(FiscalYear $closedYear, FiscalYear $nextYear, User $actor): Transaction
     {
-        return DB::transaction(function () use ($closedYear, $nextYear): Transaction {
+        return DB::transaction(function () use ($closedYear, $nextYear, $actor): Transaction {
             $closedYear = FiscalYear::query()
                 ->with('businessUnit')
                 ->lockForUpdate()
@@ -22,6 +26,8 @@ class FiscalYearRollover
                 ->lockForUpdate()
                 ->findOrFail($nextYear->getKey());
 
+            $this->authorizeBusinessUnitAccess($closedYear, $actor, 'この会計年度を繰り越す権限がありません。');
+
             $this->ensureRolloverable($closedYear, $nextYear);
 
             $rolloverData = $closedYear->calculateRolloverData();
@@ -30,6 +36,7 @@ class FiscalYearRollover
                 $nextYear,
                 $rolloverData['opening_entries'],
                 $rolloverData['capital_entry'],
+                $actor,
             );
 
             if ($openingTransaction === null) {

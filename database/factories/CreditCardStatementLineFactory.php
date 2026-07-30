@@ -22,7 +22,6 @@ class CreditCardStatementLineFactory extends Factory
             'credit_card_statement_id' => CreditCardStatement::factory(),
             'line_number' => $this->faker->unique()->numberBetween(1, 1000),
             'used_on' => $this->faker->dateTimeBetween('-2 months', 'now')->format('Y-m-d'),
-            'posted_on' => $this->faker->dateTimeBetween('-2 months', 'now')->format('Y-m-d'),
             'merchant_name' => $this->faker->company(),
             'description' => $this->faker->sentence(3),
             'amount' => $this->faker->numberBetween(500, 30000),

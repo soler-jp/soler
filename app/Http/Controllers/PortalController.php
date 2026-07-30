@@ -12,11 +12,18 @@ class PortalController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->selectedBusinessUnit?->currentFiscalYear) {
+        $unit = $user->selectedBusinessUnit;
+
+        if ($unit === null) {
             return redirect()->route('initialize');
         }
 
-        $unit = auth()->user()->selectedBusinessUnit;
+        abort_unless($unit->canAccess($user), 403);
+
+        if (! $unit->currentFiscalYear) {
+            return redirect()->route('initialize');
+        }
+
         $fiscalYear = $unit->currentFiscalYear;
 
         return view('dashboard', [
@@ -28,11 +35,18 @@ class PortalController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->selectedBusinessUnit?->currentFiscalYear) {
+        $unit = $user->selectedBusinessUnit;
+
+        if ($unit === null) {
             return redirect()->route('initialize');
         }
 
-        $unit = $user->selectedBusinessUnit;
+        abort_unless($unit->canAccess($user), 403);
+
+        if (! $unit->currentFiscalYear) {
+            return redirect()->route('initialize');
+        }
+
         $fiscalYear = $unit->currentFiscalYear;
 
         return view('fixed-expenses.index', [

@@ -27,7 +27,7 @@ class DashboardExpenseInput extends Component
     {
         $this->date = now()->toDateString();
 
-        $unit = auth()->user()->selectedBusinessUnit;
+        $unit = auth()->user()->selectedBusinessUnitOrFail();
 
         $this->expenseAccounts = $unit->accounts()
             ->with('subAccounts')
@@ -44,7 +44,8 @@ class DashboardExpenseInput extends Component
 
     public function submit()
     {
-        $unit = auth()->user()->selectedBusinessUnit;
+        $user = auth()->user();
+        $unit = $user->selectedBusinessUnitOrFail();
 
         $this->validate([
             'date' => ['required', 'date'],
@@ -57,21 +58,26 @@ class DashboardExpenseInput extends Component
         $fiscalYear = $unit->currentFiscalYear;
 
         try {
-            app(TransactionRegistrar::class)->register($fiscalYear, [
-                'date' => $this->date,
-                'description' => $this->description,
-            ], [
+            app(TransactionRegistrar::class)->register(
+                $fiscalYear,
                 [
-                    'sub_account_id' => $this->debit_sub_account_id,
-                    'type' => 'debit',
-                    'net_amount' => $this->amount,
+                    'date' => $this->date,
+                    'description' => $this->description,
                 ],
                 [
-                    'sub_account_id' => $this->credit_sub_account_id,
-                    'type' => 'credit',
-                    'net_amount' => $this->amount,
+                    [
+                        'sub_account_id' => $this->debit_sub_account_id,
+                        'type' => 'debit',
+                        'net_amount' => $this->amount,
+                    ],
+                    [
+                        'sub_account_id' => $this->credit_sub_account_id,
+                        'type' => 'credit',
+                        'net_amount' => $this->amount,
+                    ],
                 ],
-            ]);
+                $user,
+            );
 
             $this->dispatch('dashboard-transaction-created');
             // 初期化 & 確認メッセージ

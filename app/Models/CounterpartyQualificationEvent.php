@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CounterpartyQualificationEvent extends Model
+class CounterpartyQualificationEvent extends Model implements ResolvesBusinessUnit
 {
     use HasFactory;
 
@@ -25,5 +26,12 @@ class CounterpartyQualificationEvent extends Model
     public function counterparty(): BelongsTo
     {
         return $this->belongsTo(Counterparty::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('counterparty.businessUnit');
+
+        return $this->counterparty->businessUnit;
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
+use App\Contracts\ResolvesBusinessUnit;
 use Database\Factories\CreditCardImportBatchFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,8 +12,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
-class CreditCardImportBatch extends Model
+class CreditCardImportBatch extends Model implements ResolvesBusinessUnit
 {
+    use AuthorizesBusinessUnitAccess;
+
     public const STATUS_PROCESSING = 'processing';
 
     public const STATUS_COMPLETED = 'completed';
@@ -61,6 +65,13 @@ class CreditCardImportBatch extends Model
         return $this->belongsTo(CreditCardStatement::class, 'credit_card_statement_id');
     }
 
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('statement.creditCard.businessUnit');
+
+        return $this->statement->creditCard->businessUnit;
+    }
+
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
@@ -99,17 +110,19 @@ class CreditCardImportBatch extends Model
         ], true);
     }
 
-    public function deactivate(?User $user = null, ?string $reason = null): void
+    public function deactivate(User $actor, ?string $reason = null): void
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'このクレジットカード取込バッチを無効化する権限がありません。');
+
         if (! $this->is_active) {
             return;
         }
 
-        DB::transaction(function () use ($user, $reason) {
+        DB::transaction(function () use ($actor, $reason) {
             $this->forceFill([
                 'is_active' => false,
                 'deactivated_at' => now(),
-                'deactivated_by' => $user?->id,
+                'deactivated_by' => $actor->id,
                 'deactivation_reason' => $reason,
             ])->save();
 
@@ -117,12 +130,9 @@ class CreditCardImportBatch extends Model
                 'is_active' => false,
             ]);
 
-            $this->transactions()->update([
-                'is_active' => false,
-                'deactivated_at' => now(),
-                'deactivated_by' => $user?->id,
-                'deactivation_reason' => $reason,
-            ]);
+            $this->transactions()
+                ->get()
+                ->each(fn (Transaction $transaction): bool => tap(true, fn () => $transaction->deactivate($actor, $reason)));
         });
     }
 }

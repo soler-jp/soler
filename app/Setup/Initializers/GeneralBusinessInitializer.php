@@ -22,7 +22,7 @@ class GeneralBusinessInitializer
             'is_tax_exclusive' => $inputs['is_tax_exclusive'],
         ]);
 
-        $fiscalYear = $unit->createFiscalYear($inputs['year']);
+        $fiscalYear = $unit->createFiscalYear($inputs['year'], $user);
 
         $fiscalYear->update([
             'is_active' => true,
@@ -31,15 +31,13 @@ class GeneralBusinessInitializer
             'is_tax_exclusive' => $inputs['is_tax_exclusive'],
         ]);
 
-        app(OpeningEntryRegistrar::class)->register($fiscalYear, $inputs['opening_entries'] ?? []);
+        app(OpeningEntryRegistrar::class)->register($fiscalYear, $inputs['opening_entries'] ?? [], $user);
 
         $revenueAccount = $unit->getAccountByName('売上高');
 
         if (isset($inputs['revenue_sub_accounts']) && $revenueAccount) {
             foreach ($inputs['revenue_sub_accounts'] as $subAccount) {
-                $revenueAccount->subAccounts()->create([
-                    'name' => $subAccount['name'],
-                ]);
+                $revenueAccount->addCustomSubAccount($subAccount['name'], $user);
             }
         }
 

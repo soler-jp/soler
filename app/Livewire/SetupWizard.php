@@ -204,8 +204,6 @@ class SetupWizard extends Component
     {
         $this->year = (int) date('Y');
 
-        $bu = auth()->user()->selectedBusinessUnit;
-
         $this->cash_accounts[] = [
             'sub_account_name' => 'レジ現金',
             'amount' => 0,

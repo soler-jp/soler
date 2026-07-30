@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\FixedAsset;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -87,11 +88,23 @@ class UserTest extends TestCase
     }
 
     #[Test]
+    public function selected_business_unit_or_failは未選択なら例外を投げる(): void
+    {
+        $user = User::factory()->create();
+
+        $this->assertNull($user->current_business_unit_id);
+
+        $this->expectException(AuthorizationException::class);
+
+        $user->selectedBusinessUnitOrFail();
+    }
+
+    #[Test]
     public function userを削除すると関連する事業体と仕訳データも削除できる()
     {
         $user = User::factory()->create();
         $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '削除対象事業体']);
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cashSubAccount = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $salesSubAccount = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
@@ -115,7 +128,8 @@ class UserTest extends TestCase
                     'net_amount' => 1000,
                     'tax_amount' => 0,
                 ],
-            ]
+            ],
+            $user
         );
 
         $fixedAsset = FixedAsset::factory()->create([

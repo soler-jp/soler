@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
+use App\Services\CreditCardStatementLineRegistrar;
 use Database\Factories\CreditCardStatementLineFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CreditCardStatementLine extends Model
+class CreditCardStatementLine extends Model implements ResolvesBusinessUnit
 {
     public const STATUS_UNREVIEWED = 'unreviewed';
 
@@ -36,7 +38,6 @@ class CreditCardStatementLine extends Model
         'credit_card_import_batch_id',
         'line_number',
         'used_on',
-        'posted_on',
         'merchant_name',
         'description',
         'amount',
@@ -53,7 +54,6 @@ class CreditCardStatementLine extends Model
     protected $casts = [
         'line_number' => 'integer',
         'used_on' => 'date',
-        'posted_on' => 'date',
         'amount' => 'integer',
         'is_active' => 'boolean',
         'raw_payload' => 'json:unicode',
@@ -63,6 +63,13 @@ class CreditCardStatementLine extends Model
     public function statement(): BelongsTo
     {
         return $this->belongsTo(CreditCardStatement::class, 'credit_card_statement_id');
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('statement.creditCard.businessUnit');
+
+        return $this->statement->creditCard->businessUnit;
     }
 
     public function importBatch(): BelongsTo
@@ -108,5 +115,27 @@ class CreditCardStatementLine extends Model
     public function isReviewPending(): bool
     {
         return $this->status === self::STATUS_UNREVIEWED;
+    }
+
+    public function registerTransaction(
+        array $attributes,
+        User $actor,
+    ): Transaction {
+        $transaction = app(CreditCardStatementLineRegistrar::class)
+            ->register($this, $actor, $attributes);
+
+        $this->refresh();
+
+        return $transaction;
+    }
+
+    public function cancelTransactionRegistration(
+        User $actor,
+        ?string $reason = null,
+    ): void {
+        app(CreditCardStatementLineRegistrar::class)
+            ->cancelRegistration($this, $actor, $reason);
+
+        $this->refresh();
     }
 }

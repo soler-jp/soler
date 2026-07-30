@@ -73,10 +73,10 @@ class BusinessFlowScenarioTest extends TestCase
             'name' => '期首パターン事業体',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2026);
+        $fiscalYear = $unit->createFiscalYear(2026, $user);
         $this->assertDatabaseCount('transactions', 0);
 
-        $emptyResult = $fiscalYear->registerOpeningEntry([]);
+        $emptyResult = $fiscalYear->registerOpeningEntry([], $user);
         $this->assertNull($emptyResult);
         $this->assertDatabaseCount('transactions', 0);
 
@@ -86,7 +86,7 @@ class BusinessFlowScenarioTest extends TestCase
                 'sub_account_name' => 'レジ現金',
                 'amount' => 50000,
             ],
-        ]);
+        ], $user);
 
         $this->assertNotNull($openingTransaction);
         $this->assertDatabaseHas('transactions', [
@@ -112,6 +112,7 @@ class BusinessFlowScenarioTest extends TestCase
     public function 日々業務から期末処理までの上位フローを通してsummaryが整合する(bool $isTaxable, bool $isTaxExclusive): void
     {
         $user = User::factory()->create();
+        $this->actingAs($user);
         $unit = (new GeneralBusinessInitializer)->initialize($user, [
             'name' => '業務フロー事業体',
             'type' => 'general',
@@ -154,7 +155,7 @@ class BusinessFlowScenarioTest extends TestCase
                 'type' => JournalEntry::TYPE_DEBIT,
                 'net_amount' => 12000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-04-02',
@@ -170,7 +171,7 @@ class BusinessFlowScenarioTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 4000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $summaryAfterDaily = $fiscalYear->calculateSummary();
         $this->assertSame(12000, $summaryAfterDaily['actual']['total_income']);
@@ -207,9 +208,9 @@ class BusinessFlowScenarioTest extends TestCase
             'credit_sub_account_id' => $paymentSubAccount->id,
             'amount' => 3000,
             'tax_amount' => 0,
-        ]);
+        ], $user);
 
-        $plannedTransactions = $unit->generatePlannedTransactionsForPlan($fixedCostPlan, $fiscalYear);
+        $plannedTransactions = $unit->generatePlannedTransactionsForPlan($fixedCostPlan, $fiscalYear, $user);
         $this->assertCount(12, $plannedTransactions);
         $firstPlanned = $plannedTransactions->firstOrFail();
         $this->assertTrue($firstPlanned->is_planned);
@@ -219,7 +220,7 @@ class BusinessFlowScenarioTest extends TestCase
             'date' => '2025-06-10',
             'amount' => 3500,
             'credit_sub_account_id' => $paymentSubAccount->id,
-        ]);
+        ], $user);
 
         $this->assertNotNull($confirmed);
         $this->assertFalse($confirmed->is_planned);
@@ -240,7 +241,7 @@ class BusinessFlowScenarioTest extends TestCase
 
         $this->assertNull($entry->transaction_id);
 
-        app(DepreciationService::class)->registerTransactionFor($entry);
+        app(DepreciationService::class)->registerTransactionFor($entry, $user);
 
         $entry->refresh();
         $this->assertNotNull($entry->transaction_id);

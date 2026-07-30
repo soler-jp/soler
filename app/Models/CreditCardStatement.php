@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use Database\Factories\CreditCardStatementFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class CreditCardStatement extends Model
+class CreditCardStatement extends Model implements ResolvesBusinessUnit
 {
     public const STATUS_EMPTY = 'empty';
 
@@ -56,6 +57,13 @@ class CreditCardStatement extends Model
     public function creditCard(): BelongsTo
     {
         return $this->belongsTo(CreditCard::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('creditCard.businessUnit');
+
+        return $this->creditCard->businessUnit;
     }
 
     public function lines(): HasMany

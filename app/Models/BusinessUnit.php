@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
+use App\Contracts\ResolvesBusinessUnit;
 use App\Services\DepreciationService;
 use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,8 +16,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
 
-class BusinessUnit extends Model
+class BusinessUnit extends Model implements ResolvesBusinessUnit
 {
+    use AuthorizesBusinessUnitAccess;
     use HasFactory;
 
     public const HOUSEHOLD_ALLOCATION_SUB_ACCOUNT_NAME = '家事按分';
@@ -64,6 +67,12 @@ class BusinessUnit extends Model
     protected static function booted(): void
     {
         static::deleting(function (BusinessUnit $businessUnit): void {
+            if ($businessUnit->current_fiscal_year_id !== null) {
+                $businessUnit->updateQuietly([
+                    'current_fiscal_year_id' => null,
+                ]);
+            }
+
             $businessUnit->fixedAssets()->delete();
             $businessUnit->fiscalYears()->each(function (FiscalYear $fiscalYear): void {
                 $fiscalYear->delete();
@@ -75,6 +84,16 @@ class BusinessUnit extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        return $this;
+    }
+
+    public function canAccess(User $user): bool
+    {
+        return $this->user_id === $user->id;
     }
 
     public function fiscalYears()
@@ -205,7 +224,7 @@ class BusinessUnit extends Model
             ], $attributes));
 
             foreach (self::$defaultAccounts as $account) {
-                $businessUnit->createAccount($account);
+                $businessUnit->createAccount($account, $businessUnit->user);
             }
 
             return $businessUnit;
@@ -215,17 +234,19 @@ class BusinessUnit extends Model
     /**
      * BusinessUnitに紐づくアカウントを作成するヘルパーメソッド
      */
-    public function createAccount(array $attributes): Account
+    public function createAccount(array $attributes, User $user): Account
     {
-        return \DB::transaction(function () use ($attributes) {
+        $this->authorizeBusinessUnitAccess($this, $user, 'この事業体に勘定科目を追加する権限がありません。');
+
+        return \DB::transaction(function () use ($attributes, $user) {
             $account = $this->accounts()->create($attributes);
 
             if (isset(self::$defaultSubAccounts[$account->name])) {
                 foreach (self::$defaultSubAccounts[$account->name] as $subAccountName) {
-                    $account->addCustomSubAccount($subAccountName);
+                    $account->addCustomSubAccount($subAccountName, $user);
                 }
             } else {
-                $account->addCustomSubAccount($account->name);
+                $account->addCustomSubAccount($account->name, $user);
             }
 
             return $account;
@@ -235,19 +256,22 @@ class BusinessUnit extends Model
     public function addCustomAccount(
         string $type,
         string $accountName,
-        ?string $subAccountName = null,
+        ?string $subAccountName,
+        User $user,
     ): Account {
+        $this->authorizeBusinessUnitAccess($this, $user, 'この事業体に勘定科目を追加する権限がありません。');
+
         if ($this->getAccountByName($accountName) !== null) {
             throw new \InvalidArgumentException('同名の勘定科目は既に存在します。');
         }
 
-        return DB::transaction(function () use ($type, $accountName, $subAccountName): Account {
+        return DB::transaction(function () use ($type, $accountName, $subAccountName, $user): Account {
             $account = $this->accounts()->create([
                 'name' => $accountName,
                 'type' => $type,
             ]);
 
-            $account->addCustomSubAccount($subAccountName ?? $accountName);
+            $account->addCustomSubAccount($subAccountName ?? $accountName, $user);
 
             return $account->refresh();
         });
@@ -256,9 +280,11 @@ class BusinessUnit extends Model
     /**
      * FiscalYearを作成するヘルパーメソッド
      */
-    public function createFiscalYear(int $year): FiscalYear
+    public function createFiscalYear(int $year, User $actor): FiscalYear
     {
-        return DB::transaction(function () use ($year): FiscalYear {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体に会計年度を追加する権限がありません。');
+
+        return DB::transaction(function () use ($year, $actor): FiscalYear {
             $hasActive = $this->fiscalYears()->where('is_active', true)->exists();
 
             $fiscalYear = $this->fiscalYears()->create([
@@ -269,7 +295,7 @@ class BusinessUnit extends Model
                 'is_active' => ! $hasActive,  // まだなければtrueにする
             ]);
 
-            $this->setCurrentFiscalYearIfNotSet($fiscalYear);
+            $this->setCurrentFiscalYearIfNotSet($fiscalYear, $actor);
 
             app(DepreciationService::class)->prepareEntriesFor($fiscalYear);
 
@@ -338,8 +364,10 @@ class BusinessUnit extends Model
             ->values();
     }
 
-    public function createRecurringTransactionPlan(array $attributes): RecurringTransactionPlan
+    public function createRecurringTransactionPlan(array $attributes, User $actor): RecurringTransactionPlan
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体に定期取引を追加する権限がありません。');
+
         $attributes['business_unit_id'] = $this->id;
 
         $validated = RecurringTransactionPlan::validate($attributes);
@@ -349,11 +377,29 @@ class BusinessUnit extends Model
             ->refresh();
     }
 
-    public function generatePlannedTransactionsForPlan(RecurringTransactionPlan $plan, FiscalYear $fiscalYear): Collection
+    public function createCreditCard(array $attributes, User $actor): CreditCard
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体にクレジットカードを追加する権限がありません。');
+
+        $attributes['business_unit_id'] = $this->id;
+
+        $validated = CreditCard::validate($attributes);
+
+        return $this->creditCards()
+            ->create($validated)
+            ->refresh();
+    }
+
+    public function generatePlannedTransactionsForPlan(
+        RecurringTransactionPlan $plan,
+        FiscalYear $fiscalYear,
+        User $actor
+    ): Collection {
         if ($plan->business_unit_id !== $this->id) {
             throw new \InvalidArgumentException('This plan does not belong to this business unit.');
         }
+
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体の予定取引を生成する権限がありません。');
 
         if ($plan->is_active === false) {
             return collect();
@@ -375,7 +421,8 @@ class BusinessUnit extends Model
             $transaction = app(TransactionRegistrar::class)->register(
                 $fiscalYear,
                 $data['transaction'],
-                $data['entries']
+                $data['entries'],
+                $actor,
             );
 
             $transactions->push($transaction);
@@ -402,8 +449,10 @@ class BusinessUnit extends Model
         return $this->belongsTo(FiscalYear::class, 'current_fiscal_year_id');
     }
 
-    public function activateFiscalYear(FiscalYear $fiscalYear): void
+    public function activateFiscalYear(FiscalYear $fiscalYear, User $actor): void
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体の現在の会計年度を変更する権限がありません。');
+
         if ($fiscalYear->business_unit_id !== $this->id) {
             throw new \InvalidArgumentException('他の事業体の年度は選択できません。');
         }
@@ -419,8 +468,10 @@ class BusinessUnit extends Model
         });
     }
 
-    public function setCurrentFiscalYear(FiscalYear $fiscalYear): void
+    public function setCurrentFiscalYear(FiscalYear $fiscalYear, User $actor): void
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体の現在の会計年度を変更する権限がありません。');
+
         if ($fiscalYear->business_unit_id !== $this->id) {
             throw new \InvalidArgumentException('他の事業体の年度は選択できません。');
         }
@@ -428,18 +479,21 @@ class BusinessUnit extends Model
         $this->update(['current_fiscal_year_id' => $fiscalYear->id]);
     }
 
-    public function setCurrentFiscalYearIfNotSet(FiscalYear $fiscalYear): void
+    public function setCurrentFiscalYearIfNotSet(FiscalYear $fiscalYear, User $actor): void
     {
         if (is_null($this->current_fiscal_year_id)) {
-            $this->setCurrentFiscalYear($fiscalYear);
+            $this->setCurrentFiscalYear($fiscalYear, $actor);
         }
     }
 
     public function createNextFiscalYearFrom(
         FiscalYear $fiscalYear,
+        User $actor,
         ?bool $isTaxable = null,
         ?bool $isTaxExclusive = null,
     ): FiscalYear {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この事業体に会計年度を追加する権限がありません。');
+
         if ($fiscalYear->business_unit_id !== $this->id) {
             throw new \InvalidArgumentException('他の事業体の年度を基準に翌年度は作成できません。');
         }
@@ -450,7 +504,7 @@ class BusinessUnit extends Model
             throw new \InvalidArgumentException('翌年度はすでに作成されています。');
         }
 
-        $createdFiscalYear = $this->createFiscalYear($nextYear);
+        $createdFiscalYear = $this->createFiscalYear($nextYear, $actor);
 
         $createdFiscalYear->update([
             'is_taxable' => $isTaxable ?? (bool) $fiscalYear->is_taxable,

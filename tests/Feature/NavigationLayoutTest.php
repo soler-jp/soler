@@ -48,7 +48,7 @@ class NavigationLayoutTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
 
         $response = $this->actingAs($user)->get(route('dashboard'));
 

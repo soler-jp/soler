@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use App\Data\TransactionSearchFilters;
 use App\Services\BlueReturnInputRegistrar;
 use App\Services\BlueReturnPdf\BlueReturnStatementPdfGenerator;
@@ -22,7 +23,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
-class FiscalYear extends Model
+class FiscalYear extends Model implements ResolvesBusinessUnit
 {
     use HasFactory;
 
@@ -53,9 +54,25 @@ class FiscalYear extends Model
         'end_date' => 'date',
     ];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (FiscalYear $fiscalYear): void {
+            $fiscalYear->transactions()->each(function (Transaction $transaction): void {
+                $transaction->delete();
+            });
+        });
+    }
+
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('businessUnit');
+
+        return $this->businessUnit;
     }
 
     public function transactions()
@@ -82,11 +99,12 @@ class FiscalYear extends Model
     public function registerTransaction(
         array $transactionData,
         array $journalEntriesData,
+        User $actor,
         ?TransactionRegistrar $registrar = null
     ): Transaction {
         $registrar ??= app(TransactionRegistrar::class);
 
-        return $registrar->register($this, $transactionData, $journalEntriesData);
+        return $registrar->register($this, $transactionData, $journalEntriesData, $actor);
     }
 
     public function calculateSummary(): array
@@ -252,7 +270,7 @@ class FiscalYear extends Model
 
                 return [
                     'year_month' => $yearMonth,
-                    'label' => CarbonImmutable::createFromFormat('Y-m', $yearMonth)->isoFormat('YYYY年M月'),
+                    'label' => CarbonImmutable::createFromFormat('!Y-m', $yearMonth)->isoFormat('YYYY年M月'),
                     'amount' => $amount,
                 ];
             })
@@ -1016,17 +1034,17 @@ class FiscalYear extends Model
      * @param  array<string, array<string, mixed>>  $inputs
      * @return Collection<int, BlueReturnInput>
      */
-    public function saveBlueReturnInputs(array $inputs): Collection
+    public function saveBlueReturnInputs(array $inputs, User $actor): Collection
     {
-        return app(BlueReturnInputRegistrar::class)->saveMany($this, $inputs);
+        return app(BlueReturnInputRegistrar::class)->saveMany($this, $inputs, $actor);
     }
 
     /**
      * @param  array<string, mixed>  $value
      */
-    public function saveBlueReturnInput(string $key, array $value): BlueReturnInput
+    public function saveBlueReturnInput(string $key, array $value, User $actor): BlueReturnInput
     {
-        return app(BlueReturnInputRegistrar::class)->save($this, $key, $value);
+        return app(BlueReturnInputRegistrar::class)->save($this, $key, $value, $actor);
     }
 
     public function blueReturnInput(string $key): ?BlueReturnInput
@@ -1057,9 +1075,9 @@ class FiscalYear extends Model
         return app(FiscalYearRolloverDataCalculator::class)->calculate($this);
     }
 
-    public function registerOpeningEntry(array $entries): ?Transaction
+    public function registerOpeningEntry(array $entries, User $actor): ?Transaction
     {
-        return app(OpeningEntryRegistrar::class)->register($this, $entries);
+        return app(OpeningEntryRegistrar::class)->register($this, $entries, $actor);
     }
 
     public function closedBy()

@@ -2,15 +2,19 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\Account;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\SubAccount;
 use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 class InventoryClosingService
 {
+    use AuthorizesBusinessUnitAccess;
+
     private const INVENTORY_ASSET_ACCOUNT = '棚卸資産';
 
     private const OPENING_INVENTORY_ACCOUNT = '期首商品（棚卸高）';
@@ -34,8 +38,10 @@ class InventoryClosingService
      *
      * @param  array<int, int>  $closingAmounts  [棚卸資産 SubAccount ID => 期末の実地棚卸高]
      */
-    public function registerFor(FiscalYear $fiscalYear, array $closingAmounts): ?Transaction
+    public function registerFor(FiscalYear $fiscalYear, array $closingAmounts, User $actor): ?Transaction
     {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度に棚卸の決算整理仕訳を登録する権限がありません。');
+
         $inventoryAccount = $this->resolveInventoryAccount($fiscalYear);
         $closingAmounts = $this->normalizeClosingAmounts($inventoryAccount, $closingAmounts);
 
@@ -108,6 +114,7 @@ class InventoryClosingService
                 'adjusting_entry_type' => Transaction::ADJUSTING_ENTRY_TYPE_INVENTORY_CLOSING,
             ],
             $journalEntries,
+            $actor,
         );
     }
 

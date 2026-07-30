@@ -19,14 +19,14 @@ class AccountSummaryPageTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '集計テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $unit->refresh();
 
         $cash = $unit->getSubAccountByName('現金', '現金');
         $bankAccount = $unit->getAccountByName('その他の預金');
         $bankMain = $bankAccount->subAccounts()->firstOrFail();
-        $bankA = $bankAccount->createSubAccount(['name' => '三井住友銀行']);
-        $bankB = $bankAccount->createSubAccount(['name' => '楽天銀行']);
+        $bankA = $bankAccount->createSubAccount(['name' => '三井住友銀行'], $user);
+        $bankB = $bankAccount->createSubAccount(['name' => '楽天銀行'], $user);
         $loan = $unit->getSubAccountByName('借入金', '借入金');
         $capital = $unit->getSubAccountByName('元入金', '元入金');
         $revenue = $unit->getSubAccountByName('売上高', '売上高');
@@ -35,7 +35,7 @@ class AccountSummaryPageTest extends TestCase
             'name' => '広告宣伝費',
             'type' => Account::TYPE_EXPENSE,
         ]);
-        $advertising = $expenseAccount->createSubAccount(['name' => 'Web広告']);
+        $advertising = $expenseAccount->createSubAccount(['name' => 'Web広告'], $user);
 
         $registrar = new TransactionRegistrar;
 
@@ -53,7 +53,7 @@ class AccountSummaryPageTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 120000,
             ],
-        ]);
+        ], $user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-01-12',
@@ -69,7 +69,7 @@ class AccountSummaryPageTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 50000,
             ],
-        ]);
+        ], $user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-01-15',
@@ -85,7 +85,7 @@ class AccountSummaryPageTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 70000,
             ],
-        ]);
+        ], $user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-01-18',
@@ -101,7 +101,7 @@ class AccountSummaryPageTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 15000,
             ],
-        ]);
+        ], $user);
 
         $response = $this->actingAs($user)->get(route('accounts.summary'));
 

@@ -60,12 +60,17 @@
 現時点では、初版の対象を車両運搬具に限定する。
 
 - 勘定科目は `車両運搬具` のみを扱う
-- 対象資産は次の2種類のみ
+- 対象資産は次の4種類のみ
   - `new_standard_car`（新車-普通車）
   - `new_light_car`（新車-軽自動車）
-- 耐用年数は固定値とする
+  - `used_standard_car`（中古車-普通車）
+  - `used_light_car`（中古車-軽自動車）
+- 新車の耐用年数は固定値とする
   - `new_standard_car`: 6年
   - `new_light_car`: 4年
+- 中古車の耐用年数は、普通車6年・軽自動車4年を法定耐用年数として、購入日時点の初度登録日からの経過月数に基づき簡便法で自動計算する
+  - 経過月数は完全に経過した月だけを数え、端数月は切り捨てる
+  - 法定耐用年数を全部経過している場合は、最低耐用年数2年とする
 - `business_usage_ratio` は固定資産登録時の見込み値として扱い、後から年度を補完するときは既存明細の値を踏襲する
 - 後から `FiscalYear` が追加された場合は、その年度分の `DepreciationEntry` を補完する
 - 減価償却方法は初版では `straight_line` のみ対応する
@@ -77,6 +82,7 @@
 - 税抜取得価額
 - 取得時の消費税額
 - 購入日
+- 初度登録日（中古車のみ）
 - 事業利用割合（見込み値）
 
 これ以外の値は、原則としてシステム側で自動決定する。
@@ -278,8 +284,11 @@
 - `asset_category`
   - `new_standard_car`
   - `new_light_car`
+  - `used_standard_car`
+  - `used_light_car`
 - `name`
 - `acquisition_date`
+- `first_registration_date`
 - `taxable_amount`
 - `tax_amount`
 - `depreciation_base_amount`
@@ -338,7 +347,7 @@
 初版では複雑さを抑えるため、以下に絞る。
 
 - 対象勘定科目は `車両運搬具` のみとする
-- 対象資産は `new_standard_car` と `new_light_car` のみとする
+- 対象資産は `new_standard_car`、`new_light_car`、`used_standard_car`、`used_light_car` のみとする
 - 償却方法は `straight_line` のみ対応する
 - 月割り償却を行う
 - 特別償却は未対応とする
@@ -415,3 +424,28 @@
 - 償却月数の計算ルール
 - `Transaction` の貸方科目方針
 - `FixedAsset` / `DepreciationEntry` の責務を前提にしたテストケース
+
+## 積み残し課題
+
+実装済みだが未整備の論点をここに記録する。優先度は低く、クレジットに余裕があるときに着手する想定。
+
+### 過去年度取得資産の後続年度 Entry 補完導線（優先度: 低）
+
+`prepareEntriesFor(FiscalYear)` は現状 `BusinessUnit::createFiscalYear()` の FiscalYear 作成時にしか呼ばれない（`app/Models/BusinessUnit.php`）。
+
+このため、次のシナリオ（C-2: 登録し忘れ）で後続年度の `DepreciationEntry` が自動生成されない。
+
+- ユーザーは 2025 年度も Soler で記帳していた
+- ある固定資産（例: 2025 年取得の中古車）の登録を忘れていた
+- 2026 年になって気づき、取得仕訳を 2025 年度に残すため取得年度（2025）へ登録する
+- `createDepreciationEntriesUpTo()` は渡した年度（2025）分までしか作らない
+- FY2026 は既に存在し、その作成時の `prepareEntriesFor` は資産登録より前に通過済み
+- 結果、2026 年度の `DepreciationEntry` が作られず、`prepareEntriesFor(FY2026)` を手動で再実行する必要がある
+
+対応案:
+
+- 過去年度取得資産の登録時に、取得年度〜既存の後続全年度分の Entry を補完する導線を用意する（`registerFixedAsset()` 内で登録年度以降の既存 FiscalYear に対しても `prepareEntriesFor` 相当を回す等）
+- C-2 を再現する Feature テストを追加する
+- 既存の「後から FiscalYear を追加した場合の補完」テストと矛盾しないこと
+
+補足: 別処理ケース（2025 は他システムで処理し、2026 年度に `allowRegistration = true` で登録）は現状で正しく、`過去年度取得の中古車を登録年度で登録すると簡便法耐用年数で当年度分の Entry だけ作成される` テストでカバー済み。この課題は壊さないこと。

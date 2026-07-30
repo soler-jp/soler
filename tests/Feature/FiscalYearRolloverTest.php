@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\FiscalYearRollover;
 use App\Services\TransactionRegistrar;
 use DomainException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
@@ -25,8 +26,8 @@ class FiscalYearRolloverTest extends TestCase
             'name' => '繰越事業体',
         ]);
 
-        $closedYear = $businessUnit->createFiscalYear(2025);
-        $nextYear = $businessUnit->createFiscalYear(2026);
+        $closedYear = $businessUnit->createFiscalYear(2025, $user);
+        $nextYear = $businessUnit->createFiscalYear(2026, $user);
 
         $cash = $businessUnit->getSubAccountByName('現金', '現金');
         $loan = $businessUnit->getSubAccountByName('借入金', '借入金');
@@ -39,7 +40,7 @@ class FiscalYearRolloverTest extends TestCase
                 'sub_account_name' => '現金',
                 'amount' => 100_000,
             ],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-04-10',
@@ -55,7 +56,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 20_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-05-10',
@@ -71,7 +72,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 30_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-06-10',
@@ -87,7 +88,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 10_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         $closedYear->close($user);
 
@@ -115,7 +116,7 @@ class FiscalYearRolloverTest extends TestCase
             'type' => 'credit',
         ], $rolloverData['capital_entry']);
 
-        $openingTransaction = app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        $openingTransaction = app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
 
         $this->assertSame('期首残高設定', $openingTransaction->description);
         $this->assertTrue($openingTransaction->is_opening_entry);
@@ -138,8 +139,8 @@ class FiscalYearRolloverTest extends TestCase
             'name' => '債務超過事業体',
         ]);
 
-        $closedYear = $businessUnit->createFiscalYear(2025);
-        $nextYear = $businessUnit->createFiscalYear(2026);
+        $closedYear = $businessUnit->createFiscalYear(2025, $user);
+        $nextYear = $businessUnit->createFiscalYear(2026, $user);
 
         $cash = $businessUnit->getSubAccountByName('現金', '現金');
         $loan = $businessUnit->getSubAccountByName('借入金', '借入金');
@@ -151,7 +152,7 @@ class FiscalYearRolloverTest extends TestCase
                 'sub_account_name' => '現金',
                 'amount' => 50_000,
             ],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-04-10',
@@ -167,7 +168,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 200_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-05-10',
@@ -183,7 +184,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 240_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         $closedYear->close($user);
 
@@ -211,7 +212,7 @@ class FiscalYearRolloverTest extends TestCase
             'type' => 'debit',
         ], $rolloverData['capital_entry']);
 
-        $openingTransaction = app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        $openingTransaction = app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
 
         $this->assertCount(3, $openingTransaction->journalEntries);
         $this->assertSame(200_000, $openingTransaction->journalEntries->where('type', 'debit')->sum('net_amount'));
@@ -230,8 +231,8 @@ class FiscalYearRolloverTest extends TestCase
             'name' => '元入金計算事業体',
         ]);
 
-        $closedYear = $businessUnit->createFiscalYear(2025);
-        $nextYear = $businessUnit->createFiscalYear(2026);
+        $closedYear = $businessUnit->createFiscalYear(2025, $user);
+        $nextYear = $businessUnit->createFiscalYear(2026, $user);
 
         $cash = $businessUnit->getSubAccountByName('現金', '現金');
         $sales = $businessUnit->getSubAccountByName('売上高', '売上高');
@@ -246,7 +247,7 @@ class FiscalYearRolloverTest extends TestCase
                 'sub_account_name' => '現金',
                 'amount' => 500_000,
             ],
-        ]);
+        ], $user);
 
         // 青色申告特別控除前の所得金額 300,000 - 100,000 = 200,000
         (new TransactionRegistrar)->register($closedYear, [
@@ -263,7 +264,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 300_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-05-10',
@@ -279,7 +280,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 100_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         // 期末の事業主借 60,000
         (new TransactionRegistrar)->register($closedYear, [
@@ -296,7 +297,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 60_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         // 期末の事業主貸 80,000
         (new TransactionRegistrar)->register($closedYear, [
@@ -313,7 +314,7 @@ class FiscalYearRolloverTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 80_000,
             ],
-        ]);
+        ], $closedYear->businessUnit->user);
 
         $closedYear->close($user);
 
@@ -339,7 +340,7 @@ class FiscalYearRolloverTest extends TestCase
             ],
         ], $rolloverData['opening_entries']);
 
-        $openingTransaction = app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        $openingTransaction = app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
 
         $this->assertCount(2, $openingTransaction->journalEntries);
         $this->assertSame(680_000, $nextYear->calculateBalanceSummary()['asset']['total_balance']);
@@ -355,13 +356,13 @@ class FiscalYearRolloverTest extends TestCase
             'name' => '繰越失敗事業体',
         ]);
 
-        $closedYear = $businessUnit->createFiscalYear(2025);
-        $nextYear = $businessUnit->createFiscalYear(2026);
+        $closedYear = $businessUnit->createFiscalYear(2025, $user);
+        $nextYear = $businessUnit->createFiscalYear(2026, $user);
 
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('締め済みの会計年度のみ繰越できます。');
 
-        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
     }
 
     #[Test]
@@ -376,15 +377,15 @@ class FiscalYearRolloverTest extends TestCase
             'name' => '繰越先事業体',
         ]);
 
-        $closedYear = $closedUnit->createFiscalYear(2025);
-        $nextYear = $nextUnit->createFiscalYear(2026);
+        $closedYear = $closedUnit->createFiscalYear(2025, $user);
+        $nextYear = $nextUnit->createFiscalYear(2026, $user);
 
         $closedYear->close($user);
 
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('繰越元と繰越先は同じ事業体でなければなりません。');
 
-        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
     }
 
     #[Test]
@@ -396,15 +397,15 @@ class FiscalYearRolloverTest extends TestCase
             'name' => '翌年度外事業体',
         ]);
 
-        $closedYear = $businessUnit->createFiscalYear(2025);
-        $nextYear = $businessUnit->createFiscalYear(2027);
+        $closedYear = $businessUnit->createFiscalYear(2025, $user);
+        $nextYear = $businessUnit->createFiscalYear(2027, $user);
 
         $closedYear->close($user);
 
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('繰越先は翌年度でなければなりません。');
 
-        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
     }
 
     #[Test]
@@ -416,8 +417,8 @@ class FiscalYearRolloverTest extends TestCase
             'name' => '期首仕訳あり事業体',
         ]);
 
-        $closedYear = $businessUnit->createFiscalYear(2025);
-        $nextYear = $businessUnit->createFiscalYear(2026);
+        $closedYear = $businessUnit->createFiscalYear(2025, $user);
+        $nextYear = $businessUnit->createFiscalYear(2026, $user);
 
         $closedYear->close($user);
         $nextYear->registerOpeningEntry([
@@ -426,12 +427,12 @@ class FiscalYearRolloverTest extends TestCase
                 'sub_account_name' => '現金',
                 'amount' => 1_000,
             ],
-        ]);
+        ], $user);
 
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('繰越先の会計年度にはすでに期首仕訳があります。');
 
-        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
     }
 
     #[Test]
@@ -443,14 +444,34 @@ class FiscalYearRolloverTest extends TestCase
             'name' => '繰越データなし事業体',
         ]);
 
-        $closedYear = $businessUnit->createFiscalYear(2025);
-        $nextYear = $businessUnit->createFiscalYear(2026);
+        $closedYear = $businessUnit->createFiscalYear(2025, $user);
+        $nextYear = $businessUnit->createFiscalYear(2026, $user);
 
         $closedYear->close($user);
 
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('繰越する残高がありません。');
 
-        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear);
+        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $user);
+
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function 他ユーザーは会計年度を繰り越せない(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '繰越認可事業体',
+        ]);
+        $closedYear = $businessUnit->createFiscalYear(2025, $user);
+        $nextYear = $businessUnit->createFiscalYear(2026, $user);
+
+        $closedYear->close($user);
+
+        $this->expectException(AuthorizationException::class);
+
+        app(FiscalYearRollover::class)->rollover($closedYear, $nextYear, $otherUser);
     }
 }

@@ -392,15 +392,15 @@ class JournalEntryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $account = $unit->accounts()
             ->where('name', 'その他の預金')
             ->firstOrFail();
 
-        $subA = $account->createSubAccount(['name' => '口座A']);
-        $subB = $account->createSubAccount(['name' => '口座B']);
-        $subC = $account->createSubAccount(['name' => '口座C']);
+        $subA = $account->createSubAccount(['name' => '口座A'], $user);
+        $subB = $account->createSubAccount(['name' => '口座B'], $user);
+        $subC = $account->createSubAccount(['name' => '口座C'], $user);
 
         $equitySubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query) {
@@ -409,77 +409,27 @@ class JournalEntryTest extends TestCase
 
         $registrar = app(TransactionRegistrar::class);
 
-        $registrar->register(
-            $fiscalYear,
-            [
-                'date' => '2025-03-01',
-                'description' => '口座Aへの入金',
-            ],
-            [
+        foreach ([[$subA, 10000, '口座A'], [$subB, 20000, '口座B'], [$subC, 30000, '口座C']] as [$subAccount, $amount, $label]) {
+            $registrar->register($fiscalYear, [
+                'date' => sprintf('2025-03-%02d', $amount / 10000),
+                'description' => "{$label}への入金",
+            ], [
                 [
-                    'sub_account_id' => $subA->id,
+                    'sub_account_id' => $subAccount->id,
                     'type' => 'debit',
-                    'net_amount' => 10000,
+                    'net_amount' => $amount,
                     'tax_amount' => 0,
                     'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
                 [
                     'sub_account_id' => $equitySubAccount->id,
                     'type' => 'credit',
-                    'net_amount' => 10000,
+                    'net_amount' => $amount,
                     'tax_amount' => 0,
                     'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
-            ]
-        );
-
-        $registrar->register(
-            $fiscalYear,
-            [
-                'date' => '2025-03-02',
-                'description' => '口座Bへの入金',
-            ],
-            [
-                [
-                    'sub_account_id' => $subB->id,
-                    'type' => 'debit',
-                    'net_amount' => 20000,
-                    'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
-                ],
-                [
-                    'sub_account_id' => $equitySubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 20000,
-                    'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
-                ],
-            ]
-        );
-
-        $registrar->register(
-            $fiscalYear,
-            [
-                'date' => '2025-03-03',
-                'description' => '口座Cへの入金',
-            ],
-            [
-                [
-                    'sub_account_id' => $subC->id,
-                    'type' => 'debit',
-                    'net_amount' => 30000,
-                    'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
-                ],
-                [
-                    'sub_account_id' => $equitySubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 30000,
-                    'tax_amount' => 0,
-                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
-                ],
-            ]
-        );
+            ], $user);
+        }
 
         $this->assertSame(3, $account->journalEntries()->count());
 

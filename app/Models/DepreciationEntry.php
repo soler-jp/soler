@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Contracts\ResolvesBusinessUnit;
 use App\Services\DepreciationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class DepreciationEntry extends Model
+class DepreciationEntry extends Model implements ResolvesBusinessUnit
 {
     protected $fillable = [
         'fiscal_year_id',
@@ -28,6 +29,13 @@ class DepreciationEntry extends Model
     public function fiscalYear(): BelongsTo
     {
         return $this->belongsTo(FiscalYear::class);
+    }
+
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('fiscalYear.businessUnit');
+
+        return $this->fiscalYear->businessUnit;
     }
 
     // 対象の固定資産

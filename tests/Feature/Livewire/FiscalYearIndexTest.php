@@ -20,8 +20,8 @@ class FiscalYearIndexTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '切替テスト事業']);
-        $fiscalYear2024 = $unit->createFiscalYear(2024);
-        $fiscalYear2025 = $unit->createFiscalYear(2025);
+        $fiscalYear2024 = $unit->createFiscalYear(2024, $user);
+        $fiscalYear2025 = $unit->createFiscalYear(2025, $user);
 
         Livewire::actingAs($user)
             ->test(FiscalYearIndex::class)
@@ -40,7 +40,7 @@ class FiscalYearIndexTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '締めテスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         Livewire::actingAs($user)
             ->test(FiscalYearIndex::class)
@@ -59,7 +59,7 @@ class FiscalYearIndexTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '繰越作成テスト事業']);
-        $closedYear = $unit->createFiscalYear(2025);
+        $closedYear = $unit->createFiscalYear(2025, $user);
         $closedYear->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
@@ -74,7 +74,7 @@ class FiscalYearIndexTest extends TestCase
                 'sub_account_name' => '現金',
                 'amount' => 100_000,
             ],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($closedYear, [
             'date' => '2025-04-10',
@@ -90,7 +90,7 @@ class FiscalYearIndexTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 30_000,
             ],
-        ]);
+        ], $user);
 
         $closedYear->close($user);
 

@@ -60,7 +60,7 @@ class TransactionJournalIndexTest extends TestCase
         ], [
             ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 10000],
             ['sub_account_id' => $sales->id, 'type' => 'credit', 'net_amount' => 10000],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-01-12',
@@ -68,7 +68,7 @@ class TransactionJournalIndexTest extends TestCase
         ], [
             ['sub_account_id' => $supplies->id, 'type' => 'debit', 'net_amount' => 3000],
             ['sub_account_id' => $cash->id, 'type' => 'credit', 'net_amount' => 3000],
-        ]);
+        ], $user);
 
         Livewire::actingAs($user)
             ->test(TransactionJournalIndex::class)
@@ -110,7 +110,7 @@ class TransactionJournalIndexTest extends TestCase
         ], [
             ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 10000],
             ['sub_account_id' => $sales->id, 'type' => 'credit', 'net_amount' => 10000],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-01-12',
@@ -118,7 +118,7 @@ class TransactionJournalIndexTest extends TestCase
         ], [
             ['sub_account_id' => $supplies->id, 'type' => 'debit', 'net_amount' => 3000],
             ['sub_account_id' => $cash->id, 'type' => 'credit', 'net_amount' => 3000],
-        ]);
+        ], $user);
 
         Livewire::actingAs($user)
             ->test(TransactionJournalIndex::class)
@@ -133,7 +133,7 @@ class TransactionJournalIndexTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '仕訳帳UIテスト']);
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
         $unit->refresh();
 
         return [$user, $unit];

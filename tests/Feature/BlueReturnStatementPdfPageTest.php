@@ -16,7 +16,7 @@ class BlueReturnStatementPdfPageTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
 
         $response = $this->actingAs($user)->get(route('blue-return-statement.pdf.show'));
 
@@ -31,7 +31,7 @@ class BlueReturnStatementPdfPageTest extends TestCase
     {
         $user = User::factory()->create(['name' => '山田 太郎']);
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
 
         $response = $this->actingAs($user)->post(route('blue-return-statement.pdf.download'), [
             'blue_return_deduction' => 650000,
@@ -51,7 +51,7 @@ class BlueReturnStatementPdfPageTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
 
         $response = $this
             ->from(route('blue-return-statement.pdf.show'))

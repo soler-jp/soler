@@ -27,7 +27,7 @@ class JournalSourceRendererTest extends TestCase
                         'sub_account_name' => '現金',
                         'amount' => 100_000,
                     ],
-                ]);
+                ], $user);
 
                 (new TransactionRegistrar)->register($fiscalYear, [
                     'date' => '2025-06-10',
@@ -43,7 +43,7 @@ class JournalSourceRendererTest extends TestCase
                         'type' => JournalEntry::TYPE_CREDIT,
                         'net_amount' => 10_000,
                     ],
-                ]);
+                ], $fiscalYear->businessUnit->user);
 
                 $this->assertTrue(true);
             }
@@ -102,7 +102,7 @@ class JournalSourceRendererTest extends TestCase
                         'type' => 'credit',
                         'net_amount' => 11_000,
                     ],
-                ]);
+                ], $fiscalYear->businessUnit->user);
             }
         }
         PHP;
@@ -158,7 +158,7 @@ class JournalSourceRendererTest extends TestCase
                         'type' => JournalEntry::TYPE_CREDIT,
                         'net_amount' => 11_000,
                     ],
-                ]);
+                ], $fiscalYear->businessUnit->user);
             }
         }
         PHP;
@@ -207,7 +207,7 @@ class JournalSourceRendererTest extends TestCase
                         'type' => 'credit',
                         'net_amount' => $amount,
                     ],
-                ]);
+                ], $fiscalYear->businessUnit->user);
             }
         }
         PHP;
@@ -254,7 +254,7 @@ class JournalSourceRendererTest extends TestCase
                         'type' => JournalEntry::TYPE_CREDIT,
                         'net_amount' => 20_000,
                     ],
-                ]);
+                ], $fiscalYear->businessUnit->user);
 
                 $this->assertSame(2026, $rolloverData['next_year']);
                 $this->assertSame([
@@ -322,7 +322,7 @@ class JournalSourceRendererTest extends TestCase
                 ], [
                     ['sub_account_id' => $cash->id, 'type' => 'debit', 'gross_amount' => 1100],
                     ['sub_account_id' => $ownerLoan->id, 'type' => 'credit', 'gross_amount' => 1100],
-                ]);
+                ], $fiscalYear->businessUnit->user);
             }
         }
         PHP;
@@ -364,7 +364,7 @@ class JournalSourceRendererTest extends TestCase
                 ], [
                     ['sub_account_id' => $cash->id, 'type' => 'debit', 'gross_amount' => 1100],
                     ['sub_account_id' => $ownerLoan->id, 'type' => 'credit', 'gross_amount' => 1100],
-                ]);
+                ], $fiscalYear->businessUnit->user);
             }
         }
         PHP;

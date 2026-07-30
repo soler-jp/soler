@@ -25,7 +25,7 @@ class TransactionJournalSearchTest extends TestCase
         [$user, $unit] = $this->createInitializedUser();
         $fiscalYear = $unit->currentFiscalYear;
 
-        $bank = $unit->getAccountByName('その他の預金')->createSubAccount(['name' => '三井住友銀行']);
+        $bank = $unit->getAccountByName('その他の預金')->createSubAccount(['name' => '三井住友銀行'], $user);
         $sales = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
         $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $supplies = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
@@ -61,7 +61,7 @@ class TransactionJournalSearchTest extends TestCase
         [$user, $unit] = $this->createInitializedUser();
         $fiscalYear = $unit->currentFiscalYear;
 
-        $bank = $unit->getAccountByName('その他の預金')->createSubAccount(['name' => '楽天銀行']);
+        $bank = $unit->getAccountByName('その他の預金')->createSubAccount(['name' => '楽天銀行'], $user);
         $sales = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
         $capital = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
 
@@ -104,8 +104,8 @@ class TransactionJournalSearchTest extends TestCase
             'name' => '丸の内文具',
         ]);
 
-        $bank = $unit->getAccountByName('その他の預金')->createSubAccount(['name' => '三井住友銀行']);
-        $supplies = $unit->getAccountByName('消耗品費')->createSubAccount(['name' => '文具']);
+        $bank = $unit->getAccountByName('その他の預金')->createSubAccount(['name' => '三井住友銀行'], $user);
+        $supplies = $unit->getAccountByName('消耗品費')->createSubAccount(['name' => '文具'], $user);
 
         $transaction = $this->registerTransaction($fiscalYear, [
             'date' => '2025-03-03',
@@ -235,9 +235,9 @@ class TransactionJournalSearchTest extends TestCase
             'date' => '2025-06-01',
             'description' => '複合経費',
         ], [
-            ['sub_account_id' => $supplies->id, 'type' => 'debit', 'net_amount' => 4000, 'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE],
+            ['sub_account_id' => $supplies->id, 'type' => 'debit', 'net_amount' => 4000, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
             ['sub_account_id' => $travel->id, 'type' => 'debit', 'net_amount' => 6000, 'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10],
-            ['sub_account_id' => $cash->id, 'type' => 'credit', 'net_amount' => 10000, 'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE],
+            ['sub_account_id' => $cash->id, 'type' => 'credit', 'net_amount' => 10000, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
         ]);
 
         $inactive = $this->registerTransaction($fiscalYear, [
@@ -266,7 +266,7 @@ class TransactionJournalSearchTest extends TestCase
         $this->assertSame([$split->id], collect($results->items())->pluck('id')->all());
         $this->assertSame('消耗品費 4,000 / 旅費交通費 6,000', $results->items()[0]->debit_summary);
         $this->assertSame('現金 10,000', $results->items()[0]->credit_summary);
-        $this->assertSame('非課税 / 10%', $results->items()[0]->journal_tax_type_summary);
+        $this->assertSame('不課税 / 10%', $results->items()[0]->journal_tax_type_summary);
     }
 
     #[Test]
@@ -415,7 +415,7 @@ class TransactionJournalSearchTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '仕訳帳テスト事業']);
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
         $unit->refresh();
 
         return [$user, $unit];
@@ -430,6 +430,6 @@ class TransactionJournalSearchTest extends TestCase
         array $transactionData,
         array $journalEntriesData,
     ): Transaction {
-        return (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        return (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 }

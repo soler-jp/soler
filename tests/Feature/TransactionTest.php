@@ -7,6 +7,7 @@ use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Validators\TransactionValidator;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Group;
@@ -55,7 +56,7 @@ class TransactionTest extends TestCase
     public function transactionをdeactivateできる()
     {
         $user = User::factory()->create();
-        $transaction = Transaction::factory()->create();
+        $transaction = $this->createTransactionForUser($user);
 
         $transaction->deactivate($user, '誤登録のため無効化');
 
@@ -71,13 +72,12 @@ class TransactionTest extends TestCase
     public function 既に無効化済みのtransactionを再度deactivateしても記録は上書きされない()
     {
         $firstUser = User::factory()->create();
-        $secondUser = User::factory()->create();
-        $transaction = Transaction::factory()->create();
+        $transaction = $this->createTransactionForUser($firstUser);
 
         $transaction->deactivate($firstUser, '初回の無効化');
         $firstDeactivatedAt = $transaction->fresh()->deactivated_at;
 
-        $transaction->fresh()->deactivate($secondUser, '再無効化');
+        $transaction->fresh()->deactivate($firstUser, '再無効化');
 
         $transaction->refresh();
 
@@ -88,13 +88,26 @@ class TransactionTest extends TestCase
     }
 
     #[Test]
+    public function 他ユーザーはtransactionをdeactivateできない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $transaction = $this->createTransactionForUser($user);
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この取引を無効化する権限がありません。');
+
+        $transaction->deactivate($otherUser, '不正な無効化');
+    }
+
+    #[Test]
     public function 決算済み会計年度のtransactionは無効化できない()
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => '無効化制御事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         $transaction = Transaction::factory()->create([
             'fiscal_year_id' => $fiscalYear->id,
         ]);
@@ -349,7 +362,7 @@ class TransactionTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'Transaction状態テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
 
         $transaction = Transaction::create([
             'fiscal_year_id' => $fiscalYear->id,
@@ -374,5 +387,16 @@ class TransactionTest extends TestCase
         }
 
         return $transaction->fresh(['journalEntries']);
+    }
+
+    private function createTransactionForUser(User $user): Transaction
+    {
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'Transaction無効化テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        return Transaction::factory()->create([
+            'fiscal_year_id' => $fiscalYear->id,
+            'created_by' => $user->id,
+        ]);
     }
 }

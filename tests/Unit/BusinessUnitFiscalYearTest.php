@@ -11,6 +11,7 @@ use App\Services\BlueReturnStatementCalculator;
 use App\Services\FiscalYearRollover;
 use App\Services\TransactionRegistrar;
 use App\Validators\FiscalYearValidator;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Group;
@@ -27,7 +28,7 @@ class BusinessUnitFiscalYearTest extends TestCase
         $user = User::factory()->create();
         $businessUnit = BusinessUnit::factory()->create(['user_id' => $user->id]);
 
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $this->assertInstanceOf(FiscalYear::class, $fiscalYear);
         $this->assertEquals(2025, $fiscalYear->year);
@@ -43,6 +44,18 @@ class BusinessUnitFiscalYearTest extends TestCase
     }
 
     #[Test]
+    public function 他ユーザーはfiscal_yearを作成できない()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $businessUnit = BusinessUnit::factory()->create(['user_id' => $user->id]);
+
+        $this->expectException(AuthorizationException::class);
+
+        $businessUnit->createFiscalYear(2025, $otherUser);
+    }
+
+    #[Test]
     public function 年度の重複でバリデーションエラーになる()
     {
         $user = User::factory()->create();
@@ -51,7 +64,7 @@ class BusinessUnitFiscalYearTest extends TestCase
             'type' => BusinessUnit::TYPE_GENERAL,
         ]);
 
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
         $this->assertEquals(2025, $fiscalYear->year);
 
         // 同じyearで重複登録しようとしてバリデーションエラー
@@ -76,7 +89,7 @@ class BusinessUnitFiscalYearTest extends TestCase
             'business_unit_id' => $businessUnit->id,
         ]);
 
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
         $fiscalYear->refresh(); // DBから最新の状態を取得
 
         $this->assertTrue($fiscalYear->is_active);
@@ -93,10 +106,10 @@ class BusinessUnitFiscalYearTest extends TestCase
         $businessUnit = BusinessUnit::factory()->create(['user_id' => $user->id]);
 
         // 1つ目作成でactiveになる
-        $businessUnit->createFiscalYear(2024);
+        $businessUnit->createFiscalYear(2024, $user);
 
         // 2つ目作成は非active
-        $fiscalYear2 = $businessUnit->createFiscalYear(2025);
+        $fiscalYear2 = $businessUnit->createFiscalYear(2025, $user);
 
         $this->assertFalse($fiscalYear2->is_active);
         $this->assertDatabaseHas('fiscal_years', [
@@ -111,7 +124,7 @@ class BusinessUnitFiscalYearTest extends TestCase
         $user = User::factory()->create();
         $businessUnit = BusinessUnit::factory()->create(['user_id' => $user->id]);
 
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $closedFiscalYear = $fiscalYear->close($user);
 
@@ -133,7 +146,7 @@ class BusinessUnitFiscalYearTest extends TestCase
         $user = User::factory()->create();
         $businessUnit = BusinessUnit::factory()->create(['user_id' => $user->id]);
 
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $calculator = new class
         {
@@ -165,7 +178,7 @@ class BusinessUnitFiscalYearTest extends TestCase
         $user = User::factory()->create();
         $businessUnit = BusinessUnit::factory()->create(['user_id' => $user->id]);
 
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
         $fiscalYear->update(['is_closed' => true, 'is_active' => false]);
 
         $this->expectException(\InvalidArgumentException::class);
@@ -183,7 +196,7 @@ class BusinessUnitFiscalYearTest extends TestCase
             'name' => '繰越事業体',
         ]);
 
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getSubAccountByName('現金', '現金');
         $sales = $businessUnit->getSubAccountByName('売上高', '売上高');
@@ -195,7 +208,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'sub_account_name' => '現金',
                 'amount' => 100000,
             ],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-10',
@@ -211,7 +224,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 30000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-05-10',
@@ -227,7 +240,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 5000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $fiscalYear->close($user);
 
@@ -250,8 +263,8 @@ class BusinessUnitFiscalYearTest extends TestCase
             'type' => 'credit',
         ], $rolloverData['capital_entry']);
 
-        $nextFiscalYear = $businessUnit->createFiscalYear($rolloverData['next_year']);
-        $openingTransaction = app(FiscalYearRollover::class)->rollover($fiscalYear, $nextFiscalYear);
+        $nextFiscalYear = $businessUnit->createFiscalYear($rolloverData['next_year'], $user);
+        $openingTransaction = app(FiscalYearRollover::class)->rollover($fiscalYear, $nextFiscalYear, $user);
 
         $this->assertInstanceOf(Transaction::class, $openingTransaction);
         $this->assertCount(2, $openingTransaction->journalEntries);
@@ -271,7 +284,7 @@ class BusinessUnitFiscalYearTest extends TestCase
             'name' => '複数繰越事業体',
         ]);
 
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getSubAccountByName('現金', '現金');
         $deposit = $businessUnit->getSubAccountByName('その他の預金', 'その他の預金');
@@ -287,7 +300,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'sub_account_name' => 'その他の預金',
                 'amount' => 50000,
             ],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-10',
@@ -303,7 +316,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 10000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $fiscalYear->close($user);
 
@@ -333,7 +346,7 @@ class BusinessUnitFiscalYearTest extends TestCase
             'name' => 'ゼロ残高繰越事業体',
         ]);
 
-        $fiscalYear = $businessUnit->createFiscalYear(2025);
+        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
         $cash = $businessUnit->getSubAccountByName('現金', '現金');
         $deposit = $businessUnit->getSubAccountByName('その他の預金', 'その他の預金');
@@ -350,7 +363,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'sub_account_name' => 'その他の預金',
                 'amount' => 50000,
             ],
-        ]);
+        ], $user);
 
         (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-04-10',
@@ -366,7 +379,7 @@ class BusinessUnitFiscalYearTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => 50000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $fiscalYear->close($user);
 

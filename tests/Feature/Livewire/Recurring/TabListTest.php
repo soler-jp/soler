@@ -18,7 +18,7 @@ class TabListTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $unit->createRecurringTransactionPlan([
             'name' => 'サーバー代',
@@ -28,7 +28,7 @@ class TabListTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $unit->subAccounts()->first()->id,
             'credit_sub_account_id' => $unit->subAccounts()->first()->id,
-        ]);
+        ], $user);
 
         $unit->createRecurringTransactionPlan([
             'name' => 'ソフトウェア使用料',
@@ -39,7 +39,7 @@ class TabListTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $unit->subAccounts()->first()->id,
             'credit_sub_account_id' => $unit->subAccounts()->first()->id,
-        ]);
+        ], $user);
 
         Livewire::actingAs($user)
             ->test(TabList::class)
@@ -56,7 +56,7 @@ class TabListTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debitSubAccount = $unit->subAccounts()->first();
         $creditSubAccount = $unit->subAccounts()->first(); // 同一でもOK（ここでは簡略化）
@@ -70,9 +70,9 @@ class TabListTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
-        ]);
+        ], $user);
 
-        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
 
         $tx = $transactions->first();
         $orgDebit = $tx->journalEntries->where('type', 'debit')->first();
@@ -127,7 +127,7 @@ class TabListTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $debitSubAccount = $unit->getAccountByName('消耗品費')->subAccounts()->first();
         $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->first();
@@ -142,9 +142,9 @@ class TabListTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
-        ]);
+        ], $user);
 
-        $tx = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->firstOrFail();
+        $tx = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
 
         Livewire::actingAs($user)
             ->test(TabList::class)
@@ -159,10 +159,10 @@ class TabListTest extends TestCase
         $otherUser = User::factory()->create();
 
         $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
 
         $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
-        $otherFiscalYear = $otherUnit->createFiscalYear(2025);
+        $otherFiscalYear = $otherUnit->createFiscalYear(2025, $otherUser);
 
         $otherDebit = $otherUnit->subAccounts()->first();
         $otherCredit = $otherUnit->getAccountByName('現金')->subAccounts()->first();
@@ -176,9 +176,9 @@ class TabListTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $otherDebit->id,
             'credit_sub_account_id' => $otherCredit->id,
-        ]);
+        ], $otherUser);
 
-        $otherTx = $otherUnit->generatePlannedTransactionsForPlan($plan, $otherFiscalYear)->first();
+        $otherTx = $otherUnit->generatePlannedTransactionsForPlan($plan, $otherFiscalYear, $otherUser)->first();
         $ownCredit = $unit->getAccountByName('事業主借')->subAccounts()->first();
 
         Livewire::actingAs($user)
@@ -212,10 +212,10 @@ class TabListTest extends TestCase
         $otherUser = User::factory()->create();
 
         $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
-        $otherUnit->createFiscalYear(2025);
+        $otherUnit->createFiscalYear(2025, $otherUser);
 
         $debitSubAccount = $unit->subAccounts()->first();
         $creditSubAccount = $unit->getAccountByName('現金')->subAccounts()->first();
@@ -230,9 +230,9 @@ class TabListTest extends TestCase
             'is_income' => false,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
-        ]);
+        ], $user);
 
-        $tx = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear)->first();
+        $tx = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->first();
 
         Livewire::actingAs($user)
             ->test(TabList::class)

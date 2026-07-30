@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\BlueReturnInput;
 use App\Models\FiscalYear;
+use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -11,15 +13,19 @@ use Illuminate\Validation\ValidationException;
 
 class BlueReturnInputRegistrar
 {
+    use AuthorizesBusinessUnitAccess;
+
     /**
      * @param  array<string, array<string, mixed>>  $inputs
      * @return Collection<int, BlueReturnInput>
      */
-    public function saveMany(FiscalYear $fiscalYear, array $inputs): Collection
+    public function saveMany(FiscalYear $fiscalYear, array $inputs, User $actor): Collection
     {
-        return DB::transaction(function () use ($fiscalYear, $inputs): Collection {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度の決算書入力を保存する権限がありません。');
+
+        return DB::transaction(function () use ($fiscalYear, $inputs, $actor): Collection {
             return collect($inputs)->map(
-                fn (array $value, string $key): BlueReturnInput => $this->save($fiscalYear, $key, $value)
+                fn (array $value, string $key): BlueReturnInput => $this->save($fiscalYear, $key, $value, $actor)
             );
         });
     }
@@ -27,8 +33,10 @@ class BlueReturnInputRegistrar
     /**
      * @param  array<string, mixed>  $value
      */
-    public function save(FiscalYear $fiscalYear, string $key, array $value): BlueReturnInput
+    public function save(FiscalYear $fiscalYear, string $key, array $value, User $actor): BlueReturnInput
     {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度の決算書入力を保存する権限がありません。');
+
         if (! in_array($key, BlueReturnInput::KEYS, true)) {
             throw ValidationException::withMessages([
                 'key' => ['未対応の決算書入力です。'],

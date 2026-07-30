@@ -20,7 +20,7 @@ class DepreciationEntryPropertyMapTest extends TestCase
         $unit = $user->createBusinessUnitWithDefaults([
             'name' => 'テスト事業体',
         ]);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $assetSubAccount = $unit->subAccounts()
             ->whereHas('account', function ($query): void {

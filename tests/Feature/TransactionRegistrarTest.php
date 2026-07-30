@@ -9,6 +9,7 @@ use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
@@ -37,12 +38,49 @@ class TransactionRegistrarTest extends TestCase
 
     private function createBusinessUnitFiscalYear(array $attributes = []): FiscalYear
     {
+        [$fiscalYear] = $this->createBusinessUnitFiscalYearWithActor($attributes);
+
+        return $fiscalYear;
+    }
+
+    /**
+     * @return array{0: FiscalYear, 1: User}
+     */
+    private function createBusinessUnitFiscalYearWithActor(array $attributes = []): array
+    {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(array_merge([
             'name' => 'テスト事業体',
         ], $attributes));
 
-        return $unit->createFiscalYear(2025);
+        return [$unit->createFiscalYear(2025, $user), $user];
+    }
+
+    #[Test]
+    public function actorが会計年度の事業体にアクセスできない場合は取引登録を拒否する(): void
+    {
+        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$debitSubAccount, $creditSubAccount] = $this->createTwoSubAccountsForFiscalYear($fiscalYear);
+        $otherUser = User::factory()->create();
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この会計年度に取引を登録する権限がありません。');
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-01-01',
+            'description' => '権限なし登録',
+        ], [
+            [
+                'sub_account_id' => $debitSubAccount->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+            ],
+            [
+                'sub_account_id' => $creditSubAccount->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+            ],
+        ], $otherUser);
     }
 
     #[Test]
@@ -70,7 +108,7 @@ class TransactionRegistrarTest extends TestCase
         ];
 
         $registrar = new TransactionRegistrar;
-        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
 
         $this->assertDatabaseHas('transactions', [
             'id' => $transaction->id,
@@ -101,7 +139,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertSame(1000, $transaction->journalEntries()->where('type', 'debit')->first()->net_amount);
         $this->assertDatabaseHas('journal_entries', [
@@ -115,7 +153,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先自動作成事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
@@ -134,7 +172,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $this->assertSame('ABC商店', $transaction->counterparty->name);
         $this->assertSame('T1234567890123', $transaction->counterparty->registration_number);
@@ -146,7 +184,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先自動作成事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
@@ -165,7 +203,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $this->assertSame('ABC商店', $transaction->counterparty->name);
         $this->assertSame('T1234567890123', $transaction->counterparty->registration_number);
@@ -176,7 +214,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先自動作成事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $transaction = (new TransactionRegistrar)->register($fiscalYear, [
@@ -194,7 +232,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $this->assertSame('XYZストア', $transaction->counterparty->name);
         $this->assertNull($transaction->counterparty->registration_number);
@@ -206,7 +244,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先再利用事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $first = (new TransactionRegistrar)->register($fiscalYear, [
@@ -224,7 +262,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $second = (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-06-15',
@@ -241,7 +279,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $this->assertSame($first->counterparty_id, $second->counterparty_id);
         $this->assertDatabaseCount('counterparties', 1);
@@ -255,7 +293,7 @@ class TransactionRegistrarTest extends TestCase
 
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先エラー事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         (new TransactionRegistrar)->register($fiscalYear, [
@@ -274,7 +312,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
     }
 
     #[Test]
@@ -285,7 +323,7 @@ class TransactionRegistrarTest extends TestCase
 
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先エラー事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         (new TransactionRegistrar)->register($fiscalYear, [
@@ -303,7 +341,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
     }
 
     #[Test]
@@ -316,7 +354,7 @@ class TransactionRegistrarTest extends TestCase
         $otherUser = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
         $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $counterparty = Counterparty::factory()->create([
@@ -339,7 +377,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
     }
 
     #[Test]
@@ -364,7 +402,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertNull($transaction->counterparty_id);
     }
@@ -374,7 +412,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先紐づけ事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $counterparty = Counterparty::factory()->create([
@@ -398,7 +436,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $this->assertTrue($transaction->counterparty->is($counterparty));
         $this->assertSame('XYZストア', $transaction->counterparty->name);
@@ -413,7 +451,7 @@ class TransactionRegistrarTest extends TestCase
 
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先矛盾事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
         $counterparty = Counterparty::factory()->create([
@@ -437,7 +475,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
     }
 
     #[Test]
@@ -445,6 +483,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $this->expectException(ValidationException::class);
 
+        $actor = User::factory()->create();
         $fiscalYear = FiscalYear::factory()->create();
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
         $registrar = new TransactionRegistrar;
@@ -466,7 +505,7 @@ class TransactionRegistrarTest extends TestCase
                 'net_amount' => 1000,
             ],
         ];
-        $registrar->register(null, $transactionData, $journalEntriesData);
+        $registrar->register(null, $transactionData, $journalEntriesData, $actor);
     }
 
     #[Test]
@@ -497,7 +536,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ];
 
-        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -523,7 +562,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -555,7 +594,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('仕訳の金額がバランスしていません（借方: 1000 / 貸方: 800 / 差額: +200）');
 
-        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -576,7 +615,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -596,7 +635,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'net_amount' => 1000],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -617,7 +656,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 900],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -638,7 +677,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 500],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -659,7 +698,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 0],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -680,7 +719,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -697,7 +736,7 @@ class TransactionRegistrarTest extends TestCase
 
         $journalEntriesData = [];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -718,7 +757,7 @@ class TransactionRegistrarTest extends TestCase
             ['sub_account_id' => $subAccount->id, 'type' => 'debit', 'net_amount' => 1000],
         ];
 
-        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData);
+        (new TransactionRegistrar)->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -751,7 +790,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ];
 
-        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
 
         $this->assertDatabaseHas('transactions', [
             'id' => $transaction->id,
@@ -792,7 +831,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('仕訳の金額がバランスしていません');
 
-        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -828,7 +867,7 @@ class TransactionRegistrarTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('消費税額');
 
-        $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -865,7 +904,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ];
 
-        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
 
         $this->assertDatabaseHas('transactions', [
             'id' => $transaction->id,
@@ -903,7 +942,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ];
 
-        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
 
         $this->assertDatabaseHas('transactions', [
             'id' => $transaction->id,
@@ -939,7 +978,7 @@ class TransactionRegistrarTest extends TestCase
             ],
         ];
 
-        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData);
+        $transaction = $registrar->register($fiscalYear, $transactionData, $journalEntriesData, $fiscalYear->businessUnit->user);
 
         $this->assertDatabaseHas('transactions', [
             'id' => $transaction->id,
@@ -969,7 +1008,7 @@ class TransactionRegistrarTest extends TestCase
                 'net_amount' => 3000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertSame(0, $transaction->journalEntries()->where('type', 'debit')->first()->tax_amount);
         $this->assertSame(0, $transaction->journalEntries()->where('type', 'credit')->first()->tax_amount);
@@ -999,7 +1038,7 @@ class TransactionRegistrarTest extends TestCase
                 'tax_amount' => 0,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertSame(
             JournalEntry::TAX_AMOUNT_SOURCE_USER_INPUT,
@@ -1035,7 +1074,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $debit = $transaction->journalEntries()->where('type', 'debit')->firstOrFail();
         $credit = $transaction->journalEntries()->where('type', 'credit')->firstOrFail();
@@ -1078,7 +1117,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1000,
                 'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertTrue($transaction->journalEntries->every(function ($entry) {
             return $entry->net_amount === 1000
@@ -1093,7 +1132,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '家事按分テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
         $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
         $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
         $householdSubAccount = $unit->getSubAccountByName('事業主貸', '家事按分');
@@ -1115,7 +1154,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 10000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertCount(3, $transaction->journalEntries);
         $this->assertSame(60, $transaction->business_ratio);
@@ -1139,7 +1178,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '事業割合未指定テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
         $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
         $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
 
@@ -1159,7 +1198,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 10000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertCount(2, $transaction->journalEntries);
         $this->assertSame(100, $transaction->business_ratio);
@@ -1177,7 +1216,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '事業割合100テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
         $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
         $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
 
@@ -1198,7 +1237,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 10000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertCount(2, $transaction->journalEntries);
 
@@ -1214,7 +1253,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '事業割合エラーテスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
         $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
         $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
 
@@ -1238,7 +1277,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 10000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1246,7 +1285,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '事業割合範囲外テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025)->refresh();
+        $fiscalYear = $unit->createFiscalYear(2025, $user)->refresh();
         $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
         $creditSubAccount = $unit->getSubAccountByName('現金', '現金');
 
@@ -1270,7 +1309,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 10000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1298,7 +1337,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $debit = $transaction->journalEntries()->where('type', 'debit')->firstOrFail();
         $credit = $transaction->journalEntries()->where('type', 'credit')->firstOrFail();
@@ -1341,7 +1380,7 @@ class TransactionRegistrarTest extends TestCase
                 'net_amount' => 1000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1372,7 +1411,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1400,7 +1439,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1000,
                 'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $this->assertTrue($transaction->journalEntries->every(function ($entry) {
             return $entry->net_amount === 1000
@@ -1435,7 +1474,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1000,
                 'tax_type' => JournalEntry::TAX_TYPE_ZERO_RATED,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
 
         $credit = $transaction->journalEntries()->where('type', 'credit')->firstOrFail();
 
@@ -1448,7 +1487,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 免税事業者が税込2200円の売上をレジ現金に保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => false,
             'is_tax_exclusive' => false,
@@ -1473,7 +1512,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'gross_amount' => 2200,
             ],
-        ]);
+        ], $actor);
 
         $cashEntry = $transaction->journalEntries()->where('sub_account_id', $cashSubAccount->id)->firstOrFail();
         $salesEntry = $transaction->journalEntries()->where('sub_account_id', $salesSubAccount->id)->firstOrFail();
@@ -1490,7 +1529,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 免税事業者が税込1100円の通信費をレジ現金で保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => false,
             'is_tax_exclusive' => false,
@@ -1515,7 +1554,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $actor);
 
         $expenseEntry = $transaction->journalEntries()->where('sub_account_id', $expenseSubAccount->id)->firstOrFail();
         $cashEntry = $transaction->journalEntries()->where('sub_account_id', $cashSubAccount->id)->firstOrFail();
@@ -1532,7 +1571,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 課税事業者が税込2200円の売上をレジ現金に保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
@@ -1558,7 +1597,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 2200,
                 'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
             ],
-        ]);
+        ], $actor);
 
         $salesEntry = $transaction->journalEntries()->where('sub_account_id', $salesSubAccount->id)->firstOrFail();
 
@@ -1570,7 +1609,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 課税事業者が税込1100円の通信費をレジ現金で保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
@@ -1596,7 +1635,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $actor);
 
         $expenseEntry = $transaction->journalEntries()->where('sub_account_id', $expenseSubAccount->id)->firstOrFail();
 
@@ -1608,7 +1647,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 課税事業者が税込1080円の軽減税率経費をレジ現金で保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
@@ -1634,7 +1673,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1080,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $actor);
 
         $expenseEntry = $transaction->journalEntries()->where('sub_account_id', $expenseSubAccount->id)->firstOrFail();
 
@@ -1646,7 +1685,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 課税事業者が軽減税率8パーセントと10パーセントが混在する仕入れを保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
@@ -1678,7 +1717,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 7660,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $actor);
 
         $reducedRateEntry = $transaction->journalEntries()
             ->where('tax_type', JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8)
@@ -1704,7 +1743,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 課税事業者が税込1000円の非課税経費をレジ現金で保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
@@ -1730,7 +1769,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $actor);
 
         $expenseEntry = $transaction->journalEntries()->where('sub_account_id', $expenseSubAccount->id)->firstOrFail();
 
@@ -1767,7 +1806,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1798,7 +1837,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1808,7 +1847,7 @@ class TransactionRegistrarTest extends TestCase
         $otherUser = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
         $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $ownExpense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $foreignAsset = $otherUnit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -1830,7 +1869,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $fiscalYear->businessUnit->user);
     }
 
     #[Test]
@@ -1838,7 +1877,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'Test帳簿']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $account = $unit->accounts()->first();
         $subAccount = $account->subAccounts->first();
@@ -1860,7 +1899,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $this->assertTrue($transaction->is_planned);
     }
@@ -1869,8 +1908,9 @@ class TransactionRegistrarTest extends TestCase
     public function 予定取引を本登録に変更できる()
     {
         $user = User::factory()->create();
+        $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -1894,12 +1934,12 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1100,
             ],
-        ]);
+        ], $user);
 
         $transaction->description = '本登録済み';
         $transaction->date = '2025-04-02';
 
-        $confirmed = $registrar->confirmPlanned($transaction);
+        $confirmed = $registrar->confirmPlanned($transaction, $user);
 
         $this->assertFalse($confirmed->is_planned);
         $this->assertSame('本登録済み', $confirmed->description);
@@ -1910,8 +1950,9 @@ class TransactionRegistrarTest extends TestCase
     public function 本登録時に仕訳の内容を変更できて元の仕訳は上書きされる()
     {
         $user = User::factory()->create();
+        $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -1936,7 +1977,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1100,
             ],
-        ]);
+        ], $user);
 
         $transaction->description = '本登録済み（仕訳変更）';
         $transaction->date = '2025-04-02';
@@ -1950,7 +1991,7 @@ class TransactionRegistrarTest extends TestCase
         $credit->net_amount = 2200;
         $credit->sub_account_id = $liability->id;
 
-        $confirmed = $registrar->confirmPlanned($transaction);
+        $confirmed = $registrar->confirmPlanned($transaction, $user);
 
         $this->assertFalse($confirmed->is_planned);
         $this->assertSame('本登録済み（仕訳変更）', $confirmed->description);
@@ -1966,8 +2007,9 @@ class TransactionRegistrarTest extends TestCase
     public function 予定取引を0円の本登録に変換して取消できる()
     {
         $user = User::factory()->create();
+        $this->actingAs($user);
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -1991,7 +2033,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1100,
             ],
-        ]);
+        ], $user);
 
         foreach ($transaction->journalEntries as $entry) {
             $entry->net_amount = 0;
@@ -1999,7 +2041,7 @@ class TransactionRegistrarTest extends TestCase
 
         $transaction->description = '取消予定取引（取消）';
 
-        $cancelled = $registrar->confirmPlanned($transaction);
+        $cancelled = $registrar->confirmPlanned($transaction, $user);
 
         $this->assertFalse($cancelled->is_planned);
         $this->assertSame('取消予定取引（取消）', $cancelled->description);
@@ -2012,7 +2054,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -2036,7 +2078,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1100,
             ],
-        ]);
+        ], $user);
 
         $cancelled = $registrar->cancelPlanned($transaction, $user);
 
@@ -2056,7 +2098,7 @@ class TransactionRegistrarTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -2071,17 +2113,17 @@ class TransactionRegistrarTest extends TestCase
             'tax_amount' => 500,
             'tax_type' => 'taxable_purchases_10',
             'is_income' => false,
-        ]);
+        ], $user);
 
         $registrar = new TransactionRegistrar;
 
-        $generated = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+        $generated = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
         $this->assertCount(12, $generated);
 
         $registrar->cancelPlanned($generated->first(), $user);
 
         // 存在チェックは is_active を見ないため、取消済みでも再生成されない
-        $regenerated = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear);
+        $regenerated = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
         $this->assertCount(0, $regenerated);
     }
 
@@ -2092,7 +2134,7 @@ class TransactionRegistrarTest extends TestCase
 
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $expense = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '通信費'))->first();
         $asset = $unit->subAccounts()->whereHas('account', fn ($q) => $q->where('name', '現金'))->first();
@@ -2114,12 +2156,12 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
-        $registrar->cancelPlanned($transaction);
+        $registrar->cancelPlanned($transaction, $user);
     }
 
-    private function registerWithDate(FiscalYear $fiscalYear, string $date): Transaction
+    private function registerWithDate(FiscalYear $fiscalYear, string $date, User $actor): Transaction
     {
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
@@ -2137,15 +2179,15 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $actor);
     }
 
     #[Test]
     public function 会計年度の開始日当日の取引は登録できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
 
-        $transaction = $this->registerWithDate($fiscalYear, '2025-01-01');
+        $transaction = $this->registerWithDate($fiscalYear, '2025-01-01', $actor);
 
         $this->assertSame('2025-01-01', $transaction->date->toDateString());
     }
@@ -2153,9 +2195,9 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 会計年度の終了日当日の取引は登録できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
 
-        $transaction = $this->registerWithDate($fiscalYear, '2025-12-31');
+        $transaction = $this->registerWithDate($fiscalYear, '2025-12-31', $actor);
 
         $this->assertSame('2025-12-31', $transaction->date->toDateString());
     }
@@ -2163,22 +2205,48 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 会計年度の開始日より前の取引は登録できない()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('取引日は会計年度の期間内（2025-01-01〜2025-12-31）で指定してください。');
 
-        $this->registerWithDate($fiscalYear, '2024-12-31');
+        $this->registerWithDate($fiscalYear, '2024-12-31', $actor);
     }
 
     #[Test]
     public function 会計年度の終了日より後の取引は登録できない()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('取引日は会計年度の期間内（2025-01-01〜2025-12-31）で指定してください。');
 
-        $this->registerWithDate($fiscalYear, '2026-01-01');
+        $this->registerWithDate($fiscalYear, '2026-01-01', $actor);
+    }
+
+    #[Test]
+    public function 他ユーザーは予定取引をcancel_plannedで取消できない(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取消認可テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $debit = $unit->getAccountByName('通信費')->subAccounts()->firstOrFail();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+
+        $registrar = new TransactionRegistrar;
+        $transaction = $registrar->register($fiscalYear, [
+            'date' => '2025-05-01',
+            'description' => '取消認可テスト予定',
+            'is_planned' => true,
+        ], [
+            ['sub_account_id' => $debit->id, 'type' => JournalEntry::TYPE_DEBIT, 'net_amount' => 1000],
+            ['sub_account_id' => $credit->id, 'type' => JournalEntry::TYPE_CREDIT, 'net_amount' => 1000],
+        ], $user);
+
+        $this->expectException(AuthorizationException::class);
+
+        $registrar->cancelPlanned($transaction, $otherUser);
     }
 }

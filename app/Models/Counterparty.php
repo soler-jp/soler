@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
+use App\Contracts\ResolvesBusinessUnit;
 use App\Services\CounterpartySummaryCalculator;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,8 +12,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use InvalidArgumentException;
 
-class Counterparty extends Model
+class Counterparty extends Model implements ResolvesBusinessUnit
 {
+    use AuthorizesBusinessUnitAccess;
     use HasFactory;
 
     public const QUALIFICATION_STATUS_UNKNOWN = 'unknown';
@@ -61,6 +64,13 @@ class Counterparty extends Model
         return $this->belongsTo(BusinessUnit::class);
     }
 
+    public function resolveBusinessUnit(): BusinessUnit
+    {
+        $this->loadMissing('businessUnit');
+
+        return $this->businessUnit;
+    }
+
     public function qualificationEvents(): HasMany
     {
         return $this->hasMany(CounterpartyQualificationEvent::class);
@@ -99,8 +109,10 @@ class Counterparty extends Model
         return app(CounterpartySummaryCalculator::class)->calculateForFiscalYear($this, $fiscalYear);
     }
 
-    public function setQualificationStatus(string $qualificationStatus, ?Carbon $effectiveFrom = null): void
+    public function setQualificationStatus(string $qualificationStatus, User $actor, ?Carbon $effectiveFrom = null): void
     {
+        $this->authorizeBusinessUnitAccess($this, $actor, 'この取引先の適格判定状態を変更する権限がありません。');
+
         if (! in_array($qualificationStatus, self::MUTABLE_QUALIFICATION_STATUSES, true)) {
             throw new InvalidArgumentException('unknown には変更できません。');
         }

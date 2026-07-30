@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -79,6 +80,17 @@ class User extends Authenticatable
     public function selectedBusinessUnit(): BelongsTo
     {
         return $this->belongsTo(BusinessUnit::class, 'current_business_unit_id');
+    }
+
+    public function selectedBusinessUnitOrFail(): BusinessUnit
+    {
+        $businessUnit = $this->selectedBusinessUnit;
+
+        if ($businessUnit === null) {
+            throw new AuthorizationException('選択中の事業体がありません。');
+        }
+
+        return $businessUnit;
     }
 
     public function setSelectedBusinessUnit(BusinessUnit $unit): void

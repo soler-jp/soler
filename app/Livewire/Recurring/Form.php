@@ -31,7 +31,7 @@ class Form extends Component
     {
         $this->date = now()->toDateString();
 
-        $unit = auth()->user()->selectedBusinessUnit;
+        $unit = auth()->user()->selectedBusinessUnitOrFail();
 
         $this->expenseAccounts = $unit->accounts()
             ->with('subAccounts')
@@ -48,7 +48,7 @@ class Form extends Component
 
     public function save()
     {
-        $unit = auth()->user()->selectedBusinessUnit;
+        $unit = auth()->user()->selectedBusinessUnitOrFail();
 
         $validated = $this->validate([
             'form.name' => ['required', 'string', 'max:255'],
@@ -68,6 +68,7 @@ class Form extends Component
         try {
             \DB::transaction(function () use ($unit, $validated) {
                 $form = $validated['form'];
+                $actor = auth()->user();
 
                 $plan = $unit->createRecurringTransactionPlan([
                     'name' => $form['name'],
@@ -84,11 +85,12 @@ class Form extends Component
                     'start_month' => $form['interval'] === 'bimonthly'
                         ? ($form['start_month_type'] === 'odd' ? 1 : 2)
                         : null,
-                ]);
+                ], $actor);
 
                 $unit->generatePlannedTransactionsForPlan(
                     $plan,
-                    $unit->currentFiscalYear
+                    $unit->currentFiscalYear,
+                    $actor,
                 );
             });
 

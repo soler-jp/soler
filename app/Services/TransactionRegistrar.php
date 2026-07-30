@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\Account;
 use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
@@ -18,6 +19,8 @@ use Illuminate\Validation\ValidationException;
 
 class TransactionRegistrar
 {
+    use AuthorizesBusinessUnitAccess;
+
     /**
      * 取引と仕訳の登録を行う
      *
@@ -26,7 +29,7 @@ class TransactionRegistrar
      *
      * @throws ValidationException
      */
-    public function register(?FiscalYear $fiscalYear, array $transactionData, array $journalEntriesData): Transaction
+    public function register(?FiscalYear $fiscalYear, array $transactionData, array $journalEntriesData, User $actor): Transaction
     {
         // fiscalYear がnullの場合はバリデーションエラー
         if (is_null($fiscalYear)) {
@@ -34,6 +37,8 @@ class TransactionRegistrar
                 'fiscal_year_id' => ['Fiscal year is required.'],
             ]);
         }
+
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度に取引を登録する権限がありません。');
 
         if ($fiscalYear->is_closed) {
             throw ValidationException::withMessages([
@@ -159,7 +164,7 @@ class TransactionRegistrar
         ];
     }
 
-    public function confirmPlanned(Transaction $transaction): Transaction
+    public function confirmPlanned(Transaction $transaction, User $actor): Transaction
     {
         if (! $transaction->is_planned) {
             throw new \InvalidArgumentException('この取引は既に本登録されています。');
@@ -169,7 +174,7 @@ class TransactionRegistrar
 
         return app(PlannedTransactionConfirmer::class)->confirm(
             $transaction,
-            auth()->user(),
+            $actor,
             $overrides,
             $this->buildPlannedJournalEntries($transaction, $overrides),
         );
@@ -484,8 +489,10 @@ class TransactionRegistrar
      * is_planned は true のまま残すことで、定期取引の再生成をブロックする
      * （BusinessUnit::generatePlannedTransactionsForPlan の存在チェックは is_active を見ない）。
      */
-    public function cancelPlanned(Transaction $transaction, ?User $user = null): Transaction
+    public function cancelPlanned(Transaction $transaction, User $user): Transaction
     {
+        $this->authorizeBusinessUnitAccess($transaction, $user, 'この予定取引を取消する権限がありません。');
+
         if (! $transaction->is_planned) {
             throw new \InvalidArgumentException('本登録された取引は取消できません。');
         }

@@ -19,7 +19,7 @@
 
 ### 同名の補助科目を自動作成する
 
-第3引数を省略すると、`Account` と同じ名前の `SubAccount` が作成されます。
+第3引数に `null` を渡すと、`Account` と同じ名前の `SubAccount` が作成されます。
 
 ```php
 $user = App\Models\User::findOrFail(1);
@@ -28,6 +28,8 @@ $businessUnit = $user->businessUnits()->findOrFail(10);
 $account = $businessUnit->addCustomAccount(
     App\Models\Account::TYPE_EXPENSE,
     '会議費',
+    null,
+    $user,
 );
 ```
 
@@ -38,7 +40,7 @@ $account = $businessUnit->addCustomAccount(
 
 ### 別名の補助科目を同時に作成する
 
-第3引数を指定すると、初期補助科目名を上書きできます。
+第3引数に補助科目名を指定すると、初期補助科目名を上書きできます。
 
 ```php
 $user = App\Models\User::findOrFail(1);
@@ -48,6 +50,7 @@ $account = $businessUnit->addCustomAccount(
     App\Models\Account::TYPE_EXPENSE,
     '会議費',
     '役員会議',
+    $user,
 );
 ```
 
@@ -65,7 +68,7 @@ $user = App\Models\User::findOrFail(1);
 $businessUnit = $user->businessUnits()->findOrFail(10);
 $account = $businessUnit->getAccountByName('会議費');
 
-$subAccount = $account->addCustomSubAccount('定例会議');
+$subAccount = $account->addCustomSubAccount('定例会議', $user);
 ```
 
 ## 注意点

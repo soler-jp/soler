@@ -34,8 +34,8 @@ class FixedAssetFactory extends Factory
         return [
             'business_unit_id' => $businessUnit->id,
             'account_id' => $account->id,
-            'asset_category' => '新車-普通車',
-            'name' => '新車-普通車',
+            'asset_category' => FixedAsset::ASSET_CATEGORY_NEW_STANDARD_CAR,
+            'name' => FixedAsset::ASSET_CATEGORY_NEW_STANDARD_CAR,
             'acquisition_date' => $this->faker->date(),
             'taxable_amount' => 2_000_000,
             'tax_amount' => 200_000,

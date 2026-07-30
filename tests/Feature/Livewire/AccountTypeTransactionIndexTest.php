@@ -67,15 +67,15 @@ class AccountTypeTransactionIndexTest extends TestCase
                 'sub_account_id' => $purchase->id,
                 'type' => 'debit',
                 'net_amount' => 12000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $cash->id,
                 'type' => 'credit',
                 'net_amount' => 12000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-01-20',
@@ -85,15 +85,15 @@ class AccountTypeTransactionIndexTest extends TestCase
                 'sub_account_id' => $expense->id,
                 'type' => 'debit',
                 'net_amount' => 3000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $cash->id,
                 'type' => 'credit',
                 'net_amount' => 3000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         Livewire::actingAs($user)
             ->test(AccountTypeTransactionIndex::class, ['kind' => 'purchase'])
@@ -125,15 +125,15 @@ class AccountTypeTransactionIndexTest extends TestCase
                 'type' => 'debit',
                 'gross_amount' => 10000,
                 'business_ratio' => 60,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
                 'type' => 'credit',
                 'gross_amount' => 10000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-03-20',
@@ -144,15 +144,15 @@ class AccountTypeTransactionIndexTest extends TestCase
                 'sub_account_id' => $unit->getAccountByName('仕入金額')->subAccounts()->firstOrFail()->id,
                 'type' => 'debit',
                 'net_amount' => 12000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
                 'type' => 'credit',
                 'net_amount' => 12000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         Livewire::actingAs($user)
             ->test(AccountTypeTransactionIndex::class, ['kind' => 'expense'])
@@ -186,15 +186,15 @@ class AccountTypeTransactionIndexTest extends TestCase
                 'sub_account_id' => $cash->id,
                 'type' => 'debit',
                 'net_amount' => 2000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $sales->id,
                 'type' => 'credit',
                 'net_amount' => 2000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-01-01',
@@ -204,15 +204,15 @@ class AccountTypeTransactionIndexTest extends TestCase
                 'sub_account_id' => $cash->id,
                 'type' => 'debit',
                 'net_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $sales->id,
                 'type' => 'credit',
                 'net_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         $component = Livewire::actingAs($user)
             ->test(AccountTypeTransactionIndex::class, ['kind' => 'revenue']);
@@ -243,15 +243,15 @@ class AccountTypeTransactionIndexTest extends TestCase
                 'sub_account_id' => $supplies->id,
                 'type' => 'debit',
                 'net_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $cash->id,
                 'type' => 'credit',
                 'net_amount' => 1000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-01-20',
@@ -261,15 +261,15 @@ class AccountTypeTransactionIndexTest extends TestCase
                 'sub_account_id' => $travel->id,
                 'type' => 'debit',
                 'net_amount' => 2000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $cash->id,
                 'type' => 'credit',
                 'net_amount' => 2000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         $registrar->register($fiscalYear, [
             'date' => '2025-02-05',
@@ -279,15 +279,15 @@ class AccountTypeTransactionIndexTest extends TestCase
                 'sub_account_id' => $purchase->id,
                 'type' => 'debit',
                 'net_amount' => 3000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
                 'sub_account_id' => $cash->id,
                 'type' => 'credit',
                 'net_amount' => 3000,
-                'tax_type' => JournalEntry::TAX_TYPE_NON_TAXABLE,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $user);
 
         $component = Livewire::actingAs($user)
             ->test(AccountTypeTransactionIndex::class, ['kind' => 'expense_type'])
@@ -321,7 +321,7 @@ class AccountTypeTransactionIndexTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $unit->createFiscalYear(2025);
+        $unit->createFiscalYear(2025, $user);
         $unit->refresh();
 
         return [$user, $unit];

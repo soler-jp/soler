@@ -3,8 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
-use App\Models\BusinessUnit;
 use App\Models\SubAccount;
+use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -55,13 +56,16 @@ class SubAccountTest extends TestCase
     #[Test]
     public function add_custom_sub_accountで補助科目を追加できる(): void
     {
-        $businessUnit = BusinessUnit::factory()->create();
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '補助科目追加テスト',
+        ]);
         $account = $businessUnit->accounts()->create([
             'name' => '会議費',
             'type' => Account::TYPE_EXPENSE,
         ]);
 
-        $subAccount = $account->addCustomSubAccount('役員会議');
+        $subAccount = $account->addCustomSubAccount('役員会議', $user);
 
         $this->assertDatabaseHas('sub_accounts', [
             'id' => $subAccount->id,
@@ -73,11 +77,36 @@ class SubAccountTest extends TestCase
     #[Test]
     public function add_custom_sub_accountは空名を許可しない(): void
     {
-        $account = Account::factory()->create();
+        $user = User::factory()->create();
+        $account = Account::factory()->create([
+            'business_unit_id' => $user->createBusinessUnitWithDefaults([
+                'name' => '空名補助科目テスト',
+            ])->id,
+        ]);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('name は必須です。');
 
-        $account->addCustomSubAccount('');
+        $account->addCustomSubAccount('', $user);
+    }
+
+    #[Test]
+    public function add_custom_sub_accountは他人の事業体には追加できない(): void
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $businessUnit = $owner->createBusinessUnitWithDefaults([
+            'name' => '認可テスト',
+        ]);
+
+        $account = $businessUnit->accounts()->create([
+            'name' => '会議費',
+            'type' => Account::TYPE_EXPENSE,
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+
+        $account->addCustomSubAccount('役員会議', $otherUser);
     }
 }

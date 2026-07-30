@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\SubAccount;
 use App\Models\User;
 use DomainException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -18,9 +19,9 @@ class RegisterOpeningEntryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
-        $txn = $fiscalYear->registerOpeningEntry([]);
+        $txn = $fiscalYear->registerOpeningEntry([], $user);
 
         $this->assertEquals(null, $txn);
         $this->assertCount(0, $fiscalYear->journalEntries);
@@ -31,7 +32,7 @@ class RegisterOpeningEntryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $txn = $fiscalYear->registerOpeningEntry([
             [
@@ -44,7 +45,7 @@ class RegisterOpeningEntryTest extends TestCase
                 'sub_account_name' => '定期預金',
                 'amount' => 200000,
             ],
-        ]);
+        ], $user);
 
         $this->assertEquals('期首残高設定', $txn->description);
         $this->assertTrue($txn->is_opening_entry);
@@ -84,7 +85,7 @@ class RegisterOpeningEntryTest extends TestCase
             'name' => '地方信用金庫',
         ]);
 
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $transaction = $fiscalYear->registerOpeningEntry([
             [
@@ -97,7 +98,7 @@ class RegisterOpeningEntryTest extends TestCase
                 'sub_account_name' => '地方信用金庫',
                 'account_name' => 'その他の預金',
             ],
-        ]);
+        ], $user);
 
         $this->assertEquals(3, $transaction->journalEntries->count());
 
@@ -127,7 +128,7 @@ class RegisterOpeningEntryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $cashAccount = $unit->accounts()->where('name', '現金')->first();
 
@@ -147,7 +148,7 @@ class RegisterOpeningEntryTest extends TestCase
                 'amount' => 100000,
                 'sub_account_name' => '金庫',
             ],
-        ]);
+        ], $user);
 
         $usedSubAccountId = $transaction->journalEntries()->first()->sub_account_id;
         $this->assertEquals($existing->id, $usedSubAccountId);
@@ -164,7 +165,7 @@ class RegisterOpeningEntryTest extends TestCase
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $fiscalYear = $unit->createFiscalYear(2025);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
 
         $fiscalYear->registerOpeningEntry([
             [
@@ -172,7 +173,7 @@ class RegisterOpeningEntryTest extends TestCase
                 'sub_account_name' => '現金',
                 'amount' => 100000,
             ],
-        ]);
+        ], $user);
 
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('この会計年度にはすでに期首仕訳が登録されています。');
@@ -183,6 +184,26 @@ class RegisterOpeningEntryTest extends TestCase
                 'sub_account_name' => '普通預金',
                 'amount' => 200000,
             ],
-        ]);
+        ], $user);
+    }
+
+    #[Test]
+    public function 他ユーザーは期首仕訳を登録できない(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この会計年度に期首仕訳を登録する権限がありません。');
+
+        $fiscalYear->registerOpeningEntry([
+            [
+                'account_name' => '現金',
+                'sub_account_name' => '現金',
+                'amount' => 100000,
+            ],
+        ], $otherUser);
     }
 }

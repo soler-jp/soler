@@ -240,10 +240,10 @@ class DashboardRevenueInputTest extends TestCase
 
         $bankSubAccount_1 = $bankAccount->createSubAccount([
             'name' => 'テスト銀行1',
-        ]);
+        ], $user);
         $bankSubAccount_2 = $bankAccount->createSubAccount([
             'name' => 'テスト銀行2',
-        ]);
+        ], $user);
 
         $component = Livewire::actingAs($user)
             ->test('dashboard-revenue-input');
@@ -252,15 +252,15 @@ class DashboardRevenueInputTest extends TestCase
 
         // 現金（SubAccountなし → Accountで表示）
         $this->assertContainsOnlyInstancesOf(SubAccount::class, $groups['cash']);
-        $this->assertTrue(collect($groups['cash'])->contains(fn($c) => $c->id === $cashSubAccount->id));
+        $this->assertTrue(collect($groups['cash'])->contains(fn ($c) => $c->id === $cashSubAccount->id));
 
         // その他の預金（SubAccountが2つ → SubAccountで表示）
         $this->assertContainsOnlyInstancesOf(SubAccount::class, $groups['bank']);
-        $this->assertTrue(collect($groups['bank'])->contains(fn($c) => $c->id === $bankSubAccount_1->id));
-        $this->assertTrue(collect($groups['bank'])->contains(fn($c) => $c->id === $bankSubAccount_2->id));
+        $this->assertTrue(collect($groups['bank'])->contains(fn ($c) => $c->id === $bankSubAccount_1->id));
+        $this->assertTrue(collect($groups['bank'])->contains(fn ($c) => $c->id === $bankSubAccount_2->id));
 
         // 銀行本体は含まれない
-        $this->assertFalse(collect($groups['bank'])->contains(fn($c) => $c instanceof Account && $c->id === $bankAccount->id));
+        $this->assertFalse(collect($groups['bank'])->contains(fn ($c) => $c instanceof Account && $c->id === $bankAccount->id));
     }
 
     #[Test]
@@ -318,8 +318,8 @@ class DashboardRevenueInputTest extends TestCase
             'is_tax_exclusive' => false,
         ]);
 
-        $fy = $unit->createFiscalYear(2025);
-        $unit->setCurrentFiscalYear($fy);
+        $fy = $unit->createFiscalYear(2025, $user);
+        $unit->setCurrentFiscalYear($fy, $user);
 
         $revenueSubAccount = $unit->getSubAccountByName('売上高', '売上高');
         $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
