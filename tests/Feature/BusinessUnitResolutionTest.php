@@ -46,7 +46,8 @@ class BusinessUnitResolutionTest extends TestCase
                     'type' => JournalEntry::TYPE_CREDIT,
                     'net_amount' => 1000,
                 ],
-            ]
+            ],
+            $user
         );
         $journalEntry = $transaction->journalEntries()->firstOrFail();
 

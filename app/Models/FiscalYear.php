@@ -91,6 +91,7 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
     public function registerTransaction(
         array $transactionData,
         array $journalEntriesData,
+        User $actor,
         ?TransactionRegistrar $registrar = null
     ): Transaction {
         $registrar ??= app(TransactionRegistrar::class);

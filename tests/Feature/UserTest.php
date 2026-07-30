@@ -128,7 +128,8 @@ class UserTest extends TestCase
                     'net_amount' => 1000,
                     'tax_amount' => 0,
                 ],
-            ]
+            ],
+            $user
         );
 
         $fixedAsset = FixedAsset::factory()->create([

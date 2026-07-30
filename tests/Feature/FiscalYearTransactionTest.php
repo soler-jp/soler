@@ -30,13 +30,13 @@ class FiscalYearTransactionTest extends TestCase
             'type' => 'asset',
         ], $unit->user);
 
-        return [$fiscalYear, $account->subAccounts->first()];
+        return [$user, $fiscalYear, $account->subAccounts->first()];
     }
 
     #[Test]
     public function 取引と仕訳を正常に登録できる()
     {
-        [$fiscalYear, $sub] = $this->createSubAccount();
+        [$user, $fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
             'date' => '2025-06-15',
@@ -48,7 +48,7 @@ class FiscalYearTransactionTest extends TestCase
             ['sub_account_id' => $sub->id, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
-        $transaction = $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
+        $transaction = $fiscalYear->registerTransaction($transactionData, $journalEntriesData, $user);
 
         $this->assertDatabaseHas('transactions', [
             'id' => $transaction->id,
@@ -64,7 +64,7 @@ class FiscalYearTransactionTest extends TestCase
     {
         $this->expectException(DomainException::class);
 
-        [$fiscalYear, $sub] = $this->createSubAccount();
+        [$user, $fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
             'date' => '2025-06-15',
@@ -76,7 +76,7 @@ class FiscalYearTransactionTest extends TestCase
             ['sub_account_id' => $sub->id, 'type' => 'credit', 'net_amount' => 900],
         ];
 
-        $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
+        $fiscalYear->registerTransaction($transactionData, $journalEntriesData, $user);
     }
 
     #[Test]
@@ -100,7 +100,7 @@ class FiscalYearTransactionTest extends TestCase
 
         $journalEntriesData = [];
 
-        $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
+        $fiscalYear->registerTransaction($transactionData, $journalEntriesData, $user);
     }
 
     #[Test]
@@ -108,7 +108,7 @@ class FiscalYearTransactionTest extends TestCase
     {
         $this->expectException(ValidationException::class);
 
-        [$fiscalYear, $sub] = $this->createSubAccount();
+        [$user, $fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
             'date' => null,
@@ -120,7 +120,7 @@ class FiscalYearTransactionTest extends TestCase
             ['sub_account_id' => $sub->id, 'type' => 'credit', 'net_amount' => 500],
         ];
 
-        $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
+        $fiscalYear->registerTransaction($transactionData, $journalEntriesData, $user);
     }
 
     #[Test]
@@ -147,13 +147,13 @@ class FiscalYearTransactionTest extends TestCase
             ['sub_account_id' => null, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
-        $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
+        $fiscalYear->registerTransaction($transactionData, $journalEntriesData, $user);
     }
 
     #[Test]
     public function fiscal_year_idが自動的に取引に設定される()
     {
-        [$fiscalYear, $sub] = $this->createSubAccount();
+        [$user, $fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
             'date' => '2025-06-15',
@@ -165,7 +165,7 @@ class FiscalYearTransactionTest extends TestCase
             ['sub_account_id' => $sub->id, 'type' => 'credit', 'net_amount' => 1000],
         ];
 
-        $transaction = $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
+        $transaction = $fiscalYear->registerTransaction($transactionData, $journalEntriesData, $user);
 
         $this->assertEquals($fiscalYear->id, $transaction->fiscal_year_id);
     }
@@ -173,7 +173,7 @@ class FiscalYearTransactionTest extends TestCase
     #[Test]
     public function 仕訳が登録された取引に正しく紐づく()
     {
-        [$fiscalYear, $sub] = $this->createSubAccount();
+        [$user, $fiscalYear, $sub] = $this->createSubAccount();
 
         $transactionData = [
             'date' => '2025-06-15',
@@ -185,7 +185,7 @@ class FiscalYearTransactionTest extends TestCase
             ['sub_account_id' => $sub->id, 'type' => 'credit', 'net_amount' => 500],
         ];
 
-        $transaction = $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
+        $transaction = $fiscalYear->registerTransaction($transactionData, $journalEntriesData, $user);
 
         $this->assertCount(2, $transaction->journalEntries);
         $this->assertTrue(

@@ -40,7 +40,7 @@ class OpeningEntryRegistrar
             throw new DomainException('この会計年度にはすでに期首仕訳が登録されています。');
         }
 
-        return DB::transaction(function () use ($fiscalYear, $entries): Transaction {
+        return DB::transaction(function () use ($fiscalYear, $entries, $actor): Transaction {
             $transactionData = [
                 'date' => $fiscalYear->start_date,
                 'description' => self::DESCRIPTION,
@@ -70,7 +70,7 @@ class OpeningEntryRegistrar
                 'net_amount' => $totalAmount,
             ];
 
-            return $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
+            return $fiscalYear->registerTransaction($transactionData, $journalEntriesData, $actor);
         });
     }
 
@@ -92,7 +92,7 @@ class OpeningEntryRegistrar
             throw new DomainException('この会計年度にはすでに期首仕訳が登録されています。');
         }
 
-        return DB::transaction(function () use ($fiscalYear, $entries, $capitalEntry): Transaction {
+        return DB::transaction(function () use ($fiscalYear, $entries, $capitalEntry, $actor): Transaction {
             $transactionData = [
                 'date' => $fiscalYear->start_date,
                 'description' => self::DESCRIPTION,
@@ -110,7 +110,7 @@ class OpeningEntryRegistrar
                 $journalEntriesData[] = $this->buildCapitalEntry($fiscalYear, $capitalEntry);
             }
 
-            return $fiscalYear->registerTransaction($transactionData, $journalEntriesData);
+            return $fiscalYear->registerTransaction($transactionData, $journalEntriesData, $actor);
         });
     }
 
