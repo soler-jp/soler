@@ -38,12 +38,22 @@ class TransactionRegistrarTest extends TestCase
 
     private function createBusinessUnitFiscalYear(array $attributes = []): FiscalYear
     {
+        [$fiscalYear] = $this->createBusinessUnitFiscalYearWithActor($attributes);
+
+        return $fiscalYear;
+    }
+
+    /**
+     * @return array{0: FiscalYear, 1: User}
+     */
+    private function createBusinessUnitFiscalYearWithActor(array $attributes = []): array
+    {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(array_merge([
             'name' => 'テスト事業体',
         ], $attributes));
 
-        return $unit->createFiscalYear(2025, $user);
+        return [$unit->createFiscalYear(2025, $user), $user];
     }
 
     #[Test]
@@ -1476,7 +1486,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 免税事業者が税込2200円の売上をレジ現金に保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => false,
             'is_tax_exclusive' => false,
@@ -1501,7 +1511,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'gross_amount' => 2200,
             ],
-        ]);
+        ], $actor);
 
         $cashEntry = $transaction->journalEntries()->where('sub_account_id', $cashSubAccount->id)->firstOrFail();
         $salesEntry = $transaction->journalEntries()->where('sub_account_id', $salesSubAccount->id)->firstOrFail();
@@ -1518,7 +1528,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 免税事業者が税込1100円の通信費をレジ現金で保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => false,
             'is_tax_exclusive' => false,
@@ -1543,7 +1553,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $actor);
 
         $expenseEntry = $transaction->journalEntries()->where('sub_account_id', $expenseSubAccount->id)->firstOrFail();
         $cashEntry = $transaction->journalEntries()->where('sub_account_id', $cashSubAccount->id)->firstOrFail();
@@ -1560,7 +1570,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 課税事業者が税込2200円の売上をレジ現金に保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
@@ -1586,7 +1596,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 2200,
                 'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
             ],
-        ]);
+        ], $actor);
 
         $salesEntry = $transaction->journalEntries()->where('sub_account_id', $salesSubAccount->id)->firstOrFail();
 
@@ -1598,7 +1608,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 課税事業者が税込1100円の通信費をレジ現金で保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
@@ -1624,7 +1634,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1100,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $actor);
 
         $expenseEntry = $transaction->journalEntries()->where('sub_account_id', $expenseSubAccount->id)->firstOrFail();
 
@@ -1636,7 +1646,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 課税事業者が税込1080円の軽減税率経費をレジ現金で保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
@@ -1662,7 +1672,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1080,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $actor);
 
         $expenseEntry = $transaction->journalEntries()->where('sub_account_id', $expenseSubAccount->id)->firstOrFail();
 
@@ -1674,7 +1684,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 課税事業者が軽減税率8パーセントと10パーセントが混在する仕入れを保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
@@ -1706,7 +1716,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 7660,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $actor);
 
         $reducedRateEntry = $transaction->journalEntries()
             ->where('tax_type', JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8)
@@ -1732,7 +1742,7 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 課税事業者が税込1000円の非課税経費をレジ現金で保存できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
         $fiscalYear->update([
             'is_taxable' => true,
             'is_tax_exclusive' => false,
@@ -1758,7 +1768,7 @@ class TransactionRegistrarTest extends TestCase
                 'gross_amount' => 1000,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
-        ]);
+        ], $actor);
 
         $expenseEntry = $transaction->journalEntries()->where('sub_account_id', $expenseSubAccount->id)->firstOrFail();
 
@@ -1888,7 +1898,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $this->assertTrue($transaction->is_planned);
     }
@@ -1923,7 +1933,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1100,
             ],
-        ]);
+        ], $user);
 
         $transaction->description = '本登録済み';
         $transaction->date = '2025-04-02';
@@ -1966,7 +1976,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1100,
             ],
-        ]);
+        ], $user);
 
         $transaction->description = '本登録済み（仕訳変更）';
         $transaction->date = '2025-04-02';
@@ -2022,7 +2032,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1100,
             ],
-        ]);
+        ], $user);
 
         foreach ($transaction->journalEntries as $entry) {
             $entry->net_amount = 0;
@@ -2067,7 +2077,7 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1100,
             ],
-        ]);
+        ], $user);
 
         $cancelled = $registrar->cancelPlanned($transaction, $user);
 
@@ -2145,12 +2155,12 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $user);
 
         $registrar->cancelPlanned($transaction, $user);
     }
 
-    private function registerWithDate(FiscalYear $fiscalYear, string $date): Transaction
+    private function registerWithDate(FiscalYear $fiscalYear, string $date, User $actor): Transaction
     {
         [, $subAccount] = $this->createSubAccountForFiscalYear($fiscalYear);
 
@@ -2168,15 +2178,15 @@ class TransactionRegistrarTest extends TestCase
                 'type' => 'credit',
                 'net_amount' => 1000,
             ],
-        ]);
+        ], $actor);
     }
 
     #[Test]
     public function 会計年度の開始日当日の取引は登録できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
 
-        $transaction = $this->registerWithDate($fiscalYear, '2025-01-01');
+        $transaction = $this->registerWithDate($fiscalYear, '2025-01-01', $actor);
 
         $this->assertSame('2025-01-01', $transaction->date->toDateString());
     }
@@ -2184,9 +2194,9 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 会計年度の終了日当日の取引は登録できる()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
 
-        $transaction = $this->registerWithDate($fiscalYear, '2025-12-31');
+        $transaction = $this->registerWithDate($fiscalYear, '2025-12-31', $actor);
 
         $this->assertSame('2025-12-31', $transaction->date->toDateString());
     }
@@ -2194,23 +2204,23 @@ class TransactionRegistrarTest extends TestCase
     #[Test]
     public function 会計年度の開始日より前の取引は登録できない()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('取引日は会計年度の期間内（2025-01-01〜2025-12-31）で指定してください。');
 
-        $this->registerWithDate($fiscalYear, '2024-12-31');
+        $this->registerWithDate($fiscalYear, '2024-12-31', $actor);
     }
 
     #[Test]
     public function 会計年度の終了日より後の取引は登録できない()
     {
-        $fiscalYear = $this->createBusinessUnitFiscalYear();
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('取引日は会計年度の期間内（2025-01-01〜2025-12-31）で指定してください。');
 
-        $this->registerWithDate($fiscalYear, '2026-01-01');
+        $this->registerWithDate($fiscalYear, '2026-01-01', $actor);
     }
 
     #[Test]
@@ -2232,7 +2242,7 @@ class TransactionRegistrarTest extends TestCase
         ], [
             ['sub_account_id' => $debit->id, 'type' => JournalEntry::TYPE_DEBIT, 'net_amount' => 1000],
             ['sub_account_id' => $credit->id, 'type' => JournalEntry::TYPE_CREDIT, 'net_amount' => 1000],
-        ]);
+        ], $user);
 
         $this->expectException(AuthorizationException::class);
 
