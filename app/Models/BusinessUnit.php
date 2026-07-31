@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -121,6 +122,11 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
     public function counterparties(): HasMany
     {
         return $this->hasMany(Counterparty::class);
+    }
+
+    public function initialSetupData(): HasOne
+    {
+        return $this->hasOne(InitialSetupData::class);
     }
 
     // 固定資産

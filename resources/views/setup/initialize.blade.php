@@ -1,18 +1,17 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Setup Wizard
-        </h2>
-    </x-slot>
+@extends('layouts.setup')
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900">
-                    <livewire:setup-wizard />
+@section('title', '初期セットアップ')
 
-                </div>
-            </div>
+@section('content')
+    <div class="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+        <div class="mb-10 space-y-4">
+            <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Soler Setup Wizard</p>
+            <h1 class="text-4xl font-semibold tracking-tight text-slate-900">初期セットアップ</h1>
+            <p class="text-base leading-7 text-slate-600">
+                まずは、Soler を始めるための基本設定だけを行います。詳しい設定が必要なものは、あとで Dashboard から順番に進められます。
+            </p>
         </div>
+
+        <livewire:setup-wizard />
     </div>
-</x-app-layout>
+@endsection

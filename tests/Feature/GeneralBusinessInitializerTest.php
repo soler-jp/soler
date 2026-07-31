@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\InitialSetupData;
 use App\Models\SubAccount;
 use App\Models\User;
 use App\Setup\Initializers\GeneralBusinessInitializer;
@@ -36,6 +37,19 @@ class GeneralBusinessInitializerTest extends TestCase
             'name' => 'テスト事業体',
             'type' => 'general',
         ]);
+
+        $this->assertDatabaseHas('initial_setup_data', [
+            'business_unit_id' => $unit->id,
+            'year' => 2025,
+            'opening_context' => InitialSetupData::OPENING_CONTEXT_FIRST_YEAR,
+            'is_taxable' => false,
+            'bank_account_answer' => InitialSetupData::ANSWER_NO,
+            'cash_on_hand_answer' => InitialSetupData::ANSWER_NO,
+            'fixed_asset_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_expense_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_income_answer' => InitialSetupData::ANSWER_NO,
+            'counterparty_answer' => InitialSetupData::ANSWER_NO,
+        ]);
     }
 
     #[Test]
@@ -49,6 +63,13 @@ class GeneralBusinessInitializerTest extends TestCase
             'year' => 2025,
             'is_taxable' => false,
             'is_tax_exclusive' => false,
+            'opening_context' => InitialSetupData::OPENING_CONTEXT_FIRST_YEAR,
+            'bank_account_answer' => InitialSetupData::ANSWER_NO,
+            'cash_on_hand_answer' => InitialSetupData::ANSWER_NO,
+            'fixed_asset_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_expense_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_income_answer' => InitialSetupData::ANSWER_NO,
+            'counterparty_answer' => InitialSetupData::ANSWER_NO,
             'cash_balance' => null,
             'bank_accounts' => [],
             'fixed_assets' => [],

@@ -36,4 +36,16 @@ class PortalControllerTest extends TestCase
             ->get(route('dashboard'))
             ->assertForbidden();
     }
+
+    #[Test]
+    public function initialize画面ではサイドメニューを表示しない(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('initialize'))
+            ->assertOk()
+            ->assertSee('初期セットアップ')
+            ->assertDontSee('Main Menu');
+    }
 }

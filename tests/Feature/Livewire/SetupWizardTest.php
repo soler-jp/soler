@@ -3,7 +3,7 @@
 namespace Tests\Feature\Livewire;
 
 use App\Livewire\SetupWizard;
-use App\Models\Account;
+use App\Models\InitialSetupData;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -15,97 +15,56 @@ class SetupWizardTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function 初期状態ではnameが入っている()
+    public function 初期状態では仕様どおりのデフォルト値が入っている(): void
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        // テストの日付を変更
-        $this->travelTo('2024-01-01');
+        $this->travelTo('2026-07-31');
 
         Livewire::test(SetupWizard::class)
-            ->assertSet('name', '一般事業所')
-            ->assertSet('business_type', 'general')
-            ->assertSet('is_taxable', false)
-            ->assertSet('is_tax_exclusive', false);
+            ->assertSet('step', 1)
+            ->assertSet('name', '個人事業')
+            ->assertSet('year', 2026)
+            ->assertSet('opening_context', InitialSetupData::OPENING_CONTEXT_FIRST_YEAR)
+            ->assertSet('bank_account_answer', '')
+            ->assertSet('is_taxable', false);
     }
 
     #[Test]
-    public function 必須入力が空ならバリデーションエラーになる()
-    {
-        $user = User::factory()->create();
-        $this->actingAs($user);
-
-        Livewire::test(SetupWizard::class)
-            ->set('name', '')
-            ->set('year', '')
-            ->call('submit')
-            ->assertHasErrors(['name', 'year']);
-    }
-
-    #[Test]
-    public function 免税事業者_税込経理なら初期化に成功する()
+    public function progressから入力済みstepへ直接移動できる(): void
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
         Livewire::test(SetupWizard::class)
-            ->set('name', 'テスト事業体')
-            ->set('business_type', 'general')
-            ->set('year', 2025)
-            ->set('is_taxable', false)
-            ->set('is_tax_exclusive', false)
-            ->call('submit');
-
-        $this->assertDatabaseHas('business_units', [
-            'user_id' => $user->id,
-            'name' => 'テスト事業体',
-            'type' => 'general',
-        ]);
-
-        $this->assertDatabaseHas('fiscal_years', [
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-        ]);
+            ->set('name', 'テスト事業')
+            ->call('next')
+            ->assertSet('step', 2)
+            ->set('year', 2026)
+            ->call('next')
+            ->call('goToStep', 3)
+            ->assertSet('step', 3)
+            ->call('goToStep', 1)
+            ->assertSet('step', 1);
     }
 
     #[Test]
-    public function 課税事業者なら初期化できず例外が発生する()
+    public function 未到達のstepへはprogressから直接移動できない(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-
         $user = User::factory()->create();
         $this->actingAs($user);
 
         Livewire::test(SetupWizard::class)
-            ->set('name', '課税業者のテスト')
-            ->set('business_type', 'general')
-            ->set('year', 2025)
-            ->set('is_taxable', true)
-            ->set('is_tax_exclusive', false)
-            ->call('submit');
+            ->call('goToStep', 6)
+            ->assertSet('step', 1)
+            ->set('name', 'テスト事業')
+            ->call('goToStep', 3)
+            ->assertSet('step', 1);
     }
 
     #[Test]
-    public function 税抜経理は未対応として初期化できない()
-    {
-        $this->expectException(\InvalidArgumentException::class);
-
-        $user = User::factory()->create();
-        $this->actingAs($user);
-
-        Livewire::test(SetupWizard::class)
-            ->set('name', '税抜経理のテスト')
-            ->set('business_type', 'general')
-            ->set('year', 2025)
-            ->set('is_taxable', false)
-            ->set('is_tax_exclusive', true)
-            ->call('submit');
-    }
-
-    #[Test]
-    public function step1で未入力ならバリデーションエラーになる()
+    public function step1で事業名が空ならバリデーションエラーになる(): void
     {
         $user = User::factory()->create();
         $this->actingAs($user);
@@ -117,277 +76,160 @@ class SetupWizardTest extends TestCase
     }
 
     #[Test]
-    public function step1でnameとtypeを入力して次に進める()
+    public function step2で2022以前は選べない(): void
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
         Livewire::test(SetupWizard::class)
-            ->set('name', 'テスト事業体')
-            ->set('business_type', 'general')
+            ->set('step', 2)
+            ->set('year', 2022)
             ->call('next')
-            ->assertSet('step', 2);
+            ->assertHasErrors(['year']);
     }
 
     #[Test]
-    public function step2で入力すれば初期化処理が呼ばれる()
+    public function step4では未選択のまま進めない(): void
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
         Livewire::test(SetupWizard::class)
-            ->set('name', 'ウィザード事業体')
-            ->set('business_type', 'general')
-            ->call('next') // Step1完了
-
-            ->set('year', 2025)
-            ->set('is_taxable', false)
-            ->set('is_tax_exclusive', false)
+            ->set('step', 4)
             ->call('next')
-            ->assertOk();
+            ->assertHasErrors([
+                'bank_account_answer',
+                'cash_on_hand_answer',
+                'fixed_asset_answer',
+                'recurring_expense_answer',
+                'recurring_income_answer',
+                'counterparty_answer',
+            ]);
     }
 
     #[Test]
-    public function step4で銀行口座を1件追加できる()
-    {
-        $user = User::factory()->create();
-        $this->actingAs($user);
-
-        $input = [
-            'sub_account_name' => 'メインバンク',
-            'amount' => 50000,
-        ];
-
-        $component = Livewire::test(SetupWizard::class)
-            ->set('name', '銀行あり事業体')
-            ->set('business_type', 'general')
-            ->call('next') // Step1 → Step2
-            ->set('year', 2025)
-            ->set('is_taxable', false)
-            ->set('is_tax_exclusive', false)
-            ->call('next') // Step2 → Step3
-            ->call('next') // Step3 → Step4
-            ->set('bank_accounts', [$input]);
-
-        $this->assertEquals([$input], $component->get('bank_accounts'));
-    }
-
-    #[Test]
-    public function step5で資産を1件追加できる()
-    {
-        $user = User::factory()->create();
-        $this->actingAs($user);
-
-        $input = [
-            'account_name' => '車両運搬具',
-            'sub_account_name' => null,
-            'amount' => 500000,
-        ];
-
-        $component = Livewire::test(SetupWizard::class)
-            // Step1
-            ->set('name', '資産あり事業体')
-            ->set('business_type', 'general')
-            ->call('next')
-            // Step2
-            ->set('year', 2025)
-            ->set('is_taxable', false)
-            ->set('is_tax_exclusive', false)
-            ->call('next')
-            // Step3（現金）→ skip
-            ->call('next') // Step4（銀行）→ skip
-            ->call('next') // Step5（資産）
-            ->set('other_assets', [$input]);
-
-        $this->assertEquals([$input], $component->get('other_assets'));
-    }
-
-    #[Test]
-    public function step6で全情報を入力して初期化に成功する()
+    public function step4で全て選べば次に進める(): void
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
         Livewire::test(SetupWizard::class)
-            // Step 1
-            ->set('name', 'テスト事業体')
-            ->set('business_type', 'general')
+            ->set('step', 4)
+            ->set('bank_account_answer', InitialSetupData::ANSWER_YES)
+            ->set('cash_on_hand_answer', InitialSetupData::ANSWER_NO)
+            ->set('fixed_asset_answer', InitialSetupData::ANSWER_NO)
+            ->set('recurring_expense_answer', InitialSetupData::ANSWER_YES)
+            ->set('recurring_income_answer', InitialSetupData::ANSWER_NO)
+            ->set('counterparty_answer', InitialSetupData::ANSWER_YES)
             ->call('next')
-            // Step 2
-            ->set('year', 2025)
-            ->set('is_taxable', false)
-            ->set('is_tax_exclusive', false)
+            ->assertSet('step', 5);
+    }
+
+    #[Test]
+    public function 初回セットアップ完了時に年度設定と回答が保存される(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(SetupWizard::class)
+            ->set('name', 'テスト事業')
             ->call('next')
-            // Step 3
-            ->set('cash_accounts', [
-                ['sub_account_name' => 'レジ現金', 'amount' => 5000],
-                ['sub_account_name' => 'イベント用現金', 'amount' => 3000],
-            ])
+            ->set('year', 2026)
             ->call('next')
-            // Step 4
-            ->set('bank_accounts', [
-                ['sub_account_name' => 'メインバンク', 'amount' => 50000],
-            ])
+            ->set('opening_context', InitialSetupData::OPENING_CONTEXT_CARRY_FORWARD)
             ->call('next')
-            // Step 5
-            ->set('other_assets', [
-                [
-                    'account_name' => '定期預金',
-                    'sub_account_name' => 'xx銀行',
-                    'amount' => 120000,
-                ],
-            ])
+            ->set('bank_account_answer', InitialSetupData::ANSWER_YES)
+            ->set('cash_on_hand_answer', InitialSetupData::ANSWER_NO)
+            ->set('fixed_asset_answer', InitialSetupData::ANSWER_NO)
+            ->set('recurring_expense_answer', InitialSetupData::ANSWER_YES)
+            ->set('recurring_income_answer', InitialSetupData::ANSWER_NO)
+            ->set('counterparty_answer', InitialSetupData::ANSWER_YES)
             ->call('next')
-            // Step 6
+            ->set('is_taxable', true)
+            ->call('next')
             ->call('submit');
 
         $this->assertDatabaseHas('business_units', [
             'user_id' => $user->id,
-            'name' => 'テスト事業体',
+            'name' => 'テスト事業',
             'type' => 'general',
         ]);
 
         $this->assertDatabaseHas('fiscal_years', [
-            'year' => 2025,
-            'is_taxable' => false,
+            'year' => 2026,
+            'is_taxable' => true,
             'is_tax_exclusive' => false,
+            'opening_context' => InitialSetupData::OPENING_CONTEXT_CARRY_FORWARD,
         ]);
 
-        $this->assertDatabaseHas('transactions', [
-            'description' => '期首残高設定',
-            'is_opening_entry' => true,
-        ]);
+        $businessUnitId = $user->fresh()->selectedBusinessUnit->id;
 
-        $this->assertDatabaseHas('sub_accounts', [
-            'name' => 'メインバンク',
+        $this->assertDatabaseHas('initial_setup_data', [
+            'business_unit_id' => $businessUnitId,
+            'year' => 2026,
+            'opening_context' => InitialSetupData::OPENING_CONTEXT_CARRY_FORWARD,
+            'is_taxable' => true,
+            'bank_account_answer' => InitialSetupData::ANSWER_YES,
+            'cash_on_hand_answer' => InitialSetupData::ANSWER_NO,
+            'fixed_asset_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_expense_answer' => InitialSetupData::ANSWER_YES,
+            'recurring_income_answer' => InitialSetupData::ANSWER_NO,
+            'counterparty_answer' => InitialSetupData::ANSWER_YES,
         ]);
     }
 
     #[Test]
-    public function cash_account画面で、デフォルトの「レジ現金」が表示される()
-    {
-        $user = User::factory()->create();
-        $bu = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
-        $this->actingAs($user);
-
-        Livewire::test(SetupWizard::class)
-            ->set('name', 'テスト事業体')
-            ->set('business_type', 'general')
-            ->call('next') // Step1 → Step2
-            ->set('year', 2025)
-            ->set('is_taxable', false)
-            ->set('is_tax_exclusive', false)
-            ->call('next') // Step2 → Step3
-            ->assertSet('cash_accounts.0.sub_account_name', 'レジ現金');
-    }
-
-    #[Test]
-    public function cash_accountに入力した内容が_opening_entryとして渡される()
+    public function solerを始めるを押すとdashboardへリダイレクトされる(): void
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
         Livewire::test(SetupWizard::class)
-            ->set('name', 'テスト事業所')
-            ->set('business_type', 'general')
-            ->call('next') // step1 → 2
-            ->set('year', 2025)
+            ->set('name', 'テスト事業')
+            ->call('next')
+            ->set('year', 2026)
+            ->call('next')
+            ->set('opening_context', InitialSetupData::OPENING_CONTEXT_FIRST_YEAR)
+            ->call('next')
+            ->set('bank_account_answer', InitialSetupData::ANSWER_NO)
+            ->set('cash_on_hand_answer', InitialSetupData::ANSWER_NO)
+            ->set('fixed_asset_answer', InitialSetupData::ANSWER_NO)
+            ->set('recurring_expense_answer', InitialSetupData::ANSWER_NO)
+            ->set('recurring_income_answer', InitialSetupData::ANSWER_NO)
+            ->set('counterparty_answer', InitialSetupData::ANSWER_NO)
+            ->call('next')
             ->set('is_taxable', false)
-            ->set('is_tax_exclusive', false)
-            ->call('next') // step2 → 3
-            ->set('cash_accounts', [
-                ['sub_account_name' => 'レジ現金', 'amount' => 5000],
-                ['sub_account_name' => 'イベント用現金', 'amount' => 3000],
-            ])
-            ->call('next') // step3 → 4
-            ->call('next') // step4 → 5
-            ->call('next') // step5 → 6
+            ->call('next')
+            ->call('submit')
+            ->assertRedirect(route('dashboard'));
+    }
+
+    #[Test]
+    public function 初回セットアップ完了後はdashboardを開ける(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(SetupWizard::class)
+            ->set('name', 'テスト事業')
+            ->call('next')
+            ->set('year', 2026)
+            ->call('next')
+            ->set('opening_context', InitialSetupData::OPENING_CONTEXT_CARRY_FORWARD)
+            ->call('next')
+            ->set('bank_account_answer', InitialSetupData::ANSWER_YES)
+            ->set('cash_on_hand_answer', InitialSetupData::ANSWER_NO)
+            ->set('fixed_asset_answer', InitialSetupData::ANSWER_NO)
+            ->set('recurring_expense_answer', InitialSetupData::ANSWER_YES)
+            ->set('recurring_income_answer', InitialSetupData::ANSWER_NO)
+            ->set('counterparty_answer', InitialSetupData::ANSWER_YES)
+            ->call('next')
+            ->set('is_taxable', false)
             ->call('submit');
 
-        $this->assertDatabaseHas('transactions', [
-            'description' => '期首残高設定',
-            'is_opening_entry' => true,
-        ]);
-
-        $user->refresh();
-
-        $bu = $user->selectedBusinessUnit;
-
-        $cashSubAccount = $bu->getSubAccountByName('現金', 'レジ現金');
-        $this->assertDatabaseHas('journal_entries', [
-            'sub_account_id' => $cashSubAccount->id,
-            'net_amount' => 5000, // レジ現金5000
-        ]);
-    }
-
-    #[Test]
-    public function 売上高の補助科目を追加できる()
-    {
-        $user = User::factory()->create();
-        $this->actingAs($user);
-
-        Livewire::test(SetupWizard::class)
-            ->set('name', '売上高補助科目テスト')
-            ->set('business_type', 'general')
-            ->call('next') // Step1 → Step2
-            ->set('year', 2025)
-            ->set('is_taxable', false)
-            ->set('is_tax_exclusive', false)
-            ->call('next') // Step2 → Step3
-            ->call('next') // Step3 → Step4
-            ->call('next') // Step4 → Step5
-            ->set('revenue_sub_accounts', [
-                [
-                    'name' => '株式会社xxx',
-                    'is_locked' => false,
-                ],
-            ])
-            ->call('submit');
-
-        $revenueAccount = Account::where('name', '売上高')->first();
-        $this->assertDatabaseHas('sub_accounts', [
-            'account_id' => $revenueAccount->id,
-            'name' => '株式会社xxx',
-        ]);
-    }
-
-    #[Test]
-    public function 棚卸資産で名称が空白でも登録できる()
-    {
-        $user = User::factory()->create();
-        $this->actingAs($user);
-
-        Livewire::test(SetupWizard::class)
-            ->set('name', '棚卸資産空白テスト')
-            ->set('business_type', 'general')
-            ->call('next') // Step1 → Step2
-            ->set('year', 2025)
-            ->set('is_taxable', false)
-            ->set('is_tax_exclusive', false)
-            ->call('next') // Step2 → Step3
-            ->call('next') // Step3 → Step4
-            ->call('next') // Step4 → Step5
-            ->set('other_assets', [
-                [
-                    'account_name' => '棚卸資産',
-                    'sub_account_name' => '', // 空白の棚卸資産
-                    'amount' => 100000,
-                ],
-            ])
-            ->call('submit');
-
-        $this->assertDatabaseHas('transactions', [
-            'description' => '期首残高設定',
-            'is_opening_entry' => true,
-        ]);
-
-        $user->refresh();
-        $bu = $user->selectedBusinessUnit;
-
-        $inventorySubAccount = $bu->getSubAccountByName('棚卸資産', '棚卸資産');
-        $this->assertDatabaseHas('journal_entries', [
-            'sub_account_id' => $inventorySubAccount->id,
-            'net_amount' => 100000, // 棚卸資産100000
-        ]);
+        $this->get(route('dashboard'))
+            ->assertOk()
+            ->assertSeeLivewire('dashboard-expense-input')
+            ->assertSeeLivewire('dashboard-revenue-input');
     }
 }

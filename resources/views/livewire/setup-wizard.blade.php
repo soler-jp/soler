@@ -1,279 +1,235 @@
-<div class="max-w-2xl mx-auto mt-10 space-y-6">
-
+<div class="mx-auto w-full max-w-5xl space-y-8">
     @if ($submitError)
-        <div class="text-sm text-red-600 mt-4">
+        <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {{ $submitError }}
         </div>
     @endif
 
+    <div class="space-y-3">
+        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Initial Setup</p>
+        <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-500 xl:flex-nowrap xl:justify-between xl:gap-x-6">
+            @foreach ([
+                1 => '1. 事業名',
+                2 => '2. 記録を始める年',
+                3 => '3. 開始状態',
+                4 => '4. 確認すること',
+                5 => '5. 消費税申告',
+                6 => '6. 確認',
+            ] as $index => $label)
+                @php($isReachable = $index <= $max_unlocked_step)
+                <button type="button" wire:click="goToStep({{ $index }})"
+                    @disabled(! $isReachable)
+                    class="{{ $step === $index ? 'font-bold text-blue-600' : '' }} {{ $isReachable ? 'hover:text-slate-700' : 'cursor-not-allowed text-slate-300' }} px-1 py-1 text-left leading-5 transition xl:flex-none">
+                    {{ $label }}
+                </button>
+            @endforeach
 
-    {{-- ステップインジケーター --}}
-    <div class="flex justify-between text-sm text-gray-500">
-        <div class="{{ $step === 1 ? 'font-bold text-blue-600' : '' }}">1. 基本情報</div>
-        <div class="{{ $step === 2 ? 'font-bold text-blue-600' : '' }}">2. 会計年度</div>
-        <div class="{{ $step === 3 ? 'font-bold text-blue-600' : '' }}">3. 現金残高</div>
-        <div class="{{ $step === 4 ? 'font-bold text-blue-600' : '' }}">4. 銀行口座</div>
-        <div class="{{ $step === 5 ? 'font-bold text-blue-600' : '' }}">5. その他資産</div>
-        <div class="{{ $step === 6 ? 'font-bold text-blue-600' : '' }}">6. 売上の分類</div>
-        <div class="{{ $step === 7 ? 'font-bold text-blue-600' : '' }}">7. 確認</div>
+            <div aria-hidden="true" class="hidden xl:block xl:w-12 xl:flex-none"></div>
+        </div>
     </div>
 
-    <div class="max-w-3xl mx-auto p-6 space-y-6">
+    <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
         @if ($step === 1)
-            <div>
-                <label class="block font-bold mb-2">事業体名</label>
-                <p>
-                    複数の事業を行う場合に区別するための名称です。<br>
-                    1つしか事業を行わない場合は、任意の文字列で構いません。<br>
-                    後から変更も可能です。
-                </p>
-                <input type="text" wire:model="name" class="w-full border rounded px-3 py-2">
-                @error('name')
-                    <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
-                @enderror
-            </div>
-
-            <div class="mt-4">
-                <label class="block font-bold mb-2">事業種別</label>
-                <div class="grid grid-cols-3 gap-4">
-                    <button type="button"
-                        class="w-full px-6 py-6 border rounded flex flex-col items-center text-xl @if ($business_type === 'general') bg-blue-600 text-white @endif"
-                        wire:click="$set('business_type', 'general')">
-                        <x-heroicon-o-briefcase class="w-12 h-12 mb-1" />
-                        一般
-                    </button>
-                    <!--
-                    <button type="button" disabled
-                        class="w-full px-6 py-6 border rounded flex flex-col items-center text-xl bg-gray-200 text-gray-500 cursor-not-allowed">
-                        <x-heroicon-o-sparkles class="w-12 h-12 mb-1" />
-                        農業（未対応）
-                    </button>
-                    <button type="button" disabled
-                        class="w-full px-6 py-6 border rounded flex flex-col items-center text-xl bg-gray-200 text-gray-500 cursor-not-allowed">
-                        <x-heroicon-o-home-modern class="w-12 h-12 mb-1" />
-                        不動産（未対応）
-                    </button>
-                    -->
+            <div class="space-y-6">
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">あなたの屋号を教えてください</h2>
+                    <p class="text-sm leading-6 text-slate-600">
+                        開業届で申請した屋号を入力するか、「個人事業」など任意の文字列でも構いません。<br>あとで修正できます。
+                    </p>
                 </div>
-                @error('business_type')
-                    <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
-                @enderror
-            </div>
 
-            <div class="mt-6 text-right">
-                <button wire:click="next" class="px-6 py-3 bg-blue-600 text-white rounded">次へ</button>
+                <div>
+                    <label class="mb-2 block text-sm font-semibold text-slate-800">事業名</label>
+                    <input type="text" wire:model="name"
+                        class="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    @error('name')
+                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
             </div>
         @endif
 
         @if ($step === 2)
-            <div>
-                <label class="block font-bold mb-2">会計年度（西暦）</label>
-                <input type="number" wire:model="year" class="w-full border rounded px-3 py-2">
-                @error('year')
-                    <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
-                @enderror
-            </div>
-
-            <div class="mt-4">
-                <label class="block font-bold mb-2">課税業者ですか？</label>
-                <div class="grid grid-cols-2 gap-4">
-                    <button type="button"
-                        class="w-full px-6 py-6 border rounded text-xl text-center bg-gray-200 text-gray-500 opacity-50 cursor-not-allowed">はい(未対応)</button>
-                    <button type="button" disabled
-                        class="w-full px-6 py-6 border rounded text-xl text-center　@if ($is_taxable === false) bg-blue-600 text-white @endif">いいえ、免税業者です</button>
+            <div class="space-y-6">
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">何年の分から記録を始めますか？</h2>
+                    <p class="text-sm leading-6 text-amber-700">2022より以前の記帳については未サポートです。</p>
                 </div>
-            </div>
 
-            <div class="mt-4">
-                <label class="block font-bold mb-2">帳簿処理</label>
-                <div class="grid grid-cols-2 gap-4">
-                    <button type="button"
-                        class="w-full px-6 py-6 border rounded text-xl text-center bg-gray-200 text-gray-500 opacity-50 cursor-not-allowed">税抜経理(未対応)</button>
-                    <button type="button" disabled
-                        class="w-full px-6 py-6 border rounded text-xl text-center @if ($is_tax_exclusive === false) bg-blue-600 text-white @endif">税込経理</button>
+                <div class="space-y-3">
+                    <label class="block text-sm font-semibold text-slate-800">記録を始める年</label>
+                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        @foreach ($availableYears as $availableYear)
+                            <button type="button" wire:click="$set('year', {{ $availableYear }})"
+                                class="{{ $year === $availableYear ? 'border-blue-600 bg-blue-50 text-blue-700 ring-2 ring-blue-200' : 'border-slate-200 text-slate-700 hover:border-slate-300' }} rounded-xl border px-4 py-4 text-left transition">
+                                <span class="block text-base font-semibold">{{ $availableYear }}年</span>
+                            </button>
+                        @endforeach
+                    </div>
+                    @error('year')
+                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
-            </div>
-
-            <div class="mt-6 flex justify-between">
-                <button wire:click="$set('step', 1)" class="px-6 py-3 bg-gray-300 rounded">戻る</button>
-                <button wire:click="next" class="px-6 py-3 bg-blue-600 text-white rounded">次へ</button>
             </div>
         @endif
 
         @if ($step === 3)
-            <div>
-                <label class="block font-bold mb-2">今年の事業開始時の、<strong>事業専用の現金</strong>を設定します。</label>
-                <p class="text-sm text-gray-600 mb-4">
-                    レジや金庫などで管理している<strong>事業専用の現金</strong>の金額を入力してください(個人の財布などは含めません)<br>
-                    既に「<strong>レジ現金</strong>」という内訳が用意されています。必要に応じて「金庫」「両替用小銭入れ」など追加してください。<br>
-                </p>
+            <div class="space-y-6">
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">{{ $this->yearLabel() }}は、どの状態ですか？</h2>
+                    <p class="text-sm leading-6 text-slate-600">
+                        {{ $this->yearLabel() }}が、前年の決算書から引き継ぐ年なのか、この年に新しく事業を始めた年なのかを選んでください。
+                    </p>
+                </div>
 
-                @foreach ($cash_accounts as $index => $cash)
-                    <div class="flex items-center gap-4 mb-2">
-                        @if ($cash['is_locked'] ?? false)
-                            <div class="flex-1 px-3 py-2 border rounded bg-gray-100 text-gray-700">
-                                {{ $cash['sub_account_name'] }}
-                            </div>
-                        @else
-                            <input type="text" wire:model="cash_accounts.{{ $index }}.sub_account_name"
-                                placeholder="名称（例：レジ現金）" class="flex-1 border rounded px-3 py-2">
-                        @endif
+                <div class="grid gap-4 md:grid-cols-2">
+                    <button type="button" wire:click="$set('opening_context', 'first_year')"
+                        class="rounded-2xl border px-6 py-6 text-left transition {{ $opening_context === 'first_year' ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-200' : 'border-slate-200 hover:border-slate-300' }}">
+                        <p class="text-lg font-semibold text-slate-900">{{ $this->yearLabel() }}に新しく事業を始めた</p>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">
+                            前年の決算書から引き継ぐ金額はありません。開業のために用意した現金・預金などの元手は、このあと入力できます。
+                        </p>
+                    </button>
 
-                        <input type="number" wire:model="cash_sub_accounts.{{ $index }}.amount"
-                            placeholder="金額" class="w-32 border rounded px-3 py-2">
-                        @if (empty($cash['is_locked']))
-                            <button type="button" wire:click="removeCashSubAccount({{ $index }})"
-                                class="text-red-600">削除</button>
-                        @endif
+                    <button type="button" wire:click="$set('opening_context', 'carry_forward')"
+                        class="rounded-2xl border px-6 py-6 text-left transition {{ $opening_context === 'carry_forward' ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-200' : 'border-slate-200 hover:border-slate-300' }}">
+                        <p class="text-lg font-semibold text-slate-900">{{ $this->yearLabel() }}より前から事業を続けている</p>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">
+                            {{ $this->yearLabel() }}の開始時点へ、前年の決算書から現金・銀行口座・売掛金・借入金などを引き継ぎます。詳しい設定は、Soler を始めたあとに行います。
+                        </p>
+                    </button>
+                </div>
 
-                    </div>
-                @endforeach
-                <button type="button" wire:click="addCashSubAccount" class="mt-2 text-blue-600">＋ 追加</button>
-
-                @error('cash_sub_accounts.*.amount')
-                    <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
+                @error('opening_context')
+                    <p class="text-sm text-red-600">{{ $message }}</p>
                 @enderror
-            </div>
-            <div class="mt-6 flex justify-between">
-                <button wire:click="$set('step', 2)" class="px-6 py-3 bg-gray-300 rounded">戻る</button>
-                <button wire:click="next" class="px-6 py-3 bg-blue-600 text-white rounded">次へ</button>
             </div>
         @endif
 
-
         @if ($step === 4)
-            <div>
-                <label class="block font-bold mb-2">事業専用の銀行口座がある場合は、その口座の名前と金額を入力してください</label>
-                @foreach ($bank_accounts as $index => $account)
-                    <div class="flex items-center gap-4 mb-2">
-                        <input type="text" wire:model="bank_accounts.{{ $index }}.sub_account_name"
-                            placeholder="銀行名" class="flex-1 border rounded px-3 py-2">
-                        <input type="number" wire:model="bank_accounts.{{ $index }}.amount" placeholder="金額"
-                            class="w-32 border rounded px-3 py-2">
-                        <button type="button" wire:click="removeBankAccount({{ $index }})"
-                            class="text-red-600">削除</button>
-                    </div>
-                @endforeach
-                <button type="button" wire:click="addBankAccount" class="mt-2 text-blue-600">＋ 追加</button>
-            </div>
-            <div class="mt-6 flex justify-between">
-                <button wire:click="$set('step', 3)" class="px-6 py-3 bg-gray-300 rounded">戻る</button>
-                <button wire:click="next" class="px-6 py-3 bg-blue-600 text-white rounded">次へ</button>
+            <div class="space-y-8">
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">これから必要になる設定を確認します</h2>
+                </div>
+
+                <div class="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-900 shadow-sm">
+                    <p class="font-semibold">ここで選んだ内容は、使い始めてから変更できます。</p>
+                    <p class="mt-1">あとで修正できるので、今わかる範囲で選んで大丈夫です。</p>
+                </div>
+
+                <div class="space-y-5">
+                    @foreach ($setupQuestions as $question)
+                        <section class="rounded-2xl border border-slate-200 p-5">
+                            <h3 class="text-base font-semibold text-slate-900">{{ $question['title'] }}</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">{{ $question['description'] }}</p>
+
+                            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                                @foreach (['yes' => 'はい', 'no' => 'いいえ'] as $value => $label)
+                                    <button type="button" wire:click="$set('{{ $question['field'] }}', '{{ $value }}')"
+                                        class="rounded-xl border px-4 py-3 text-sm font-medium transition {{ data_get($this, $question['field']) === $value ? 'border-blue-600 bg-blue-50 text-blue-700 ring-2 ring-blue-200' : 'border-slate-200 text-slate-700 hover:border-slate-300' }}">
+                                        {{ $label }}
+                                    </button>
+                                @endforeach
+                            </div>
+
+                            @error($question['field'])
+                                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </section>
+                    @endforeach
+                </div>
             </div>
         @endif
 
         @if ($step === 5)
-            <div>
-                <label
-                    class="block font-bold mb-2">去年、確定申告をした人で、車やか棚卸資産がある場合は入力してください。金額は、去年の確定申告の[ココ]の金額を入力してください</label>
-                @foreach ($other_assets as $index => $asset)
-                    <div class="flex items-center gap-4 mb-2">
-                        <select wire:model="other_assets.{{ $index }}.account_name"
-                            class="border rounded px-3 py-2">
-                            <option value="">-- 勘定科目 --</option>
-                            <option value="車両運搬具">車両運搬具</option>
-                            <option value="棚卸資産">棚卸資産</option>
-                        </select>
-                        <input type="text" wire:model="other_assets.{{ $index }}.sub_account_name"
-                            placeholder="名称（任意）" class="flex-1 border rounded px-3 py-2">
-                        <input type="number" wire:model="other_assets.{{ $index }}.amount" placeholder="金額"
-                            class="w-32 border rounded px-3 py-2">
-                        <button type="button" wire:click="removeOtherAsset({{ $index }})"
-                            class="text-red-600">削除</button>
-                    </div>
-                @endforeach
-                <button type="button" wire:click="addOtherAsset" class="mt-2 text-blue-600">＋ 追加</button>
-            </div>
-            <div class="mt-6 flex justify-between">
-                <button wire:click="$set('step', 4)" class="px-6 py-3 bg-gray-300 rounded">戻る</button>
-                <button wire:click="next" class="px-6 py-3 bg-blue-600 text-white rounded">次へ</button>
+            <div class="space-y-6">
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">{{ $year }} 年の消費税の申告は必要ですか？</h2>
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <button type="button" wire:click="$set('is_taxable', true)"
+                        class="rounded-2xl border px-6 py-6 text-left transition {{ $is_taxable ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-200' : 'border-slate-200 hover:border-slate-300' }}">
+                        <p class="text-lg font-semibold text-slate-900">必要</p>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">課税事業者として記録します。</p>
+                    </button>
+
+                    <button type="button" wire:click="$set('is_taxable', false)"
+                        class="rounded-2xl border px-6 py-6 text-left transition {{ ! $is_taxable ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-200' : 'border-slate-200 hover:border-slate-300' }}">
+                        <p class="text-lg font-semibold text-slate-900">不要</p>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">免税事業者として記録します。</p>
+                    </button>
+                </div>
+
+                @error('is_taxable')
+                    <p class="text-sm text-red-600">{{ $message }}</p>
+                @enderror
             </div>
         @endif
-
 
         @if ($step === 6)
-            <div>
-                <label class="block font-bold mb-2">売上の分類（任意）</label>
-                <p class="text-sm text-gray-600 mb-4">
-                    売上をあとで見返しやすくするために、あらかじめ分類（例：ネット販売、顧客A など）を登録しておくことができます。<br>
-                    既に「<strong>一般売上</strong>」という分類が1つ用意されています。必要に応じて追加してください。
-                </p>
+            <div class="space-y-8">
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-semibold tracking-tight text-slate-900">Soler を始める準備ができました</h2>
+                    <p class="text-sm leading-6 text-slate-600">
+                        ここまでの内容をもとに、Soler を使い始める準備をします。詳しい設定が必要なものは、Dashboard に表示されます。
+                    </p>
+                </div>
 
-                @foreach ($revenue_sub_accounts as $index => $sub)
-                    <div class="flex items-center gap-4 mb-2">
-                        @if ($sub['is_locked'] ?? false)
-                            <div
-                                class="flex-1 px-3 py-2 border rounded bg-gray-100 text-gray-700 italic cursor-not-allowed">
-                                {{ $sub['name'] }}
-                            </div>
-                        @else
-                            <input type="text" wire:model="revenue_sub_accounts.{{ $index }}.name"
-                                placeholder="名称（例：ネット販売）" class="flex-1 border rounded px-3 py-2">
-                            <button type="button" wire:click="removeRevenueSubAccount({{ $index }})"
-                                class="text-red-600">削除</button>
-                        @endif
+                <dl class="grid gap-4 rounded-2xl bg-slate-50 p-6 sm:grid-cols-2">
+                    <div>
+                        <dt class="text-sm font-medium text-slate-500">事業名</dt>
+                        <dd class="mt-1 text-base font-semibold text-slate-900">{{ $name }}</dd>
                     </div>
-                @endforeach
+                    <div>
+                        <dt class="text-sm font-medium text-slate-500">記録を始める年</dt>
+                        <dd class="mt-1 text-base font-semibold text-slate-900">{{ $year }} 年</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-slate-500">開始状態</dt>
+                        <dd class="mt-1 text-base font-semibold text-slate-900">
+                            {{ $opening_context === 'carry_forward' ? '前年以前から事業を続けている' : 'この年に新しく事業を始めた' }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-slate-500">消費税</dt>
+                        <dd class="mt-1 text-base font-semibold text-slate-900">{{ $this->consumptionTaxStatusLabel() }}</dd>
+                    </div>
+                </dl>
 
-                <button type="button" wire:click="addRevenueSubAccount" class="mt-2 text-blue-600">＋ 追加</button>
-            </div>
-
-            <div class="mt-6 flex justify-between">
-                <button wire:click="$set('step', 5)" class="px-6 py-3 bg-gray-300 rounded">戻る</button>
-                <button wire:click="next" class="px-6 py-3 bg-blue-600 text-white rounded">次へ</button>
-            </div>
-        @endif
-
-        @if ($step === 7)
-            <div>
-                <h2 class="text-xl font-bold mb-4">以下の内容で初期設定を行います</h2>
-                <ul class="space-y-2">
-                    <li><strong>事業体名:</strong> {{ $name }}</li>
-                    <li><strong>事業種別:</strong> {{ $business_type }}</li>
-                    <li><strong>会計年度:</strong> {{ $year }} 年</li>
-                    <li>
-                        <strong>現金残高:</strong>
-                        <ul class="ml-4 list-disc">
-                            @foreach ($cash_accounts as $account)
-                                <li>{{ $account['sub_account_name'] }}: {{ number_format($account['amount']) }} 円</li>
-                            @endforeach
-                        </ul>
-
-                    </li>
-                    <li>
-                        <strong>銀行口座:</strong>
-                        <ul class="ml-4 list-disc">
-                            @foreach ($bank_accounts as $account)
-                                <li>{{ $account['sub_account_name'] }}: {{ number_format($account['amount']) }} 円</li>
-                            @endforeach
-                        </ul>
-                    </li>
-                    <li>
-                        <strong>その他資産:</strong>
-                        <ul class="ml-4 list-disc">
-                            @foreach ($other_assets as $asset)
-                                <li>{{ $asset['account_name'] }} ({{ $asset['sub_account_name'] ?? 'なし' }}):
-                                    {{ number_format($asset['amount']) }} 円</li>
-                            @endforeach
-                        </ul>
-                    </li>
-                </ul>
-                <hr>
-                <div>
-                    売上の分類:
-                    <ul class="ml-4 list-disc">
-                        @foreach ($revenue_sub_accounts as $sub)
-                            <li>{{ $sub['name'] }}</li>
+                <div class="rounded-2xl border border-slate-200 p-6">
+                    <h3 class="text-base font-semibold text-slate-900">Dashboard に表示される開始準備</h3>
+                    <ul class="mt-4 space-y-3 text-sm text-slate-700">
+                        @foreach ($setupQuestions as $question)
+                            @php($answer = data_get($this, $question['field']))
+                            <li class="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
+                                <span class="flex-1">{{ $question['title'] }}</span>
+                                <span class="shrink-0 font-semibold text-slate-900">{{ $this->answerLabel($answer) }}</span>
+                            </li>
                         @endforeach
                     </ul>
                 </div>
-
-                <div class="mt-6 flex justify-between">
-                    <button wire:click="$set('step', 5)" class="px-6 py-3 bg-gray-300 rounded">戻る</button>
-                    <button wire:click="submit" class="px-6 py-3 bg-green-600 text-white rounded">この内容で登録</button>
-                </div>
+            </div>
         @endif
 
-    </div>
+        <div class="mt-10 flex justify-between">
+            @if ($step > 1)
+                <button wire:click="$set('step', {{ $step - 1 }})" class="rounded-xl bg-slate-200 px-6 py-3 text-slate-800">
+                    戻る
+                </button>
+            @else
+                <div></div>
+            @endif
 
+            @if ($step < 6)
+                <button wire:click="next" class="rounded-xl bg-blue-600 px-6 py-3 text-white">
+                    次へ
+                </button>
+            @else
+                <button wire:click="submit" class="rounded-xl bg-emerald-600 px-6 py-3 text-white">
+                    Soler を始める
+                </button>
+            @endif
+        </div>
+    </div>
 </div>

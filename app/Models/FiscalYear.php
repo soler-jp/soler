@@ -38,6 +38,7 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
         'closed_by',
         'is_taxable',   // 課税事業者ならtrue, 免税事業者なfalse
         'is_tax_exclusive',  // 税抜経理ならtrue, 税込経理ならfalse
+        'opening_context',
         'start_date',
         'end_date',
 
