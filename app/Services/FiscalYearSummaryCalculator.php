@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Concerns\SkipActorGuard;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use Illuminate\Database\Eloquent\Builder;
 
+#[SkipActorGuard('read-only な会計年度サマリ計算。呼び出し側で FiscalYear を actor でガードする前提。')]
 class FiscalYearSummaryCalculator
 {
     /**

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Concerns\AuthorizesBusinessUnitAccess;
+use App\Concerns\SkipActorGuard;
 use App\Models\Account;
 use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
@@ -95,11 +96,13 @@ class TransactionRegistrar
         });
     }
 
+    #[SkipActorGuard('stateless helper。認可対象のリソースを引数に持たない。TODO: protected 化を検討。')]
     public function totalWithTax(array $entries): int
     {
         return collect($entries)->sum(fn ($e) => (int) ($e['net_amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
     }
 
+    #[SkipActorGuard('内部ヘルパー。register() の内部で actor 検証済の FiscalYear を渡す前提。TODO: protected 化を検討。')]
     public function prepareJournalEntries(FiscalYear $fiscalYear, array $journalEntriesData): array
     {
         $preparedEntries = [];
@@ -113,6 +116,7 @@ class TransactionRegistrar
         return $preparedEntries;
     }
 
+    #[SkipActorGuard('確定処理用のデータ組立ヘルパー。confirmPlanned() から呼ばれる。TODO: protected 化を検討。')]
     public function buildPlannedTransactionData(Transaction $transaction, array $overrides = []): array
     {
         $base = [
@@ -127,6 +131,7 @@ class TransactionRegistrar
         return array_merge($base, $overrides);
     }
 
+    #[SkipActorGuard('確定処理用のデータ組立ヘルパー。confirmPlanned() から呼ばれる。TODO: protected 化を検討。')]
     public function buildPlannedJournalEntries(Transaction $transaction, array $overrides = []): array
     {
         $transaction->loadMissing('journalEntries', 'recurringTransactionPlan');
@@ -209,6 +214,7 @@ class TransactionRegistrar
         return $entries;
     }
 
+    #[SkipActorGuard('PlannedTransactionConfirmer::confirm() へ委譲し、下流で actor をガードする。')]
     public function confirmPlanned(Transaction $transaction, User $actor): Transaction
     {
         if (! $transaction->is_planned) {
@@ -231,6 +237,7 @@ class TransactionRegistrar
      * fiscal_year_id 基準で集計する処理（年度サマリ・残高集計など）は
      * 取引日が年度期間内であることを前提にしているため、登録時に保証する。
      */
+    #[SkipActorGuard('内部検証ヘルパー。呼び出し側で FiscalYear を actor 検証済みで渡す前提。TODO: protected 化を検討。')]
     public function ensureDateWithinFiscalYear(FiscalYear $fiscalYear, mixed $date): void
     {
         $transactionDate = Carbon::parse($date)->startOfDay();
@@ -246,6 +253,7 @@ class TransactionRegistrar
         }
     }
 
+    #[SkipActorGuard('内部ヘルパー。呼び出し側で FiscalYear を actor 検証済みで渡す前提。TODO: protected 化を検討。')]
     public function resolveCounterparty(FiscalYear $fiscalYear, array $transactionData): array
     {
         $businessUnit = $fiscalYear->businessUnit;
@@ -494,6 +502,7 @@ class TransactionRegistrar
         return [$netAmount, $taxAmount];
     }
 
+    #[SkipActorGuard('内部検証ヘルパー。呼び出し側で FiscalYear を actor 検証済みで渡す前提。TODO: protected 化を検討。')]
     public function ensureEntriesBelongToBusinessUnit(FiscalYear $fiscalYear, array $validatedEntries): void
     {
         $businessUnit = $fiscalYear->businessUnit;
@@ -507,6 +516,7 @@ class TransactionRegistrar
         }
     }
 
+    #[SkipActorGuard('内部検証ヘルパー。呼び出し側で FiscalYear を actor 検証済みで渡す前提。TODO: protected 化を検討。')]
     public function ensureTaxTypeAllowedForFiscalYear(FiscalYear $fiscalYear, array $validatedEntries): void
     {
         if (! $fiscalYear->is_taxable) {

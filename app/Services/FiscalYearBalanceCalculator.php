@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Concerns\SkipActorGuard;
 use App\Models\Account;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use Illuminate\Support\Collection;
 
+#[SkipActorGuard('read-only な会計年度残高計算。呼び出し側で FiscalYear を actor でガードする前提。')]
 class FiscalYearBalanceCalculator
 {
     /**

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Concerns\AuthorizesBusinessUnitAccess;
+use App\Concerns\SkipActorGuard;
 use App\Models\FiscalYear;
 use App\Models\Transaction;
 use App\Models\User;
@@ -22,6 +23,7 @@ class FiscalYearCloser
      *     warnings: array<int, array{key: string}>
      * }
      */
+    #[SkipActorGuard('read-only な締め前検証。TODO: 決算画面を actor 認可下に置いた後、この API にも actor を追加する。')]
     public function validate(FiscalYear $fiscalYear): array
     {
         $fiscalYear->loadMissing('businessUnit');

@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Concerns\SkipActorGuard;
 use App\Models\Account;
 use App\Models\FiscalYear;
 use App\Models\SubAccount;
 
+#[SkipActorGuard('read-only な帳簿参照。TODO: 呼び出し側で actor をガードしていることを担保する仕組みへ移行を検討。')]
 class GeneralLedgerService
 {
     public function generate(Account $account, FiscalYear $fiscalYear): array

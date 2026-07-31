@@ -214,8 +214,9 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - actor が `null` のときは fail-closed（`AuthorizationException`）で拒否する。`authorizeBusinessUnitAccess()` 自身がこの振る舞いを担うので、独自の null 分岐を書かない。
 - Service の public メソッドは、リソースを引数で受け取る／内部で取得するに関わらず、最初のバリデーション相当の位置で `authorizeBusinessUnitAccess()` を呼ぶ。書き込み系（create/update/delete）だけでなく、他ユーザーの `BusinessUnit` を読み得る参照系にも適用する。
 - create 系で対象リソースがまだ存在しない場合は、親となる `BusinessUnit`（または `ResolvesBusinessUnit` を実装する親リソース）を actor でガードしてから作成する。
-- 「actor 不要」で作る例外（バッチ処理・システムジョブ・マイグレーション補助など）は、クラス／メソッドの docblock に理由を明記したうえで PR 説明にも記載する。曖昧なまま省略しない。
+- 「actor 不要」で作る例外（バッチ処理・システムジョブ・マイグレーション補助など）は、`#[App\Concerns\SkipActorGuard('理由')]` をクラスまたはメソッドに付与すること。クラスに付与すると子クラスも自動的に対象外になる。
 - 既存 Service を修正する際も、当該メソッドが未ガードなら合わせて修正する（後方互換のため actor は nullable で追加してよいが、null のときも `authorizeBusinessUnitAccess()` に委ねること）。
+- この規約は `tests/Unit/Architecture/ActorAuthorizationTest.php` (アーキテクチャテスト) で機械的に強制される。`app/Services/**` の新規クラス・新規 public メソッドがガード未実装のまま追加されると CI が落ちる。
 
 NG:
 

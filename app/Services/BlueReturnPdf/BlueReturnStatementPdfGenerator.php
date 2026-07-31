@@ -2,12 +2,14 @@
 
 namespace App\Services\BlueReturnPdf;
 
+use App\Concerns\SkipActorGuard;
 use App\Models\BlueReturnInput;
 use App\Models\FiscalYear;
 use RuntimeException;
 use TCPDF;
 use TCPDF_FONTS;
 
+#[SkipActorGuard('PDF 生成ロジック。呼び出し側のコントローラで FiscalYear を actor でガードする前提。')]
 class BlueReturnStatementPdfGenerator
 {
     private const FONT_FILE = 'ipaexg.ttf';

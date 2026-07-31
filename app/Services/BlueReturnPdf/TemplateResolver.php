@@ -2,9 +2,11 @@
 
 namespace App\Services\BlueReturnPdf;
 
+use App\Concerns\SkipActorGuard;
 use App\Models\FiscalYear;
 use InvalidArgumentException;
 
+#[SkipActorGuard('PDF テンプレート解決。参照だけで書き込みはない純粋関数。')]
 class TemplateResolver
 {
     public const FROM_2020 = 'from2020';

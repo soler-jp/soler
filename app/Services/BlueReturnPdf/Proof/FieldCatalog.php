@@ -2,6 +2,9 @@
 
 namespace App\Services\BlueReturnPdf\Proof;
 
+use App\Concerns\SkipActorGuard;
+
+#[SkipActorGuard('PDF 校正用のフィールドメタデータ。認可対象のリソースを持たない。')]
 class FieldCatalog
 {
     /**

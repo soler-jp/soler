@@ -2,8 +2,10 @@
 
 namespace App\Services\CreditCardImport;
 
+use App\Concerns\SkipActorGuard;
 use InvalidArgumentException;
 
+#[SkipActorGuard('CSV パーサ選択レジストリ。認可対象のリソースを持たない。')]
 class CreditCardCsvParserRegistry
 {
     /**
