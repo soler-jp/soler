@@ -222,6 +222,35 @@ class ActorAuthorizationTest extends TestCase
             return '';
         }
 
-        return implode('', array_slice($lines, $start - 1, $end - $start + 1));
+        $raw = implode('', array_slice($lines, $start - 1, $end - $start + 1));
+
+        return $this->stripCommentsAndStrings($raw);
+    }
+
+    /**
+     * コメント／文字列リテラル中に「呼んでいるフリ」の記述があっても
+     * ガード扱いされないよう、実コードだけを残した文字列を返す。
+     */
+    private function stripCommentsAndStrings(string $source): string
+    {
+        $tokens = @token_get_all('<?php '.$source);
+        $out = '';
+        foreach ($tokens as $token) {
+            if (is_string($token)) {
+                $out .= $token;
+
+                continue;
+            }
+            [$id, $text] = $token;
+            if ($id === T_COMMENT || $id === T_DOC_COMMENT) {
+                continue;
+            }
+            if ($id === T_CONSTANT_ENCAPSED_STRING || $id === T_ENCAPSED_AND_WHITESPACE) {
+                continue;
+            }
+            $out .= $text;
+        }
+
+        return $out;
     }
 }
