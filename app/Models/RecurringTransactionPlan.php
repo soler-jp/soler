@@ -11,6 +11,7 @@ use Illuminate\Contracts\Validation\Validator as ValidatorContract;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -35,6 +36,7 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
 
     protected $fillable = [
         'business_unit_id',
+        'counterparty_id',
         'name',
         'interval', // 'monthly', 'bimonthly', 'yearly'
         'month_of_year', // for 'yearly' interval
@@ -72,6 +74,11 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function counterparty(): BelongsTo
+    {
+        return $this->belongsTo(Counterparty::class);
     }
 
     public function resolveBusinessUnit(): BusinessUnit
@@ -112,6 +119,7 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
                 'withholding_sub_account_id' => ['nullable', 'exists:sub_accounts,id'],
                 'is_active' => ['boolean'],
                 'business_unit_id' => ['required', 'exists:business_units,id'],
+                'counterparty_id' => ['nullable', 'exists:counterparties,id'],
             ]
         );
 
@@ -141,6 +149,12 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
                 if ($subAccountId && ! $businessUnit->hasSubAccount((int) $subAccountId)) {
                     $validator->errors()->add($field, '選択中の事業体に属する補助科目を指定してください。');
                 }
+            }
+
+            $counterpartyId = $attributes['counterparty_id'] ?? null;
+
+            if ($counterpartyId && ! $businessUnit->counterparties()->whereKey($counterpartyId)->exists()) {
+                $validator->errors()->add('counterparty_id', '選択中の事業体に属する取引先を指定してください。');
             }
         });
 
@@ -318,6 +332,7 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
                 'remarks' => null,
                 'is_planned' => true,
                 'recurring_transaction_plan_id' => $this->id,
+                'counterparty_id' => $this->counterparty_id,
             ],
             'entries' => $entries,
         ];

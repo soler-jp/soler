@@ -145,6 +145,10 @@ $plan = $businessUnit->createRecurringTransactionPlan([
   - 源泉徴収税額
 - `withholding_sub_account_id`
   - 源泉徴収税の借方補助科目
+- `counterparty_id`
+  - 生成する取引へ自動付与する取引先
+  - 省略可能
+  - 指定する場合は同じ `BusinessUnit` に属する `Counterparty` を指定します
 
 ## バリデーション上の注意
 
@@ -153,6 +157,7 @@ $plan = $businessUnit->createRecurringTransactionPlan([
 - `is_withholding = true` のとき `withholding_tax_amount > 0` と `withholding_sub_account_id` が必須です
 - `is_withholding = true` のとき `withholding_tax_amount < amount + tax_amount` が必要です
 - `is_withholding = false` のとき源泉カラムは空にしてください
+- `counterparty_id` を指定する場合は、計画の `BusinessUnit` に属する取引先でなければなりません
 
 ## 予定取引を生成する
 
@@ -164,6 +169,7 @@ $transactions = $businessUnit->generatePlannedTransactionsForPlan($plan, $fiscal
 ```
 
 生成された取引は `is_planned = true` になり、`recurring_transaction_plan_id` に元の計画IDが入ります。
+また、計画に `counterparty_id` が設定されていれば、生成された予定取引にも同じ `counterparty_id` が入ります。
 
 ### 月次
 
@@ -230,6 +236,8 @@ $confirmed = $plan->confirmTransaction($transaction->id, [
 - `debit_sub_account_id`
 
 課税収入では、確定後も貸方の売上税区分と税額が保持されます。
+
+`counterparty_id` は予定取引の生成時点で引き継がれるため、確定時もそのまま保持されます。
 
 ### 源泉徴収付き収入を確定する例
 

@@ -37,6 +37,14 @@ UI の固定費登録画面は別レイヤーの実装であり、本ドキュ�
 
 - `business_unit_id`
   - 計画が属する事業体
+- `counterparty_id`
+  - 生成する取引に付与する取引先（`Counterparty`）
+  - nullable。取引先が固定されない計画（変動する公共料金など）では null にする
+  - 指定する場合は同じ `business_unit_id` に属する取引先でなければならない
+  - 家賃→同じ大家、サブスク→同じベンダーのように定期取引は取引先が固定なケースが多く、
+    生成される予定取引に取引先を自動付与することで確定時の手入力を減らす
+  - 付与された取引先は `CounterpartySummaryCalculator` の集計対象になり、定期取引由来の取引も
+    取引先別集計に乗る
 - `name`
   - 生成する取引の `description` に使う
 - `interval`
@@ -91,6 +99,12 @@ UI の固定費登録画面は別レイヤーの実装であり、本ドキュ�
 - `type = expense` のとき `is_withholding` は必ず `false`
 - `is_withholding = true` のとき `withholding_tax_amount > 0` かつ `withholding_sub_account_id` を必須とする
 - `is_withholding = false` のとき `withholding_tax_amount` は 0 または null、`withholding_sub_account_id` は null とする
+
+`counterparty_id` の整合条件:
+
+- 指定する場合は計画の `business_unit_id` に属する `Counterparty` でなければならない
+- 補助科目（`debit_sub_account_id` など）の事業体チェックと同じく、`validator()` の後段で検証する
+- null は許容する（取引先を固定しない計画）
 
 ## 繰り返し日付
 
@@ -241,6 +255,9 @@ UI の固定費登録画面は別レイヤーの実装であり、本ドキュ�
 
 `RecurringTransactionPlan::toTransactionData()` は、保存済みの計画から `TransactionRegistrar` に渡す raw input を組み立てる。
 
+`transaction` の `counterparty_id` には計画の `counterparty_id` をそのまま渡す。計画に取引先が
+設定されていなければ null になり、取引先なしの予定取引として生成される。
+
 支出の場合:
 
 ```php
@@ -251,6 +268,7 @@ UI の固定費登録画面は別レイヤーの実装であり、本ドキュ�
         'remarks' => null,
         'is_planned' => true,
         'recurring_transaction_plan_id' => $plan->id,
+        'counterparty_id' => $plan->counterparty_id,
     ],
     'entries' => [
         [
@@ -279,6 +297,7 @@ UI の固定費登録画面は別レイヤーの実装であり、本ドキュ�
         'remarks' => null,
         'is_planned' => true,
         'recurring_transaction_plan_id' => $plan->id,
+        'counterparty_id' => $plan->counterparty_id,
     ],
     'entries' => [
         [
@@ -306,6 +325,7 @@ UI の固定費登録画面は別レイヤーの実装であり、本ドキュ�
         'remarks' => null,
         'is_planned' => true,
         'recurring_transaction_plan_id' => $plan->id,
+        'counterparty_id' => $plan->counterparty_id,
     ],
     'entries' => [
         [
@@ -356,6 +376,10 @@ UI の固定費登録画面は別レイヤーの実装であり、本ドキュ�
   - 支払元として `credit_sub_account_id` を変更できる
 - 収入
   - 入金先として `debit_sub_account_id` を変更できる
+
+`counterparty_id` は生成時に予定取引へ付与済みのため、確定でもそのまま引き継ぐ（`confirmTransaction()`
+は既存の `transaction->counterparty_id` を上書き対象に含めて保持する）。取引先の差し替えは
+確定 API の上書き項目には含めず、必要なら確定後に取引側で変更する。
 
 ### 確定時の仕訳再構成
 
@@ -441,6 +465,8 @@ raw input を渡す形に寄せる。上記の `type` / `is_withholding` 対応�
 - `business_ratio` が収入でもバリデーション上は受け取れてしまう
 - 源泉徴収付き収入を表現するカラム（`withholding_tax_amount` / `withholding_sub_account_id`）が存在しない
 - `toTransactionData()` / 確定時の再構成が単一借方前提のため、借方 2 行（入金額・源泉徴収税）を生成・保持できない
+- 取引先を計画に紐づけるカラム（`counterparty_id`）が存在せず、生成される予定取引に取引先が付かない
+  - そのため定期取引由来の取引は `CounterpartySummaryCalculator` の取引先別集計から漏れる
 - UI コンポーネントは支出（固定費）向けであり、収入計画を作成・表示・確定しない
 
 ## 実装方針
@@ -465,7 +491,13 @@ raw input を渡す形に寄せる。上記の `type` / `is_withholding` 対応�
    - 収入時は上書きで `debit_sub_account_id`（入金先）を差し替えられるようにする
    - 単一借方の前提を外し、源泉あり収入では借方 2 行を拾い直して保持する
    - これにより課税収入・源泉あり収入の確定でも税区分・税額が保持される
-9. モデル/API テストに次を追加する
+9. 取引先の紐づけを追加する
+   - `counterparty_id`（nullable、`counterparties` への外部キー）をマイグレーションで追加する
+   - モデルに `fillable` と `counterparty()`（belongsTo）を定義し、`Counterparty` 側に
+     `recurringTransactionPlans()`（hasMany）を追加する
+   - `validator()` の後段で、指定時は計画の `business_unit_id` に属する取引先かを検証する
+   - `toTransactionData()` の `transaction` に `counterparty_id` を含め、生成される予定取引へ付与する
+10. モデル/API テストに次を追加する
    - 毎月の税なし収入（生成）
    - 毎年の税なし収入（生成）
    - 毎月の課税売上（生成）
@@ -478,6 +510,10 @@ raw input を渡す形に寄せる。上記の `type` / `is_withholding` 対応�
    - `type = expense` で `is_withholding = true` がバリデーションエラーになること
    - `is_withholding = true` で `withholding_tax_amount = 0` がバリデーションエラーになること
    - `withholding_tax_amount >= gross_amount` がバリデーションエラーになること
+   - `counterparty_id` を指定した計画から生成した予定取引に取引先が付与されること
+   - `counterparty_id = null` の計画からは取引先なしの予定取引が生成されること
+   - 別事業体の `counterparty_id` を指定するとバリデーションエラーになること
+   - `counterparty_id` を持つ計画由来の取引が `CounterpartySummaryCalculator` の集計に含まれること
 
 ## 対象外
 
@@ -488,7 +524,8 @@ raw input を渡す形に寄せる。上記の `type` / `is_withholding` 対応�
 - 源泉徴収税額の料率からの自動計算（`withholding_tax_amount` は固定のテンプレート値として持つ）
 - 消費税と源泉徴収税の端数処理・按分ロジック（源泉徴収税額はユーザーが確定値として入力する前提）
 - UI の収入タブ、フォーム、一覧、確定画面
-- 取引先の自動付与
+- 取引先の適格判定に基づく税区分の自動決定（`counterparty_id` は付与するが、`tax_type` の自動判定は行わない）
+- 確定 API での取引先差し替え（生成時に付与した `counterparty_id` を確定でそのまま引き継ぐ）
 
 ## 参考
 

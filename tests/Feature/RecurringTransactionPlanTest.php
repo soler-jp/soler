@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Counterparty;
 use App\Models\JournalEntry;
 use App\Models\RecurringTransactionPlan;
 use App\Models\User;
@@ -1462,5 +1463,139 @@ class RecurringTransactionPlanTest extends TestCase
             'amount' => 1100,
             'credit_sub_account_id' => $creditSubAccount->id,
         ], $user);
+    }
+
+    #[Test]
+    public function counterparty_idを指定した計画から生成した予定取引に取引先が引き継がれる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先付き定期取引']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $unit->id,
+        ]);
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '回線利用料',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
+            'counterparty_id' => $counterparty->id,
+            'debit_sub_account_id' => $expenseSubAccount->id,
+            'credit_sub_account_id' => $cashSubAccount->id,
+            'amount' => 5500,
+            'tax_amount' => 0,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+
+        $this->assertSame($counterparty->id, $plan->counterparty?->id);
+        $this->assertSame($counterparty->id, $transaction->counterparty_id);
+        $this->assertTrue($counterparty->recurringTransactionPlans->contains($plan));
+    }
+
+    #[Test]
+    public function counterparty_idを指定しない計画からは取引先なしの予定取引が生成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先なし定期取引']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '回線利用料',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
+            'debit_sub_account_id' => $expenseSubAccount->id,
+            'credit_sub_account_id' => $cashSubAccount->id,
+            'amount' => 5500,
+            'tax_amount' => 0,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+
+        $this->assertNull($plan->counterparty_id);
+        $this->assertNull($transaction->counterparty_id);
+    }
+
+    #[Test]
+    public function 別事業体のcounterparty_idを指定するとバリデーションエラーになる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
+        $otherUser = User::factory()->create();
+        $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
+        $foreignCounterparty = Counterparty::factory()->create([
+            'business_unit_id' => $otherUnit->id,
+        ]);
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+
+        $this->expectException(ValidationException::class);
+
+        $unit->createRecurringTransactionPlan([
+            'name' => '回線利用料',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
+            'counterparty_id' => $foreignCounterparty->id,
+            'debit_sub_account_id' => $expenseSubAccount->id,
+            'credit_sub_account_id' => $cashSubAccount->id,
+            'amount' => 5500,
+            'tax_amount' => 0,
+        ], $user);
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function counterparty_idを持つ計画由来の取引が取引先集計に含まれる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先集計付き定期取引']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $unit->id,
+        ]);
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '回線利用料',
+            'interval' => 'yearly',
+            'month_of_year' => 5,
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
+            'counterparty_id' => $counterparty->id,
+            'debit_sub_account_id' => $expenseSubAccount->id,
+            'credit_sub_account_id' => $cashSubAccount->id,
+            'amount' => 5000,
+            'tax_amount' => 500,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+        $summary = $counterparty->calculateAmountSummaryForFiscalYear(2025);
+
+        $this->assertSame($counterparty->id, $transaction->counterparty_id);
+        $this->assertSame([
+            'expense' => [
+                'accounts' => [
+                    [
+                        'account_id' => $expenseSubAccount->account_id,
+                        'account_name' => '通信費',
+                        'amount' => 5500,
+                    ],
+                ],
+                'total_amount' => 5500,
+            ],
+            'income' => [
+                'accounts' => [],
+                'total_amount' => 0,
+            ],
+        ], $summary);
     }
 }

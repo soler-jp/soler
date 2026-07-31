@@ -81,6 +81,11 @@ class Counterparty extends Model implements ResolvesBusinessUnit
         return $this->hasMany(Transaction::class);
     }
 
+    public function recurringTransactionPlans(): HasMany
+    {
+        return $this->hasMany(RecurringTransactionPlan::class);
+    }
+
     /**
      * @return array{
      *     all: array{
