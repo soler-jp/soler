@@ -210,6 +210,11 @@ $summary = $counterparty->calculateAmountSummaryForFiscalYear(2025);
 
 この実装では、無効化済みの取引は集計から除外する。
 
+`transactions.counterparty_id` は手入力の取引だけでなく、`RecurringTransactionPlan` から生成された
+予定取引にも付く。計画に `counterparty_id` を設定しておくと、生成・確定された取引がそのまま
+この集計対象に含まれる（`docs/recurring-transaction-design.md` を参照）。`Counterparty` 側からは
+`recurringTransactionPlans()`（hasMany）でその取引先を既定とする定期取引計画を辿れる。
+
 ## 集計内容
 
 各 `fiscal_years.year` ごとに、次の単位で集計する。

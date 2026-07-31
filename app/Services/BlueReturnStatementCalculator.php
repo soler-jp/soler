@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Concerns\SkipActorGuard;
 use App\Models\Account;
 use App\Models\DepreciationEntry;
 use App\Models\FiscalYear;
@@ -10,6 +11,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use RuntimeException;
 
+#[SkipActorGuard('read-only な決算書計算。呼び出し側で FiscalYear を actor でガードする前提。')]
 class BlueReturnStatementCalculator
 {
     public function __construct(

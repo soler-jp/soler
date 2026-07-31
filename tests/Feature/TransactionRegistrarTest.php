@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Counterparty;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
+use App\Models\RecurringTransactionPlan;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
@@ -2112,7 +2113,7 @@ class TransactionRegistrarTest extends TestCase
             'amount' => 5000,
             'tax_amount' => 500,
             'tax_type' => 'taxable_purchases_10',
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
         ], $user);
 
         $registrar = new TransactionRegistrar;

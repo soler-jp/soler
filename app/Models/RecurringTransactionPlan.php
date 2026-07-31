@@ -11,6 +11,7 @@ use Illuminate\Contracts\Validation\Validator as ValidatorContract;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -22,30 +23,47 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
     /** @use HasFactory<RecurringTransactionPlanFactory> */
     use AuthorizesBusinessUnitAccess, HasFactory;
 
+    public const TYPE_EXPENSE = 'expense';
+
+    public const TYPE_INCOME = 'income';
+
+    public const TYPES = [
+        self::TYPE_EXPENSE,
+        self::TYPE_INCOME,
+    ];
+
+    public const WITHHOLDING_SUB_ACCOUNT_NAME = '源泉徴収';
+
     protected $fillable = [
         'business_unit_id',
+        'counterparty_id',
         'name',
         'interval', // 'monthly', 'bimonthly', 'yearly'
         'month_of_year', // for 'yearly' interval
         'start_month', // for 'bimonthly' interval
         'day_of_month',
-        'is_income',
+        'type',
+        'is_withholding',
         'debit_sub_account_id',
         'credit_sub_account_id',
         'amount',
         'tax_amount',
         'tax_type', //
         'business_ratio',
+        'withholding_tax_amount',
+        'withholding_sub_account_id',
         'is_active',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'is_income' => 'boolean',
+        'type' => 'string',
+        'is_withholding' => 'boolean',
         'day_of_month' => 'integer',
         'amount' => 'integer',
         'tax_amount' => 'integer',
         'business_ratio' => 'integer',
+        'withholding_tax_amount' => 'integer',
     ];
 
     protected function grossAmount(): Attribute
@@ -56,6 +74,11 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function counterparty(): BelongsTo
+    {
+        return $this->belongsTo(Counterparty::class);
     }
 
     public function resolveBusinessUnit(): BusinessUnit
@@ -84,15 +107,19 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
                 'day_of_month' => ['required', 'integer', 'min:1', 'max:31'],
                 'month_of_year' => ['nullable', 'integer', 'min:1', 'max:12'],
                 'start_month' => ['nullable', 'integer', 'min:1', 'max:12'],
-                'is_income' => ['required', 'boolean'],
+                'type' => ['required', 'in:'.implode(',', self::TYPES)],
+                'is_withholding' => ['boolean'],
                 'debit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
                 'credit_sub_account_id' => ['required', 'exists:sub_accounts,id'],
                 'amount' => ['required', 'integer', 'min:1'],
                 'tax_amount' => ['nullable', 'integer', 'min:0'],
                 'tax_type' => ['nullable', 'string', 'max:50'],
                 'business_ratio' => ['nullable', 'integer', 'min:1', 'max:100'],
+                'withholding_tax_amount' => ['nullable', 'integer', 'min:0'],
+                'withholding_sub_account_id' => ['nullable', 'exists:sub_accounts,id'],
                 'is_active' => ['boolean'],
                 'business_unit_id' => ['required', 'exists:business_units,id'],
+                'counterparty_id' => ['nullable', 'exists:counterparties,id'],
             ]
         );
 
@@ -116,12 +143,63 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
                 return;
             }
 
-            foreach (['debit_sub_account_id', 'credit_sub_account_id'] as $field) {
+            foreach (['debit_sub_account_id', 'credit_sub_account_id', 'withholding_sub_account_id'] as $field) {
                 $subAccountId = $attributes[$field] ?? null;
 
                 if ($subAccountId && ! $businessUnit->hasSubAccount((int) $subAccountId)) {
                     $validator->errors()->add($field, '選択中の事業体に属する補助科目を指定してください。');
                 }
+            }
+
+            $counterpartyId = $attributes['counterparty_id'] ?? null;
+
+            if ($counterpartyId && ! $businessUnit->counterparties()->whereKey($counterpartyId)->exists()) {
+                $validator->errors()->add('counterparty_id', '選択中の事業体に属する取引先を指定してください。');
+            }
+        });
+
+        $validator->after(function ($validator) use ($attributes) {
+            $type = $attributes['type'] ?? null;
+            $isWithholding = (bool) ($attributes['is_withholding'] ?? false);
+            $businessRatio = $attributes['business_ratio'] ?? null;
+            $withholdingTaxAmount = $attributes['withholding_tax_amount'] ?? null;
+            $withholdingSubAccountId = $attributes['withholding_sub_account_id'] ?? null;
+            $grossAmount = (int) ($attributes['amount'] ?? 0) + (int) ($attributes['tax_amount'] ?? 0);
+
+            if ($type === self::TYPE_INCOME && $businessRatio !== null) {
+                $validator->errors()->add('business_ratio', '収入計画では事業割合を指定できません。');
+            }
+
+            if ($type === self::TYPE_EXPENSE && $isWithholding) {
+                $validator->errors()->add('is_withholding', '支出計画では源泉徴収を指定できません。');
+            }
+
+            if (! $isWithholding) {
+                if (! in_array($withholdingTaxAmount, [null, 0, '0'], true)) {
+                    $validator->errors()->add('withholding_tax_amount', '源泉徴収税額は源泉徴収ありの収入計画でのみ指定できます。');
+                }
+
+                if ($withholdingSubAccountId !== null) {
+                    $validator->errors()->add('withholding_sub_account_id', '源泉徴収補助科目は源泉徴収ありの収入計画でのみ指定できます。');
+                }
+
+                return;
+            }
+
+            if ($type !== self::TYPE_INCOME) {
+                return;
+            }
+
+            if ((int) $withholdingTaxAmount < 1) {
+                $validator->errors()->add('withholding_tax_amount', '源泉徴収税額は1以上で指定してください。');
+            }
+
+            if ($withholdingSubAccountId === null) {
+                $validator->errors()->add('withholding_sub_account_id', '源泉徴収補助科目を指定してください。');
+            }
+
+            if ((int) $withholdingTaxAmount >= $grossAmount) {
+                $validator->errors()->add('withholding_tax_amount', '源泉徴収税額は税込金額より小さくしてください。');
             }
         });
 
@@ -195,10 +273,57 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
 
     public function toTransactionData(Carbon $date): array
     {
-        $taxType = $this->tax_type
-            ?? ($this->tax_amount > 0
-                ? JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10
-                : JournalEntry::TAX_TYPE_OUT_OF_SCOPE);
+        $taxType = $this->defaultTaxType();
+
+        if ($this->type === self::TYPE_EXPENSE) {
+            $entries = [
+                [
+                    'sub_account_id' => $this->debit_sub_account_id,
+                    'type' => JournalEntry::TYPE_DEBIT,
+                    'gross_amount' => $this->gross_amount,
+                    'tax_type' => $taxType,
+                    'business_ratio' => $this->business_ratio,
+                ],
+                [
+                    'sub_account_id' => $this->credit_sub_account_id,
+                    'type' => JournalEntry::TYPE_CREDIT,
+                    'net_amount' => $this->gross_amount,
+                ],
+            ];
+        } elseif ($this->is_withholding) {
+            $entries = [
+                [
+                    'sub_account_id' => $this->debit_sub_account_id,
+                    'type' => JournalEntry::TYPE_DEBIT,
+                    'net_amount' => $this->gross_amount - (int) $this->withholding_tax_amount,
+                ],
+                [
+                    'sub_account_id' => $this->withholding_sub_account_id,
+                    'type' => JournalEntry::TYPE_DEBIT,
+                    'net_amount' => (int) $this->withholding_tax_amount,
+                ],
+                [
+                    'sub_account_id' => $this->credit_sub_account_id,
+                    'type' => JournalEntry::TYPE_CREDIT,
+                    'gross_amount' => $this->gross_amount,
+                    'tax_type' => $taxType,
+                ],
+            ];
+        } else {
+            $entries = [
+                [
+                    'sub_account_id' => $this->debit_sub_account_id,
+                    'type' => JournalEntry::TYPE_DEBIT,
+                    'net_amount' => $this->gross_amount,
+                ],
+                [
+                    'sub_account_id' => $this->credit_sub_account_id,
+                    'type' => JournalEntry::TYPE_CREDIT,
+                    'gross_amount' => $this->gross_amount,
+                    'tax_type' => $taxType,
+                ],
+            ];
+        }
 
         return [
             'transaction' => [
@@ -207,21 +332,9 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
                 'remarks' => null,
                 'is_planned' => true,
                 'recurring_transaction_plan_id' => $this->id,
+                'counterparty_id' => $this->counterparty_id,
             ],
-            'entries' => [
-                [
-                    'sub_account_id' => $this->debit_sub_account_id,
-                    'type' => 'debit',
-                    'gross_amount' => $this->gross_amount,
-                    'tax_type' => $taxType,
-                    'business_ratio' => $this->business_ratio,
-                ],
-                [
-                    'sub_account_id' => $this->credit_sub_account_id,
-                    'type' => 'credit',
-                    'net_amount' => $this->gross_amount,
-                ],
-            ],
+            'entries' => $entries,
         ];
     }
 
@@ -238,26 +351,11 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
             return null;
         }
 
-        $debitEntry = $transaction->journalEntries->first(function ($entry): bool {
-            return $entry->type === 'debit' && $entry->business_ratio !== null;
-        }) ?? $transaction->journalEntries->firstWhere('type', 'debit');
-
         $creditEntry = $transaction->journalEntries->firstWhere('type', 'credit');
 
-        if (! $debitEntry || ! $creditEntry) {
+        if (! $creditEntry) {
             return null;
         }
-
-        $creditSubAccountId = (int) ($attributes['credit_sub_account_id'] ?? $creditEntry->sub_account_id);
-
-        if (! $this->businessUnit->hasSubAccount($creditSubAccountId)) {
-            throw ValidationException::withMessages([
-                'credit_sub_account_id' => ['選択中の事業体に属する補助科目を指定してください。'],
-            ]);
-        }
-
-        $grossAmount = (int) ($attributes['amount'] ?? $creditEntry->net_amount);
-        $businessRatio = $attributes['business_ratio'] ?? $debitEntry->business_ratio ?? $this->business_ratio;
 
         $overrides = [
             'date' => $attributes['date'] ?? $transaction->date?->toDateString(),
@@ -265,12 +363,64 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
             'remarks' => $transaction->remarks,
             'counterparty_id' => $transaction->counterparty_id,
             'revision_reason' => $transaction->revision_reason,
-            'amount' => $grossAmount,
-            'credit_sub_account_id' => $creditSubAccountId,
+            'amount' => (int) ($attributes['amount'] ?? ((int) $creditEntry->net_amount + (int) $creditEntry->tax_amount)),
         ];
 
-        if ($businessRatio !== null) {
-            $overrides['business_ratio'] = $businessRatio;
+        if ($this->type === self::TYPE_EXPENSE) {
+            $debitEntry = $transaction->journalEntries->first(function ($entry): bool {
+                return $entry->type === JournalEntry::TYPE_DEBIT && $entry->business_ratio !== null;
+            }) ?? $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+
+            if (! $debitEntry) {
+                return null;
+            }
+
+            $creditSubAccountId = (int) ($attributes['credit_sub_account_id'] ?? $creditEntry->sub_account_id);
+
+            if (! $this->businessUnit->hasSubAccount($creditSubAccountId)) {
+                throw ValidationException::withMessages([
+                    'credit_sub_account_id' => ['選択中の事業体に属する補助科目を指定してください。'],
+                ]);
+            }
+
+            $overrides['credit_sub_account_id'] = $creditSubAccountId;
+
+            $businessRatio = $attributes['business_ratio'] ?? $debitEntry->business_ratio ?? $this->business_ratio;
+
+            if ($businessRatio !== null) {
+                $overrides['business_ratio'] = $businessRatio;
+            }
+        } else {
+            if (array_key_exists('business_ratio', $attributes) && $attributes['business_ratio'] !== null) {
+                throw ValidationException::withMessages([
+                    'business_ratio' => ['収入計画の確定では事業割合を指定できません。'],
+                ]);
+            }
+
+            if ($this->is_withholding && (int) $overrides['amount'] <= (int) $this->withholding_tax_amount) {
+                throw ValidationException::withMessages([
+                    'amount' => ['源泉徴収税額より大きい税込金額を指定してください。'],
+                ]);
+            }
+
+            $primaryDebitEntry = $transaction->journalEntries
+                ->where('type', JournalEntry::TYPE_DEBIT)
+                ->firstWhere('sub_account_id', '!=', $this->withholding_sub_account_id)
+                ?? $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+
+            if (! $primaryDebitEntry) {
+                return null;
+            }
+
+            $debitSubAccountId = (int) ($attributes['debit_sub_account_id'] ?? $primaryDebitEntry->sub_account_id);
+
+            if (! $this->businessUnit->hasSubAccount($debitSubAccountId)) {
+                throw ValidationException::withMessages([
+                    'debit_sub_account_id' => ['選択中の事業体に属する補助科目を指定してください。'],
+                ]);
+            }
+
+            $overrides['debit_sub_account_id'] = $debitSubAccountId;
         }
 
         $confirmed = app(PlannedTransactionConfirmer::class)->confirm(
@@ -292,5 +442,20 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
         }
 
         return $confirmed;
+    }
+
+    public function defaultTaxType(): string
+    {
+        if ($this->tax_type !== null) {
+            return $this->tax_type;
+        }
+
+        if ((int) $this->tax_amount === 0) {
+            return JournalEntry::TAX_TYPE_OUT_OF_SCOPE;
+        }
+
+        return $this->type === self::TYPE_INCOME
+            ? JournalEntry::TAX_TYPE_TAXABLE_SALES_10
+            : JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10;
     }
 }

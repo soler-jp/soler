@@ -6,6 +6,8 @@ use App\Models\BlueReturnInput;
 use App\Models\Counterparty;
 use App\Models\CreditCard;
 use App\Models\JournalEntry;
+use App\Models\RecurringTransactionPlan;
+use App\Models\Todo;
 use App\Models\User;
 use App\Services\CreditCardImport\CreditCardImportService;
 use App\Services\DepreciationService;
@@ -78,7 +80,7 @@ class BusinessUnitResolutionTest extends TestCase
             'name' => '定期費用',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $expenseSubAccount->id,
             'credit_sub_account_id' => $cashSubAccount->id,
             'amount' => 1000,
@@ -96,6 +98,11 @@ class BusinessUnitResolutionTest extends TestCase
                 ],
             ],
         ], $user);
+
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $unit->id,
+            'fiscal_year_id' => $fiscalYear->id,
+        ]);
 
         // クレジットカードと明細取込（statement / batch / line）
         $creditCard = $unit->createCreditCard([
@@ -136,6 +143,7 @@ CSV;
             $transaction,
             $journalEntry,
             $blueReturnInput,
+            $todo,
             $creditCard,
             $statement,
             $batch,

@@ -3,6 +3,7 @@
 namespace App\Livewire\Recurring;
 
 use App\Models\Account;
+use App\Models\RecurringTransactionPlan;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -13,7 +14,7 @@ class Form extends Component
         'interval' => 'monthly',
         'day_of_month' => null,
         'month_of_year' => null,
-        'is_income' => false,
+        'type' => RecurringTransactionPlan::TYPE_EXPENSE,
         'debit_sub_account_id' => null,
         'credit_sub_account_id' => null,
         'amount' => null,
@@ -81,7 +82,7 @@ class Form extends Component
                     'tax_amount' => $form['tax_amount'],
                     'tax_type' => $form['tax_type'],
                     'business_ratio' => $form['business_ratio'],
-                    'is_income' => false,
+                    'type' => RecurringTransactionPlan::TYPE_EXPENSE,
                     'start_month' => $form['interval'] === 'bimonthly'
                         ? ($form['start_month_type'] === 'odd' ? 1 : 2)
                         : null,

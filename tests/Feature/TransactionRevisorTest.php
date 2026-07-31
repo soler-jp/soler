@@ -125,7 +125,7 @@ class TransactionRevisorTest extends TestCase
             'name' => '毎月の消耗品費',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
             'amount' => 1000,

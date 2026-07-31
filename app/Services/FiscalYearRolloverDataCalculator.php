@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Concerns\SkipActorGuard;
 use App\Models\Account;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 
+#[SkipActorGuard('read-only な翌期繰越データ計算。呼び出し側の FiscalYearRollover で actor をガードする。')]
 class FiscalYearRolloverDataCalculator
 {
     /**

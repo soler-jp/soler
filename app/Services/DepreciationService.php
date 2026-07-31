@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Concerns\AuthorizesBusinessUnitAccess;
+use App\Concerns\SkipActorGuard;
 use App\Models\DepreciationEntry;
 use App\Models\FiscalYear;
 use App\Models\FixedAsset;
@@ -49,6 +50,7 @@ class DepreciationService
 
     private const MINIMUM_USED_ASSET_USEFUL_LIFE_MONTHS = 24;
 
+    #[SkipActorGuard('TODO: 固定資産登録エントリは actor を受け取っていない。登録系エントリに actor を追加する対応が別途必要。')]
     public function registerNewStandardCar(
         FiscalYear $fiscalYear,
         SubAccount $paymentSubAccount,
@@ -68,6 +70,7 @@ class DepreciationService
         );
     }
 
+    #[SkipActorGuard('TODO: 固定資産登録エントリは actor を受け取っていない。登録系エントリに actor を追加する対応が別途必要。')]
     public function registerNewLightCar(
         FiscalYear $fiscalYear,
         SubAccount $paymentSubAccount,
@@ -87,6 +90,7 @@ class DepreciationService
         );
     }
 
+    #[SkipActorGuard('TODO: 固定資産登録エントリは actor を受け取っていない。登録系エントリに actor を追加する対応が別途必要。')]
     public function registerUsedStandardCar(
         FiscalYear $fiscalYear,
         SubAccount $paymentSubAccount,
@@ -115,6 +119,7 @@ class DepreciationService
         );
     }
 
+    #[SkipActorGuard('TODO: 固定資産登録エントリは actor を受け取っていない。登録系エントリに actor を追加する対応が別途必要。')]
     public function registerUsedLightCar(
         FiscalYear $fiscalYear,
         SubAccount $paymentSubAccount,
@@ -143,6 +148,7 @@ class DepreciationService
         );
     }
 
+    #[SkipActorGuard('TODO: 固定資産登録エントリは actor を受け取っていない。登録系エントリに actor を追加する対応が別途必要。')]
     public function registerFixedAsset(
         FiscalYear $fiscalYear,
         SubAccount $assetSubAccount,
@@ -273,6 +279,7 @@ class DepreciationService
      *
      * @return array<int, array{months: int, ordinary_amount: int, special_amount: int, total_amount: int, ending_balance: int}>
      */
+    #[SkipActorGuard('read-only な減価償却スケジュール計算。呼び出し側で FixedAsset を actor でガードする前提。')]
     public function calculateDepreciationScheduleUntilFullyDepreciated(
         FixedAsset $asset
     ): array {
@@ -325,16 +332,19 @@ class DepreciationService
         return $schedule;
     }
 
+    #[SkipActorGuard('read-only な判定。')]
     public function isFullyDepreciated(FixedAsset $asset, FiscalYear $fiscalYear): bool
     {
         return ! array_key_exists($fiscalYear->year, $this->calculateDepreciationScheduleUntilFullyDepreciated($asset));
     }
 
+    #[SkipActorGuard('read-only な判定。')]
     public function isStillDepreciating(FixedAsset $asset, FiscalYear $fiscalYear): bool
     {
         return ! $this->isFullyDepreciated($asset, $fiscalYear);
     }
 
+    #[SkipActorGuard('read-only な残高計算。')]
     public function calculateEndingUndepreciatedBalance(FixedAsset $asset, FiscalYear $fiscalYear): int
     {
         $schedule = $this->calculateDepreciationScheduleUntilFullyDepreciated($asset);
@@ -456,6 +466,7 @@ class DepreciationService
         return ($end->year - $start->year) * 12 + ($end->month - $start->month) + 1;
     }
 
+    #[SkipActorGuard('システムから呼ばれるバッチ処理。TODO: 呼び出し元で FiscalYear を actor でガードする経路を確認する。')]
     public function prepareEntriesFor(FiscalYear $fiscalYear): void
     {
         $businessUnit = $fiscalYear->businessUnit;

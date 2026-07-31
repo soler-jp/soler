@@ -2,10 +2,12 @@
 
 namespace App\Services\CreditCardImport;
 
+use App\Concerns\SkipActorGuard;
 use App\Data\ParsedCreditCardStatementLine;
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
 
+#[SkipActorGuard('CSV パース処理は認可対象のリソースを持たない。呼び出し側（CreditCardImportService）で actor をガードする。')]
 abstract class AbstractCreditCardCsvParser implements CreditCardCsvParser
 {
     /**

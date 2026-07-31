@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Counterparty;
 use App\Models\JournalEntry;
 use App\Models\RecurringTransactionPlan;
 use App\Models\User;
@@ -37,7 +38,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '水道代',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debit->id,
             'credit_sub_account_id' => $credit->id,
             'amount' => 4000,
@@ -74,7 +75,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '按分あり固定費',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debit->id,
             'credit_sub_account_id' => $credit->id,
             'amount' => 5678,
@@ -122,7 +123,7 @@ class RecurringTransactionPlanTest extends TestCase
     }
 
     #[Test]
-    public function is_incomeとis_activeはbooleanとしてキャストされる()
+    public function typeとis_activeが適切にキャストされる()
     {
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults([
@@ -137,14 +138,116 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '定期収入',
             'interval' => 'monthly',
             'day_of_month' => 5,
-            'is_income' => true,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 30000,
         ], $user);
 
-        $this->assertTrue($plan->is_income);
+        $this->assertSame(RecurringTransactionPlan::TYPE_INCOME, $plan->type);
         $this->assertTrue($plan->is_active);
+    }
+
+    #[Test]
+    public function 課税収入プランは貸方に売上税区分を持つ予定取引を生成できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '定期収入テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $depositSubAccount = $unit->getSubAccountByName('その他の預金', 'その他の預金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '月次売上',
+            'interval' => 'monthly',
+            'day_of_month' => 15,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'debit_sub_account_id' => $depositSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 10000,
+            'tax_amount' => 1000,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+
+        $debitEntry = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+        $creditEntry = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+
+        $this->assertSame(11000, $debitEntry?->net_amount);
+        $this->assertSame(0, $debitEntry?->tax_amount);
+        $this->assertNull($debitEntry?->tax_type);
+        $this->assertSame(10000, $creditEntry?->net_amount);
+        $this->assertSame(1000, $creditEntry?->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_SALES_10, $creditEntry?->tax_type);
+    }
+
+    #[Test]
+    public function yearlyの収入プランでは年に1件の予定取引が生成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '年次収入テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $depositSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '年次報酬',
+            'interval' => 'yearly',
+            'month_of_year' => 6,
+            'day_of_month' => 20,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'debit_sub_account_id' => $depositSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 50000,
+            'tax_amount' => 0,
+        ], $user);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
+
+        $this->assertCount(1, $transactions);
+        $this->assertSame('2025-06-20', $transactions->firstOrFail()->date->toDateString());
+    }
+
+    #[Test]
+    public function 源泉徴収付き収入プランは借方2行の予定取引を生成できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '源泉収入テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $depositSubAccount = $unit->getSubAccountByName('その他の預金', 'その他の預金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+        $withholdingSubAccount = $unit->getSubAccountByName('事業主貸', RecurringTransactionPlan::WITHHOLDING_SUB_ACCOUNT_NAME);
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '月次報酬',
+            'interval' => 'monthly',
+            'day_of_month' => 25,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'is_withholding' => true,
+            'debit_sub_account_id' => $depositSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 100000,
+            'tax_amount' => 0,
+            'withholding_tax_amount' => 10210,
+            'withholding_sub_account_id' => $withholdingSubAccount->id,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+
+        $debitEntries = $transaction->journalEntries->where('type', JournalEntry::TYPE_DEBIT)->values();
+        $creditEntry = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+
+        $this->assertCount(2, $debitEntries);
+        $this->assertSame(89790, $debitEntries[0]->net_amount);
+        $this->assertSame($depositSubAccount->id, $debitEntries[0]->sub_account_id);
+        $this->assertSame(10210, $debitEntries[1]->net_amount);
+        $this->assertSame($withholdingSubAccount->id, $debitEntries[1]->sub_account_id);
+        $this->assertSame(100000, $creditEntry?->net_amount);
+        $this->assertSame(0, $creditEntry?->tax_amount);
     }
 
     #[Test]
@@ -163,7 +266,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '家賃',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 50000,
@@ -191,7 +294,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '他ユーザー作成',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 1000,
@@ -217,7 +320,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '水道代',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debit->id,
             'credit_sub_account_id' => $credit->id,
             'amount' => 3000,
@@ -253,7 +356,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '誤った間隔',
             'interval' => 'weekly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 1000,
@@ -276,7 +379,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '重複チェック',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 1000,
@@ -290,7 +393,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '重複チェック',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 1000,
@@ -317,7 +420,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '重複チェック',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $sub1->id,
             'credit_sub_account_id' => $sub1->id,
             'amount' => 1000,
@@ -330,12 +433,114 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '重複チェック',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $sub2->id,
             'credit_sub_account_id' => $sub2->id,
             'amount' => 1000,
         ], $user);
         $this->assertNotNull($plan2);
+    }
+
+    #[Test]
+    public function 収入計画に事業割合を指定するとバリデーションエラーになる()
+    {
+        $this->expectException(ValidationException::class);
+
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '収入バリデーション']);
+        $depositSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+
+        RecurringTransactionPlan::validate([
+            'business_unit_id' => $unit->id,
+            'name' => '按分付き収入',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'debit_sub_account_id' => $depositSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 10000,
+            'business_ratio' => 80,
+        ]);
+    }
+
+    #[Test]
+    public function 支出計画で源泉徴収は指定できない()
+    {
+        $this->expectException(ValidationException::class);
+
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '源泉支出バリデーション']);
+        $expenseSubAccount = $unit->getSubAccountByName('消耗品費', '消耗品費');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $withholdingSubAccount = $unit->getSubAccountByName('事業主貸', RecurringTransactionPlan::WITHHOLDING_SUB_ACCOUNT_NAME);
+
+        RecurringTransactionPlan::validate([
+            'business_unit_id' => $unit->id,
+            'name' => '不正な源泉支出',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
+            'is_withholding' => true,
+            'debit_sub_account_id' => $expenseSubAccount->id,
+            'credit_sub_account_id' => $cashSubAccount->id,
+            'amount' => 10000,
+            'withholding_tax_amount' => 1000,
+            'withholding_sub_account_id' => $withholdingSubAccount->id,
+        ]);
+    }
+
+    #[Test]
+    public function 源泉徴収税額が0だとバリデーションエラーになる()
+    {
+        $this->expectException(ValidationException::class);
+
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '源泉税額0バリデーション']);
+        $depositSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+        $withholdingSubAccount = $unit->getSubAccountByName('事業主貸', RecurringTransactionPlan::WITHHOLDING_SUB_ACCOUNT_NAME);
+
+        RecurringTransactionPlan::validate([
+            'business_unit_id' => $unit->id,
+            'name' => '源泉税0',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'is_withholding' => true,
+            'debit_sub_account_id' => $depositSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 10000,
+            'withholding_tax_amount' => 0,
+            'withholding_sub_account_id' => $withholdingSubAccount->id,
+        ]);
+    }
+
+    #[Test]
+    public function 源泉徴収税額が税込金額以上だとバリデーションエラーになる()
+    {
+        $this->expectException(ValidationException::class);
+
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '源泉超過バリデーション']);
+        $depositSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+        $withholdingSubAccount = $unit->getSubAccountByName('事業主貸', RecurringTransactionPlan::WITHHOLDING_SUB_ACCOUNT_NAME);
+
+        RecurringTransactionPlan::validate([
+            'business_unit_id' => $unit->id,
+            'name' => '源泉超過',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'is_withholding' => true,
+            'debit_sub_account_id' => $depositSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 10000,
+            'tax_amount' => 0,
+            'withholding_tax_amount' => 10000,
+            'withholding_sub_account_id' => $withholdingSubAccount->id,
+        ]);
     }
 
     #[Test]
@@ -353,7 +558,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '税込月次プラン',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debitSub->id,
             'credit_sub_account_id' => $creditSub->id,
             'amount' => 10000,
@@ -388,7 +593,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '末日補正プラン',
             'interval' => 'monthly',
             'day_of_month' => 31,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $sub->id,
             'credit_sub_account_id' => $sub->id,
             'amount' => 10000,
@@ -419,7 +624,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '隔月プラン',
             'interval' => 'bimonthly',
             'day_of_month' => 15,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $sub->id,
             'credit_sub_account_id' => $sub->id,
             'amount' => 5000,
@@ -456,7 +661,7 @@ class RecurringTransactionPlanTest extends TestCase
             'interval' => 'yearly',
             'month_of_year' => 6,
             'day_of_month' => 15,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $sub->id,
             'credit_sub_account_id' => $sub->id,
             'amount' => 5000,
@@ -486,7 +691,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '非アクティブプラン',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $sub->id,
             'credit_sub_account_id' => $sub->id,
             'amount' => 3000,
@@ -511,7 +716,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => 'リンク付きプラン',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $sub->id,
             'credit_sub_account_id' => $sub->id,
             'amount' => 8000,
@@ -541,7 +746,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '認可テストプラン',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $sub->id,
             'credit_sub_account_id' => $sub->id,
             'amount' => 3000,
@@ -566,7 +771,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '確定認可テストプラン',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $sub->id,
             'credit_sub_account_id' => $sub->id,
             'amount' => 3000,
@@ -598,7 +803,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '重複チェックプラン',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $sub->id,
             'credit_sub_account_id' => $sub->id,
             'amount' => 5000,
@@ -635,7 +840,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => 'プランA',
             'interval' => 'monthly',
             'day_of_month' => 1,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $sub->id,
             'credit_sub_account_id' => $sub->id,
             'amount' => 3000,
@@ -646,7 +851,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => 'プランB',
             'interval' => 'monthly',
             'day_of_month' => 1, // 同じ日付
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $sub->id,
             'credit_sub_account_id' => $sub->id,
             'amount' => 7000,
@@ -687,7 +892,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '隔月奇数月プラン',
             'interval' => 'bimonthly',
             'day_of_month' => 15,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 6000,
@@ -723,7 +928,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '隔月偶数月プラン',
             'interval' => 'bimonthly',
             'day_of_month' => 15,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 6000,
@@ -759,7 +964,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '隔月nullプラン',
             'interval' => 'bimonthly',
             'day_of_month' => 15,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 6000,
@@ -784,6 +989,184 @@ class RecurringTransactionPlanTest extends TestCase
     }
 
     #[Test]
+    public function 収入プラン確定時に入金先補助科目を変更できる()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '収入確定テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $bankSubAccount = $unit->getSubAccountByName('その他の預金', 'その他の預金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '定期売上',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'debit_sub_account_id' => $cashSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 1100,
+            'tax_amount' => 0,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+
+        $plan->confirmTransaction($transaction->id, [
+            'date' => '2025-12-10',
+            'amount' => 1400,
+            'debit_sub_account_id' => $bankSubAccount->id,
+        ], $user);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $transaction->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => 1400,
+            'sub_account_id' => $bankSubAccount->id,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $transaction->id,
+            'type' => JournalEntry::TYPE_CREDIT,
+            'net_amount' => 1400,
+            'sub_account_id' => $salesSubAccount->id,
+        ]);
+    }
+
+    #[Test]
+    public function 課税収入プラン確定時に売上税区分と税額が保持される()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '課税収入確定テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $depositSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '課税売上',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'debit_sub_account_id' => $depositSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 10000,
+            'tax_amount' => 1000,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+
+        $plan->confirmTransaction($transaction->id, [
+            'date' => '2025-12-10',
+            'amount' => 22000,
+            'debit_sub_account_id' => $depositSubAccount->id,
+        ], $user);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $transaction->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => 22000,
+            'sub_account_id' => $depositSubAccount->id,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $transaction->id,
+            'type' => JournalEntry::TYPE_CREDIT,
+            'net_amount' => 20000,
+            'tax_amount' => 2000,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+            'sub_account_id' => $salesSubAccount->id,
+        ]);
+    }
+
+    #[Test]
+    public function 源泉徴収付き収入プラン確定時に借方2行が保持される()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '源泉収入確定テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $bankSubAccount = $unit->getSubAccountByName('その他の預金', 'その他の預金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+        $withholdingSubAccount = $unit->getSubAccountByName('事業主貸', RecurringTransactionPlan::WITHHOLDING_SUB_ACCOUNT_NAME);
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '源泉付き報酬',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'is_withholding' => true,
+            'debit_sub_account_id' => $cashSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 100000,
+            'tax_amount' => 0,
+            'withholding_tax_amount' => 10210,
+            'withholding_sub_account_id' => $withholdingSubAccount->id,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+
+        $plan->confirmTransaction($transaction->id, [
+            'date' => '2025-12-10',
+            'amount' => 100000,
+            'debit_sub_account_id' => $bankSubAccount->id,
+        ], $user);
+
+        $debitEntries = $transaction->fresh('journalEntries')->journalEntries
+            ->where('type', JournalEntry::TYPE_DEBIT)
+            ->values();
+
+        $this->assertCount(2, $debitEntries);
+        $this->assertSame(89790, $debitEntries[0]->net_amount);
+        $this->assertSame($bankSubAccount->id, $debitEntries[0]->sub_account_id);
+        $this->assertSame(10210, $debitEntries[1]->net_amount);
+        $this->assertSame($withholdingSubAccount->id, $debitEntries[1]->sub_account_id);
+    }
+
+    #[Test]
+    public function 源泉徴収付き収入プラン確定時に税込金額が源泉徴収税額以下だとバリデーションエラーになる()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '源泉収入確定バリデーション']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+        $withholdingSubAccount = $unit->getSubAccountByName('事業主貸', RecurringTransactionPlan::WITHHOLDING_SUB_ACCOUNT_NAME);
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '源泉付き報酬',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'is_withholding' => true,
+            'debit_sub_account_id' => $cashSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 100000,
+            'tax_amount' => 0,
+            'withholding_tax_amount' => 10210,
+            'withholding_sub_account_id' => $withholdingSubAccount->id,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('源泉徴収税額より大きい税込金額を指定してください。');
+
+        $plan->confirmTransaction($transaction->id, [
+            'date' => '2025-12-10',
+            'amount' => 10210,
+            'debit_sub_account_id' => $cashSubAccount->id,
+        ], $user);
+    }
+
+    #[Test]
     public function planned_transactionを確定できる()
     {
         $user = User::factory()->create();
@@ -799,7 +1182,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => 'サーバー代',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
             'amount' => 1100,
@@ -848,7 +1231,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '按分あり固定費',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
             'amount' => 10000,
@@ -882,7 +1265,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '税区分既定値プラン',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
             'amount' => 10000,
@@ -913,7 +1296,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '貸方変更プラン',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $originalCreditSubAccount->id,
             'amount' => 1100,
@@ -962,7 +1345,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => 'プランA',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 1100,
@@ -973,7 +1356,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => 'プランB',
             'interval' => 'monthly',
             'day_of_month' => 15,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $subAccount->id,
             'credit_sub_account_id' => $subAccount->id,
             'amount' => 2200,
@@ -1014,7 +1397,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => 'サーバー代',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
             'amount' => 1100,
@@ -1062,7 +1445,7 @@ class RecurringTransactionPlanTest extends TestCase
             'name' => '締め後プラン',
             'interval' => 'monthly',
             'day_of_month' => 10,
-            'is_income' => false,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
             'debit_sub_account_id' => $debitSubAccount->id,
             'credit_sub_account_id' => $creditSubAccount->id,
             'amount' => 1100,
@@ -1080,5 +1463,139 @@ class RecurringTransactionPlanTest extends TestCase
             'amount' => 1100,
             'credit_sub_account_id' => $creditSubAccount->id,
         ], $user);
+    }
+
+    #[Test]
+    public function counterparty_idを指定した計画から生成した予定取引に取引先が引き継がれる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先付き定期取引']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $unit->id,
+        ]);
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '回線利用料',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
+            'counterparty_id' => $counterparty->id,
+            'debit_sub_account_id' => $expenseSubAccount->id,
+            'credit_sub_account_id' => $cashSubAccount->id,
+            'amount' => 5500,
+            'tax_amount' => 0,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+
+        $this->assertSame($counterparty->id, $plan->counterparty?->id);
+        $this->assertSame($counterparty->id, $transaction->counterparty_id);
+        $this->assertTrue($counterparty->recurringTransactionPlans->contains($plan));
+    }
+
+    #[Test]
+    public function counterparty_idを指定しない計画からは取引先なしの予定取引が生成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先なし定期取引']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '回線利用料',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
+            'debit_sub_account_id' => $expenseSubAccount->id,
+            'credit_sub_account_id' => $cashSubAccount->id,
+            'amount' => 5500,
+            'tax_amount' => 0,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+
+        $this->assertNull($plan->counterparty_id);
+        $this->assertNull($transaction->counterparty_id);
+    }
+
+    #[Test]
+    public function 別事業体のcounterparty_idを指定するとバリデーションエラーになる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '自分の事業体']);
+        $otherUser = User::factory()->create();
+        $otherUnit = $otherUser->createBusinessUnitWithDefaults(['name' => '他人の事業体']);
+        $foreignCounterparty = Counterparty::factory()->create([
+            'business_unit_id' => $otherUnit->id,
+        ]);
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+
+        $this->expectException(ValidationException::class);
+
+        $unit->createRecurringTransactionPlan([
+            'name' => '回線利用料',
+            'interval' => 'monthly',
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
+            'counterparty_id' => $foreignCounterparty->id,
+            'debit_sub_account_id' => $expenseSubAccount->id,
+            'credit_sub_account_id' => $cashSubAccount->id,
+            'amount' => 5500,
+            'tax_amount' => 0,
+        ], $user);
+    }
+
+    #[Test]
+    #[Group('mysql')]
+    public function counterparty_idを持つ計画由来の取引が取引先集計に含まれる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '取引先集計付き定期取引']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $unit->id,
+        ]);
+        $expenseSubAccount = $unit->getSubAccountByName('通信費', '通信費');
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '回線利用料',
+            'interval' => 'yearly',
+            'month_of_year' => 5,
+            'day_of_month' => 10,
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
+            'counterparty_id' => $counterparty->id,
+            'debit_sub_account_id' => $expenseSubAccount->id,
+            'credit_sub_account_id' => $cashSubAccount->id,
+            'amount' => 5000,
+            'tax_amount' => 500,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+        ], $user);
+
+        $transaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+        $summary = $counterparty->calculateAmountSummaryForFiscalYear(2025);
+
+        $this->assertSame($counterparty->id, $transaction->counterparty_id);
+        $this->assertSame([
+            'expense' => [
+                'accounts' => [
+                    [
+                        'account_id' => $expenseSubAccount->account_id,
+                        'account_name' => '通信費',
+                        'amount' => 5500,
+                    ],
+                ],
+                'total_amount' => 5500,
+            ],
+            'income' => [
+                'accounts' => [],
+                'total_amount' => 0,
+            ],
+        ], $summary);
     }
 }

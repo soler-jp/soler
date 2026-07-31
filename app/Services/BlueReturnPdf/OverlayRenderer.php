@@ -2,9 +2,11 @@
 
 namespace App\Services\BlueReturnPdf;
 
+use App\Concerns\SkipActorGuard;
 use RuntimeException;
 use TCPDF;
 
+#[SkipActorGuard('PDF 描画ユーティリティ。認可対象のリソースを持たない。')]
 class OverlayRenderer
 {
     public function renderBackground(TCPDF $pdf, string $backgroundPath): void

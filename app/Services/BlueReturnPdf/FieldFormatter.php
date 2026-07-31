@@ -2,8 +2,10 @@
 
 namespace App\Services\BlueReturnPdf;
 
+use App\Concerns\SkipActorGuard;
 use RuntimeException;
 
+#[SkipActorGuard('PDF フィールドの整形処理。認可対象のリソースを持たない純粋関数。')]
 class FieldFormatter
 {
     private const FAMILY_EMPLOYEE_SALARY_ROW_COUNT = 4;

@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Concerns\SkipActorGuard;
 use App\Models\Counterparty;
 use App\Models\JournalEntry;
 use Illuminate\Database\Eloquent\Builder;
 
+#[SkipActorGuard('read-only な取引先集計。呼び出し側で Counterparty を actor でガードする前提。')]
 class CounterpartySummaryCalculator
 {
     /**

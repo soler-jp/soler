@@ -7,6 +7,7 @@
 - 取引先の現在の適格判定を登録する
 - 過去日にさかのぼった適格判定を登録する
 - 特定日時点の判定を確認する
+- 取引先を定期取引計画の既定値として設定し、生成される予定取引へ自動付与する
 
 ## 取引先の初期状態
 
@@ -102,6 +103,32 @@ $status = $counterparty->qualificationStatusAt(
 $summary = $counterparty->calculateAmountSummary();
 $summary2025 = $counterparty->calculateAmountSummaryForFiscalYear(2025);
 ```
+
+## 定期取引計画に取引先を紐づける
+
+`RecurringTransactionPlan` に `counterparty_id` を指定すると、その計画から生成される予定取引へ同じ取引先が自動で付きます。
+
+```php
+use App\Models\RecurringTransactionPlan;
+
+$counterparty = $businessUnit->counterparties()->findOrFail($counterpartyId);
+
+$plan = $businessUnit->createRecurringTransactionPlan([
+    'name' => '月額保守料',
+    'interval' => 'monthly',
+    'day_of_month' => 31,
+    'type' => RecurringTransactionPlan::TYPE_INCOME,
+    'counterparty_id' => $counterparty->id,
+    'debit_sub_account_id' => $depositSubAccount->id,
+    'credit_sub_account_id' => $salesSubAccount->id,
+    'amount' => 100_000,
+    'tax_amount' => 10_000,
+], auth()->user());
+```
+
+- `counterparty_id` は省略できます
+- 指定する場合は同じ `BusinessUnit` に属する取引先である必要があります
+- この計画から生成・確定された取引は、そのまま取引先別集計に含まれます
 
 ### 全体集計と年別集計
 

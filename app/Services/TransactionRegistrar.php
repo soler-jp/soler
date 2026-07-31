@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Concerns\AuthorizesBusinessUnitAccess;
+use App\Concerns\SkipActorGuard;
 use App\Models\Account;
 use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
+use App\Models\RecurringTransactionPlan;
 use App\Models\SubAccount;
 use App\Models\Transaction;
 use App\Models\User;
@@ -94,11 +96,13 @@ class TransactionRegistrar
         });
     }
 
+    #[SkipActorGuard('stateless helper。認可対象のリソースを引数に持たない。TODO: protected 化を検討。')]
     public function totalWithTax(array $entries): int
     {
         return collect($entries)->sum(fn ($e) => (int) ($e['net_amount'] ?? 0) + (int) ($e['tax_amount'] ?? 0));
     }
 
+    #[SkipActorGuard('内部ヘルパー。register() の内部で actor 検証済の FiscalYear を渡す前提。TODO: protected 化を検討。')]
     public function prepareJournalEntries(FiscalYear $fiscalYear, array $journalEntriesData): array
     {
         $preparedEntries = [];
@@ -112,6 +116,7 @@ class TransactionRegistrar
         return $preparedEntries;
     }
 
+    #[SkipActorGuard('確定処理用のデータ組立ヘルパー。confirmPlanned() から呼ばれる。TODO: protected 化を検討。')]
     public function buildPlannedTransactionData(Transaction $transaction, array $overrides = []): array
     {
         $base = [
@@ -126,44 +131,90 @@ class TransactionRegistrar
         return array_merge($base, $overrides);
     }
 
+    #[SkipActorGuard('確定処理用のデータ組立ヘルパー。confirmPlanned() から呼ばれる。TODO: protected 化を検討。')]
     public function buildPlannedJournalEntries(Transaction $transaction, array $overrides = []): array
     {
-        $transaction->loadMissing('journalEntries');
-
-        $debitEntry = $transaction->journalEntries->first(function (JournalEntry $entry): bool {
-            return $entry->type === JournalEntry::TYPE_DEBIT && $entry->business_ratio !== null;
-        }) ?? $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+        $transaction->loadMissing('journalEntries', 'recurringTransactionPlan');
 
         $creditEntry = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+        $plan = $transaction->recurringTransactionPlan;
 
-        if ($debitEntry === null || $creditEntry === null) {
+        if ($creditEntry === null) {
             return [];
         }
 
-        $grossAmount = (int) ($overrides['amount'] ?? $creditEntry->net_amount);
-        $businessRatio = $overrides['business_ratio'] ?? $debitEntry->business_ratio;
+        $grossAmount = (int) ($overrides['amount'] ?? ((int) $creditEntry->net_amount + (int) $creditEntry->tax_amount));
 
-        $debitPlannedEntry = [
-            'sub_account_id' => $debitEntry->sub_account_id,
-            'type' => JournalEntry::TYPE_DEBIT,
-            'gross_amount' => $grossAmount,
-            'tax_type' => $debitEntry->tax_type,
-        ];
+        if (! $plan instanceof RecurringTransactionPlan || $plan->type === RecurringTransactionPlan::TYPE_EXPENSE) {
+            $debitEntry = $transaction->journalEntries->first(function (JournalEntry $entry): bool {
+                return $entry->type === JournalEntry::TYPE_DEBIT && $entry->business_ratio !== null;
+            }) ?? $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
 
-        if ($businessRatio !== null) {
-            $debitPlannedEntry['business_ratio'] = $businessRatio;
+            if ($debitEntry === null) {
+                return [];
+            }
+
+            $businessRatio = $overrides['business_ratio'] ?? $debitEntry->business_ratio;
+
+            $debitPlannedEntry = [
+                'sub_account_id' => $debitEntry->sub_account_id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => $grossAmount,
+                'tax_type' => $debitEntry->tax_type,
+            ];
+
+            if ($businessRatio !== null) {
+                $debitPlannedEntry['business_ratio'] = $businessRatio;
+            }
+
+            return [
+                $debitPlannedEntry,
+                [
+                    'sub_account_id' => $overrides['credit_sub_account_id'] ?? $creditEntry->sub_account_id,
+                    'type' => JournalEntry::TYPE_CREDIT,
+                    'net_amount' => $grossAmount,
+                ],
+            ];
         }
 
-        return [
-            $debitPlannedEntry,
+        $primaryDebitEntry = $transaction->journalEntries
+            ->where('type', JournalEntry::TYPE_DEBIT)
+            ->firstWhere('sub_account_id', '!=', $plan->withholding_sub_account_id)
+            ?? $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+
+        if ($primaryDebitEntry === null) {
+            return [];
+        }
+
+        $entries = [
             [
-                'sub_account_id' => $overrides['credit_sub_account_id'] ?? $creditEntry->sub_account_id,
-                'type' => JournalEntry::TYPE_CREDIT,
-                'net_amount' => $grossAmount,
+                'sub_account_id' => $overrides['debit_sub_account_id'] ?? $primaryDebitEntry->sub_account_id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => $plan->is_withholding
+                    ? $grossAmount - (int) $plan->withholding_tax_amount
+                    : $grossAmount,
             ],
         ];
+
+        if ($plan->is_withholding) {
+            $entries[] = [
+                'sub_account_id' => $plan->withholding_sub_account_id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => (int) $plan->withholding_tax_amount,
+            ];
+        }
+
+        $entries[] = [
+            'sub_account_id' => $creditEntry->sub_account_id,
+            'type' => JournalEntry::TYPE_CREDIT,
+            'gross_amount' => $grossAmount,
+            'tax_type' => $creditEntry->tax_type,
+        ];
+
+        return $entries;
     }
 
+    #[SkipActorGuard('PlannedTransactionConfirmer::confirm() へ委譲し、下流で actor をガードする。')]
     public function confirmPlanned(Transaction $transaction, User $actor): Transaction
     {
         if (! $transaction->is_planned) {
@@ -186,6 +237,7 @@ class TransactionRegistrar
      * fiscal_year_id 基準で集計する処理（年度サマリ・残高集計など）は
      * 取引日が年度期間内であることを前提にしているため、登録時に保証する。
      */
+    #[SkipActorGuard('内部検証ヘルパー。呼び出し側で FiscalYear を actor 検証済みで渡す前提。TODO: protected 化を検討。')]
     public function ensureDateWithinFiscalYear(FiscalYear $fiscalYear, mixed $date): void
     {
         $transactionDate = Carbon::parse($date)->startOfDay();
@@ -201,6 +253,7 @@ class TransactionRegistrar
         }
     }
 
+    #[SkipActorGuard('内部ヘルパー。呼び出し側で FiscalYear を actor 検証済みで渡す前提。TODO: protected 化を検討。')]
     public function resolveCounterparty(FiscalYear $fiscalYear, array $transactionData): array
     {
         $businessUnit = $fiscalYear->businessUnit;
@@ -449,6 +502,7 @@ class TransactionRegistrar
         return [$netAmount, $taxAmount];
     }
 
+    #[SkipActorGuard('内部検証ヘルパー。呼び出し側で FiscalYear を actor 検証済みで渡す前提。TODO: protected 化を検討。')]
     public function ensureEntriesBelongToBusinessUnit(FiscalYear $fiscalYear, array $validatedEntries): void
     {
         $businessUnit = $fiscalYear->businessUnit;
@@ -462,6 +516,7 @@ class TransactionRegistrar
         }
     }
 
+    #[SkipActorGuard('内部検証ヘルパー。呼び出し側で FiscalYear を actor 検証済みで渡す前提。TODO: protected 化を検討。')]
     public function ensureTaxTypeAllowedForFiscalYear(FiscalYear $fiscalYear, array $validatedEntries): void
     {
         if (! $fiscalYear->is_taxable) {

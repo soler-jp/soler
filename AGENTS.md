@@ -205,3 +205,42 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 # Project Conventions
 
 - Enum的な定数値（`tax_type`など）をテストコードで参照するときは、生の文字列リテラルではなくモデルの定数（例: `JournalEntry::TAX_TYPE_OUT_OF_SCOPE`）を使う。定数名を変更した際にテスト側の文字列リテラルまで追跡・置換する手間を避けるため。
+
+## 認可ガード規約（必須）
+
+新規の Service クラスおよびモデルの CRUD 系メソッドを追加・変更するときは、必ず actor (`?App\Models\User`) を引数で受け取り、`App\Concerns\AuthorizesBusinessUnitAccess::authorizeBusinessUnitAccess()` を通して対象リソースの `BusinessUnit` へのアクセス可否を検証すること。
+
+- 対象リソースは `App\Contracts\ResolvesBusinessUnit` を実装していること。実装がない既存モデルを CRUD する場合は、先に実装を追加する。
+- actor が `null` のときは fail-closed（`AuthorizationException`）で拒否する。`authorizeBusinessUnitAccess()` 自身がこの振る舞いを担うので、独自の null 分岐を書かない。
+- Service の public メソッドは、リソースを引数で受け取る／内部で取得するに関わらず、最初のバリデーション相当の位置で `authorizeBusinessUnitAccess()` を呼ぶ。書き込み系（create/update/delete）だけでなく、他ユーザーの `BusinessUnit` を読み得る参照系にも適用する。
+- create 系で対象リソースがまだ存在しない場合は、親となる `BusinessUnit`（または `ResolvesBusinessUnit` を実装する親リソース）を actor でガードしてから作成する。
+- 「actor 不要」で作る例外（バッチ処理・システムジョブ・マイグレーション補助など）は、`#[App\Concerns\SkipActorGuard('理由')]` をクラスまたはメソッドに付与すること。クラスに付与すると子クラスも自動的に対象外になる。
+- 既存 Service を修正する際も、当該メソッドが未ガードなら合わせて修正する（後方互換のため actor は nullable で追加してよいが、null のときも `authorizeBusinessUnitAccess()` に委ねること）。
+- この規約は `tests/Unit/Architecture/ActorAuthorizationTest.php` (アーキテクチャテスト) で機械的に強制される。`app/Services/**` の新規クラス・新規 public メソッドがガード未実装のまま追加されると CI が落ちる。
+
+NG:
+
+```php
+public function update(Project $project, array $attrs): Project
+{
+    return tap($project)->update($attrs);
+}
+```
+
+OK:
+
+```php
+use App\Concerns\AuthorizesBusinessUnitAccess;
+
+class ProjectService
+{
+    use AuthorizesBusinessUnitAccess;
+
+    public function update(Project $project, array $attrs, ?User $actor): Project
+    {
+        $this->authorizeBusinessUnitAccess($project, $actor);
+
+        return tap($project)->update($attrs);
+    }
+}
+```
