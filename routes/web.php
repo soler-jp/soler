@@ -20,6 +20,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/dashboard', PortalController::class)->name('dashboard');
     Route::get('/initialize', [SetupController::class, 'initialize'])->name('initialize');
+    Route::get('/help/accounting-basics', [SetupController::class, 'accountingBasics'])->name('help.accounting-basics');
 
     Route::get('/fixed-expenses', [PortalController::class, 'fixedExpenses'])
         ->name('fixed-expenses');

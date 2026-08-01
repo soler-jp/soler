@@ -8,4 +8,9 @@ class SetupController extends Controller
     {
         return view('setup.initialize');
     }
+
+    public function accountingBasics()
+    {
+        return view('help.accounting-basics');
+    }
 }

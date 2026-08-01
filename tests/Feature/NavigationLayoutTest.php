@@ -16,7 +16,7 @@ class NavigationLayoutTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->get(route('initialize'));
+        $response = $this->actingAs($user)->get(route('help.accounting-basics'));
 
         $response->assertOk();
         $response->assertSee('年度未設定');
@@ -26,6 +26,7 @@ class NavigationLayoutTest extends TestCase
         $response->assertSee('年度管理');
         $response->assertSee('固定費');
         $response->assertSee('青色申告決算書PDF');
+        $response->assertSee('Help');
         $response->assertSee('brand/logo-mark-light.png');
         $response->assertDontSee('ユーザー管理');
     }
@@ -37,7 +38,7 @@ class NavigationLayoutTest extends TestCase
             'is_admin' => true,
         ]);
 
-        $response = $this->actingAs($admin)->get(route('initialize'));
+        $response = $this->actingAs($admin)->get(route('help.accounting-basics'));
 
         $response->assertOk();
         $response->assertSee('ユーザー管理');

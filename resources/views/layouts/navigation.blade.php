@@ -10,6 +10,7 @@
         ['label' => '年度管理', 'route' => 'fiscal-years.index'],
         ['label' => '固定費', 'route' => 'fixed-expenses'],
         ['label' => '青色申告決算書PDF', 'route' => 'blue-return-statement.pdf.show'],
+        ['label' => 'Help', 'route' => 'help.accounting-basics'],
     ];
 
     $adminItems = [];

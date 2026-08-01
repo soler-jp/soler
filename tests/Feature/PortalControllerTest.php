@@ -46,6 +46,26 @@ class PortalControllerTest extends TestCase
             ->get(route('initialize'))
             ->assertOk()
             ->assertSee('初期セットアップ')
+            ->assertSee('選んでくれてありがとう')
+            ->assertSee('以下の3ステップで始めます')
+            ->assertSee('Solerを始める')
+            ->assertSee('会計の基本')
+            ->assertSee('SetupWizard')
+            ->assertSee('利用開始')
+            ->assertSee('いつでも見直せます')
             ->assertDontSee('Main Menu');
+    }
+
+    #[Test]
+    public function helpから会計説明をいつでも読み直せる(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('help.accounting-basics'))
+            ->assertOk()
+            ->assertSee('個人事業主としての会計の説明')
+            ->assertSee('事業のお金は、まず3つに分けます')
+            ->assertSee('Help');
     }
 }
