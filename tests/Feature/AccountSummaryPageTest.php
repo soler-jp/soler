@@ -25,8 +25,8 @@ class AccountSummaryPageTest extends TestCase
         $cash = $unit->getSubAccountByName('現金', '現金');
         $bankAccount = $unit->getAccountByName('その他の預金');
         $bankMain = $bankAccount->subAccounts()->firstOrFail();
-        $bankA = $bankAccount->createSubAccount(['name' => '三井住友銀行'], $user);
-        $bankB = $bankAccount->createSubAccount(['name' => '楽天銀行'], $user);
+        $bankA = $bankAccount->createSubAccount(['name' => 'ひかり青空銀行'], $user);
+        $bankB = $bankAccount->createSubAccount(['name' => 'みらい星銀行'], $user);
         $loan = $unit->getSubAccountByName('借入金', '借入金');
         $capital = $unit->getSubAccountByName('元入金', '元入金');
         $revenue = $unit->getSubAccountByName('売上高', '売上高');
@@ -113,8 +113,8 @@ class AccountSummaryPageTest extends TestCase
         $response->assertSee('純資産');
         $response->assertSee('費用');
         $response->assertSee('その他の預金');
-        $response->assertSee('三井住友銀行');
-        $response->assertSee('楽天銀行');
+        $response->assertSee('ひかり青空銀行');
+        $response->assertSee('みらい星銀行');
         $response->assertSee('Web広告');
         $response->assertDontSee('広告宣伝費');
         $response->assertSee('120,000');

@@ -92,6 +92,63 @@ $todo = app(TodoService::class)->register(
 
 `Todo::SOURCE_TYPE_SYSTEM` に対して `sourceModel` を渡すことはできません。
 
+## Handler 付き Todo を登録して実行する
+
+`todo_type` を持つ Todo は、`TodoService` 経由で入力スキーマ取得と実行ができます。  
+銀行口座登録では `BankAccountTodoHandler` が紐づいています。
+
+### 銀行口座登録 Todo を作る
+
+```php
+use App\Models\Todo;
+use App\Services\TodoService;
+
+$todo = app(TodoService::class)->register(
+    $businessUnit,
+    '銀行口座を登録する',
+    $actor,
+    $fiscalYear,
+    todoType: Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
+);
+```
+
+### 入力スキーマを取得する
+
+```php
+use App\Services\TodoService;
+
+$schema = app(TodoService::class)->schemaFor($todo, $actor);
+```
+
+現在の銀行口座登録 Todo では、次の 2 項目を入力します。
+
+- `bank_name`
+- `opening_balance`
+
+### 実行する
+
+```php
+use App\Services\TodoService;
+
+$todo = app(TodoService::class)->execute($todo, [
+    'bank_name' => 'ひかり青空銀行',
+    'opening_balance' => 120000,
+], $actor);
+```
+
+実行に成功すると、次が行われます。
+
+- `その他の預金` 配下に銀行名の `SubAccount` が追加される
+- `opening_balance > 0` の場合は期首仕訳が作成または改訂される
+- Todo 自体は `completed` になる
+
+### 注意点
+
+- Handler は直接呼ばず、必ず `TodoService::schemaFor()` / `TodoService::execute()` を使う
+- 銀行口座登録 Todo は `FiscalYear` に紐づいている必要がある
+- `opening_balance` は 0 円以上でなければならない
+- `opening_balance = 0` の場合は、補助科目だけ追加して期首仕訳は作られない
+
 ## 主な定数
 
 - `Todo::SOURCE_TYPE_MANUAL`
@@ -179,5 +236,8 @@ app(TodoService::class)->dismiss($todo, $actor);
 
 - `app/Models/Todo.php`
 - `app/Services/TodoService.php`
+- `app/TodoHandlers/BankAccountTodoHandler.php`
+- `app/Services/BankAccountRegistrationService.php`
 - `tests/Feature/TodoServiceTest.php`
+- `tests/Feature/TodoHandlers/BankAccountTodoHandlerTest.php`
 - `docs/todo-design.md`

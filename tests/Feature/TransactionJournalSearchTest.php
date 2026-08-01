@@ -25,7 +25,7 @@ class TransactionJournalSearchTest extends TestCase
         [$user, $unit] = $this->createInitializedUser();
         $fiscalYear = $unit->currentFiscalYear;
 
-        $bank = $unit->getAccountByName('その他の預金')->createSubAccount(['name' => '三井住友銀行'], $user);
+        $bank = $unit->getAccountByName('その他の預金')->createSubAccount(['name' => 'ひかり青空銀行'], $user);
         $sales = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
         $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $supplies = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
@@ -52,7 +52,7 @@ class TransactionJournalSearchTest extends TestCase
 
         $this->assertSame([$sale->id], collect($results->items())->pluck('id')->all());
         $this->assertNotContains($expense->id, collect($results->items())->pluck('id')->all());
-        $this->assertSame('その他の預金 / 三井住友銀行 50,000', $results->items()[0]->debit_summary);
+        $this->assertSame('その他の預金 / ひかり青空銀行 50,000', $results->items()[0]->debit_summary);
     }
 
     #[Test]
@@ -61,7 +61,7 @@ class TransactionJournalSearchTest extends TestCase
         [$user, $unit] = $this->createInitializedUser();
         $fiscalYear = $unit->currentFiscalYear;
 
-        $bank = $unit->getAccountByName('その他の預金')->createSubAccount(['name' => '楽天銀行'], $user);
+        $bank = $unit->getAccountByName('その他の預金')->createSubAccount(['name' => 'みらい星銀行'], $user);
         $sales = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
         $capital = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
 
@@ -104,7 +104,7 @@ class TransactionJournalSearchTest extends TestCase
             'name' => '丸の内文具',
         ]);
 
-        $bank = $unit->getAccountByName('その他の預金')->createSubAccount(['name' => '三井住友銀行'], $user);
+        $bank = $unit->getAccountByName('その他の預金')->createSubAccount(['name' => 'ひかり青空銀行'], $user);
         $supplies = $unit->getAccountByName('消耗品費')->createSubAccount(['name' => '文具'], $user);
 
         $transaction = $this->registerTransaction($fiscalYear, [
@@ -119,7 +119,7 @@ class TransactionJournalSearchTest extends TestCase
         $descriptionResults = $fiscalYear->searchTransactionsForJournal(TransactionSearchFilters::from(keyword: 'まとめ買い'));
         $counterpartyResults = $fiscalYear->searchTransactionsForJournal(TransactionSearchFilters::from(keyword: '丸の内文具'));
         $accountResults = $fiscalYear->searchTransactionsForJournal(TransactionSearchFilters::from(keyword: '消耗品費'));
-        $subAccountResults = $fiscalYear->searchTransactionsForJournal(TransactionSearchFilters::from(keyword: '三井住友銀行'));
+        $subAccountResults = $fiscalYear->searchTransactionsForJournal(TransactionSearchFilters::from(keyword: 'ひかり青空銀行'));
 
         $expected = [$transaction->id];
 

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Contracts\ResolvesBusinessUnit;
 use App\Contracts\TodoHandler;
+use App\TodoHandlers\BankAccountTodoHandler;
 use Carbon\CarbonInterface;
 use Database\Factories\TodoFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,6 +22,8 @@ class Todo extends Model implements ResolvesBusinessUnit
     public const SOURCE_TYPE_RECURRING = 'recurring';
 
     public const SOURCE_TYPE_SYSTEM = 'system';
+
+    public const TODO_TYPE_WIZARD_BANK_ACCOUNT = 'wizard_bank_account';
 
     public const PRIORITY_HIGH = 'high';
 
@@ -64,7 +67,9 @@ class Todo extends Model implements ResolvesBusinessUnit
     /**
      * @var array<string, class-string<TodoHandler>>
      */
-    public static array $handlers = [];
+    public static array $handlers = [
+        self::TODO_TYPE_WIZARD_BANK_ACCOUNT => BankAccountTodoHandler::class,
+    ];
 
     protected $fillable = [
         'business_unit_id',

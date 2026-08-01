@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
+use App\Models\JournalEntry;
 use App\Models\RecurringTransactionPlan;
 use App\Models\Todo;
 use App\Models\User;
@@ -12,22 +13,14 @@ use DomainException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\Support\TodoHandlers\FakeTodoHandler;
-use Tests\Support\TodoHandlers\ThrowingFakeTodoHandler;
 use Tests\TestCase;
 
 class TodoServiceTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        Todo::$handlers = [];
-    }
 
     #[Test]
     public function actorが事業体にアクセスできない場合はtodo登録を拒否する(): void
@@ -83,21 +76,17 @@ class TodoServiceTest extends TestCase
     #[Test]
     public function handler付きtodoを登録できる(): void
     {
-        Todo::$handlers = [
-            FakeTodoHandler::TODO_TYPE => FakeTodoHandler::class,
-        ];
-
         [$user, $businessUnit, $fiscalYear] = $this->createBusinessUnitWithFiscalYear();
 
         $todo = (new TodoService)->register(
             $businessUnit,
-            '売上を入力する',
+            '銀行口座を登録する',
             $user,
             $fiscalYear,
-            todoType: FakeTodoHandler::TODO_TYPE,
+            todoType: Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
         );
 
-        $this->assertSame(FakeTodoHandler::TODO_TYPE, $todo->todo_type);
+        $this->assertSame(Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT, $todo->todo_type);
         $this->assertTrue($todo->isExecutable());
     }
 
@@ -113,7 +102,7 @@ class TodoServiceTest extends TestCase
             $businessUnit,
             'handler 未登録',
             $user,
-            todoType: FakeTodoHandler::TODO_TYPE,
+            todoType: 'unregistered_handler',
         );
     }
 
@@ -395,15 +384,11 @@ class TodoServiceTest extends TestCase
     #[Test]
     public function actorが事業体にアクセスできない場合はtodoスキーマ取得を拒否する(): void
     {
-        Todo::$handlers = [
-            FakeTodoHandler::TODO_TYPE => FakeTodoHandler::class,
-        ];
-
         [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
         $otherUser = User::factory()->create();
         $todo = Todo::factory()->create([
             'business_unit_id' => $businessUnit->id,
-            'todo_type' => FakeTodoHandler::TODO_TYPE,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
         ]);
 
         $this->expectException(AuthorizationException::class);
@@ -415,51 +400,63 @@ class TodoServiceTest extends TestCase
     #[Test]
     public function schema_forはhandlerの入力スキーマを返す(): void
     {
-        Todo::$handlers = [
-            FakeTodoHandler::TODO_TYPE => FakeTodoHandler::class,
-        ];
-
         [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
         $todo = Todo::factory()->create([
             'business_unit_id' => $businessUnit->id,
-            'todo_type' => FakeTodoHandler::TODO_TYPE,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
         ]);
 
         $schema = (new TodoService)->schemaFor($todo, $user);
 
         $this->assertSame([
-            'amount' => [
-                'rules' => ['required', 'integer', 'min:1'],
-                'label' => '金額',
+            'bank_name' => [
+                'rules' => ['required', 'string', 'max:255'],
+                'label' => '銀行名',
+                'type' => 'text',
+            ],
+            'opening_balance' => [
+                'rules' => ['required', 'integer', 'min:0'],
+                'label' => 'その年の期首残高',
                 'type' => 'number',
             ],
         ], $schema);
     }
 
     #[Test]
-    public function executeはhandlerを通してtodoを完了する(): void
+    public function executeはhandlerを通して銀行口座を登録しtodoを完了する(): void
     {
-        Todo::$handlers = [
-            FakeTodoHandler::TODO_TYPE => FakeTodoHandler::class,
-        ];
-
-        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        [$user, $businessUnit, $fiscalYear] = $this->createBusinessUnitWithFiscalYear();
         $todo = Todo::factory()->create([
             'business_unit_id' => $businessUnit->id,
-            'todo_type' => FakeTodoHandler::TODO_TYPE,
+            'fiscal_year_id' => $fiscalYear->id,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
             'status' => Todo::STATUS_PENDING,
         ]);
+        $bankAccount = $businessUnit->getAccountByName('その他の預金');
 
         Carbon::setTestNow('2026-08-01 12:00:00');
 
         try {
-            $refreshedTodo = (new TodoService)->execute($todo, ['amount' => 1200], $user);
+            $refreshedTodo = (new TodoService)->execute($todo, [
+                'bank_name' => 'ひかり青空銀行',
+                'opening_balance' => 120000,
+            ], $user);
         } finally {
             Carbon::setTestNow();
         }
 
+        $capitalSubAccount = $businessUnit->getSubAccountByName('元入金', '元入金');
         $this->assertSame(Todo::STATUS_COMPLETED, $refreshedTodo->status);
         $this->assertSame('2026-08-01 12:00:00', $refreshedTodo->completed_at?->format('Y-m-d H:i:s'));
+        $this->assertDatabaseHas('sub_accounts', [
+            'account_id' => $bankAccount?->id,
+            'name' => 'ひかり青空銀行',
+        ]);
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $capitalSubAccount?->id,
+            'type' => JournalEntry::TYPE_CREDIT,
+            'net_amount' => 120000,
+        ]);
     }
 
     #[Test]
@@ -468,55 +465,57 @@ class TodoServiceTest extends TestCase
         [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
         $todo = Todo::factory()->create([
             'business_unit_id' => $businessUnit->id,
-            'todo_type' => FakeTodoHandler::TODO_TYPE,
+            'todo_type' => 'unregistered_handler',
             'status' => Todo::STATUS_PENDING,
         ]);
 
         $this->expectException(DomainException::class);
-        $this->expectExceptionMessage('この Todo は実行可能な Handler を持ちません: todo_type=fake_executable');
+        $this->expectExceptionMessage('この Todo は実行可能な Handler を持ちません: todo_type=unregistered_handler');
 
-        (new TodoService)->execute($todo, ['amount' => 1200], $user);
+        (new TodoService)->execute($todo, [
+            'bank_name' => 'ひかり青空銀行',
+            'opening_balance' => 120000,
+        ], $user);
     }
 
     #[Test]
     public function actorが事業体にアクセスできない場合はtodo実行を拒否する(): void
     {
-        Todo::$handlers = [
-            FakeTodoHandler::TODO_TYPE => FakeTodoHandler::class,
-        ];
-
-        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        [$user, $businessUnit, $fiscalYear] = $this->createBusinessUnitWithFiscalYear();
         $otherUser = User::factory()->create();
         $todo = Todo::factory()->create([
             'business_unit_id' => $businessUnit->id,
-            'todo_type' => FakeTodoHandler::TODO_TYPE,
+            'fiscal_year_id' => $fiscalYear->id,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
             'status' => Todo::STATUS_PENDING,
         ]);
 
         $this->expectException(AuthorizationException::class);
         $this->expectExceptionMessage('この Todo を実行する権限がありません。');
 
-        (new TodoService)->execute($todo, ['amount' => 1200], $otherUser);
+        (new TodoService)->execute($todo, [
+            'bank_name' => 'ひかり青空銀行',
+            'opening_balance' => 120000,
+        ], $otherUser);
     }
 
     #[Test]
-    public function executeはhandler例外を伝播する(): void
+    public function executeはhandlerのバリデーション例外を伝播する(): void
     {
-        Todo::$handlers = [
-            FakeTodoHandler::TODO_TYPE => ThrowingFakeTodoHandler::class,
-        ];
-
-        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        [$user, $businessUnit, $fiscalYear] = $this->createBusinessUnitWithFiscalYear();
         $todo = Todo::factory()->create([
             'business_unit_id' => $businessUnit->id,
-            'todo_type' => FakeTodoHandler::TODO_TYPE,
+            'fiscal_year_id' => $fiscalYear->id,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
             'status' => Todo::STATUS_PENDING,
         ]);
 
-        $this->expectException(DomainException::class);
-        $this->expectExceptionMessage('handler failure');
+        $this->expectException(ValidationException::class);
 
-        (new TodoService)->execute($todo, ['amount' => 1200], $user);
+        (new TodoService)->execute($todo, [
+            'bank_name' => '',
+            'opening_balance' => -1,
+        ], $user);
     }
 
     #[Test]
