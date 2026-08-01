@@ -108,6 +108,23 @@ class TodoServiceTest extends TestCase
     }
 
     #[Test]
+    public function 取引先handler付きtodoを登録できる(): void
+    {
+        [$user, $businessUnit, $fiscalYear] = $this->createBusinessUnitWithFiscalYear();
+
+        $todo = (new TodoService)->register(
+            $businessUnit,
+            '取引先を登録する',
+            $user,
+            $fiscalYear,
+            todoType: Todo::TODO_TYPE_WIZARD_COUNTERPARTY,
+        );
+
+        $this->assertSame(Todo::TODO_TYPE_WIZARD_COUNTERPARTY, $todo->todo_type);
+        $this->assertTrue($todo->isExecutable());
+    }
+
+    #[Test]
     public function 定期支出handler付きtodoを登録できる(): void
     {
         [$user, $businessUnit, $fiscalYear] = $this->createBusinessUnitWithFiscalYear();
@@ -481,6 +498,38 @@ class TodoServiceTest extends TestCase
     }
 
     #[Test]
+    public function schema_forは取引先todoの入力スキーマを返す(): void
+    {
+        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_COUNTERPARTY,
+        ]);
+
+        $schema = (new TodoService)->schemaFor($todo, $user);
+
+        $this->assertSame([
+            'counterparties' => [
+                'rules' => ['required', 'array', 'min:1'],
+                'label' => '取引先',
+                'type' => 'array',
+                'item_schema' => [
+                    'name' => [
+                        'rules' => ['required', 'string', 'max:255'],
+                        'label' => '取引先名',
+                        'type' => 'text',
+                    ],
+                    'notes' => [
+                        'rules' => ['nullable', 'string'],
+                        'label' => 'メモ',
+                        'type' => 'textarea',
+                    ],
+                ],
+            ],
+        ], $schema);
+    }
+
+    #[Test]
     public function schema_forは定期支出todoの入力スキーマを返す(): void
     {
         [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
@@ -556,6 +605,43 @@ class TodoServiceTest extends TestCase
             'sub_account_id' => $capitalSubAccount?->id,
             'type' => JournalEntry::TYPE_CREDIT,
             'net_amount' => 200000,
+        ]);
+    }
+
+    #[Test]
+    public function executeはhandlerを通して取引先を登録しtodoを完了する(): void
+    {
+        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_COUNTERPARTY,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+
+        Carbon::setTestNow('2026-08-01 12:30:00');
+
+        try {
+            $refreshedTodo = (new TodoService)->execute($todo, [
+                'counterparties' => [
+                    ['name' => '株式会社ソレル', 'notes' => '定期請求あり'],
+                    ['name' => '山田商店', 'notes' => null],
+                ],
+            ], $user);
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $this->assertSame(Todo::STATUS_COMPLETED, $refreshedTodo->status);
+        $this->assertSame('2026-08-01 12:30:00', $refreshedTodo->completed_at?->format('Y-m-d H:i:s'));
+        $this->assertDatabaseHas('counterparties', [
+            'business_unit_id' => $businessUnit->id,
+            'name' => '株式会社ソレル',
+            'notes' => '定期請求あり',
+        ]);
+        $this->assertDatabaseHas('counterparties', [
+            'business_unit_id' => $businessUnit->id,
+            'name' => '山田商店',
+            'notes' => null,
         ]);
     }
 
