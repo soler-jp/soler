@@ -51,6 +51,7 @@ class Transaction extends Model implements ResolvesBusinessUnit
 
     protected $casts = [
         'date' => 'date',
+        'is_opening_entry' => 'boolean',
         'is_adjusting_entry' => 'boolean',
         'is_planned' => 'boolean',
         'is_active' => 'boolean',

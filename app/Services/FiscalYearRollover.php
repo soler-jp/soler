@@ -61,7 +61,7 @@ class FiscalYearRollover
             throw new DomainException('繰越先は翌年度でなければなりません。');
         }
 
-        if ($nextYear->transactions()->where('is_opening_entry', true)->exists()) {
+        if ($nextYear->transactions()->where('is_opening_entry', true)->where('is_active', true)->exists()) {
             throw new DomainException('繰越先の会計年度にはすでに期首仕訳があります。');
         }
     }

@@ -36,7 +36,7 @@ class OpeningEntryRegistrar
             return null;
         }
 
-        if ($fiscalYear->transactions()->where('is_opening_entry', true)->exists()) {
+        if ($fiscalYear->transactions()->where('is_opening_entry', true)->where('is_active', true)->exists()) {
             throw new DomainException('この会計年度にはすでに期首仕訳が登録されています。');
         }
 
@@ -88,7 +88,7 @@ class OpeningEntryRegistrar
             return null;
         }
 
-        if ($fiscalYear->transactions()->where('is_opening_entry', true)->exists()) {
+        if ($fiscalYear->transactions()->where('is_opening_entry', true)->where('is_active', true)->exists()) {
             throw new DomainException('この会計年度にはすでに期首仕訳が登録されています。');
         }
 

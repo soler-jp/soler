@@ -51,6 +51,7 @@ class TransactionRevisor
                 'date' => $lockedTransaction->date?->toDateString(),
                 'description' => $lockedTransaction->description,
                 'remarks' => $lockedTransaction->remarks,
+                'is_opening_entry' => $lockedTransaction->is_opening_entry,
                 'counterparty_id' => $lockedTransaction->counterparty_id,
                 'created_by' => $user->id,
                 'revised_from_transaction_id' => $lockedTransaction->id,
@@ -74,10 +75,6 @@ class TransactionRevisor
     {
         if (! $transaction->is_active) {
             throw new \InvalidArgumentException('無効化済みの取引は修正できません。');
-        }
-
-        if ($transaction->is_opening_entry) {
-            throw new \InvalidArgumentException('期首仕訳はこの修正機能の対象外です。');
         }
 
         if ($transaction->is_planned) {
