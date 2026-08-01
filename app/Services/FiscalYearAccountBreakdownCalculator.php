@@ -2,15 +2,19 @@
 
 namespace App\Services;
 
+use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\Account;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class FiscalYearAccountBreakdownCalculator
 {
+    use AuthorizesBusinessUnitAccess;
+
     /**
      * @return array{
      *     asset: array{
@@ -84,8 +88,9 @@ class FiscalYearAccountBreakdownCalculator
      *         }>
      *     }
      */
-    public function calculate(FiscalYear $fiscalYear): array
+    public function calculate(FiscalYear $fiscalYear, ?User $actor): array
     {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor);
         $summary = $this->emptySummary();
 
         foreach ($this->queryRows($fiscalYear) as $row) {
@@ -134,7 +139,9 @@ class FiscalYearAccountBreakdownCalculator
         string $accountType,
         int $accountId,
         ?int $subAccountId = null,
+        ?User $actor = null,
     ): array {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor);
         $transactions = Transaction::query()
             ->with([
                 'counterparty:id,name',

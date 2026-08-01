@@ -41,7 +41,7 @@ class AccountSummaryIndex extends Component
     {
         $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
 
-        $this->accountTypeCards = $calculator->calculate($fiscalYear);
+        $this->accountTypeCards = $calculator->calculate($fiscalYear, auth()->user());
     }
 
     public function openTransactionsModal(
@@ -59,6 +59,7 @@ class AccountSummaryIndex extends Component
             $accountType,
             $accountId,
             $subAccountId,
+            auth()->user(),
         );
         $this->showTransactionsModal = true;
     }
