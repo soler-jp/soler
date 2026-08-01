@@ -14,11 +14,20 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\TodoHandlers\FakeTodoHandler;
+use Tests\Support\TodoHandlers\ThrowingFakeTodoHandler;
 use Tests\TestCase;
 
 class TodoServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Todo::$handlers = [];
+    }
 
     #[Test]
     public function actorが事業体にアクセスできない場合はtodo登録を拒否する(): void
@@ -54,6 +63,7 @@ class TodoServiceTest extends TestCase
 
         $this->assertSame(Todo::STATUS_PENDING, $todo->status);
         $this->assertSame(Todo::SOURCE_TYPE_MANUAL, $todo->source_type);
+        $this->assertNull($todo->todo_type);
         $this->assertTrue($todo->businessUnit->is($businessUnit));
         $this->assertTrue($todo->fiscalYear->is($fiscalYear));
         $this->assertNull($todo->source);
@@ -63,10 +73,48 @@ class TodoServiceTest extends TestCase
             'business_unit_id' => $businessUnit->id,
             'fiscal_year_id' => $fiscalYear->id,
             'source_type' => Todo::SOURCE_TYPE_MANUAL,
+            'todo_type' => null,
             'title' => '月次入力を確認する',
             'priority' => Todo::PRIORITY_HIGH,
             'status' => Todo::STATUS_PENDING,
         ]);
+    }
+
+    #[Test]
+    public function handler付きtodoを登録できる(): void
+    {
+        Todo::$handlers = [
+            FakeTodoHandler::TODO_TYPE => FakeTodoHandler::class,
+        ];
+
+        [$user, $businessUnit, $fiscalYear] = $this->createBusinessUnitWithFiscalYear();
+
+        $todo = (new TodoService)->register(
+            $businessUnit,
+            '売上を入力する',
+            $user,
+            $fiscalYear,
+            todoType: FakeTodoHandler::TODO_TYPE,
+        );
+
+        $this->assertSame(FakeTodoHandler::TODO_TYPE, $todo->todo_type);
+        $this->assertTrue($todo->isExecutable());
+    }
+
+    #[Test]
+    public function handler未登録のtodo_typeで登録を拒否する(): void
+    {
+        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('この todo_type に対応する Handler が登録されていません。');
+
+        (new TodoService)->register(
+            $businessUnit,
+            'handler 未登録',
+            $user,
+            todoType: FakeTodoHandler::TODO_TYPE,
+        );
     }
 
     #[Test]
@@ -342,6 +390,133 @@ class TodoServiceTest extends TestCase
         $this->expectExceptionMessage('この事業体の Todo を参照する権限がありません。');
 
         (new TodoService)->listPending($businessUnit, $otherUser);
+    }
+
+    #[Test]
+    public function actorが事業体にアクセスできない場合はtodoスキーマ取得を拒否する(): void
+    {
+        Todo::$handlers = [
+            FakeTodoHandler::TODO_TYPE => FakeTodoHandler::class,
+        ];
+
+        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        $otherUser = User::factory()->create();
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => FakeTodoHandler::TODO_TYPE,
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この Todo の入力仕様を参照する権限がありません。');
+
+        (new TodoService)->schemaFor($todo, $otherUser);
+    }
+
+    #[Test]
+    public function schema_forはhandlerの入力スキーマを返す(): void
+    {
+        Todo::$handlers = [
+            FakeTodoHandler::TODO_TYPE => FakeTodoHandler::class,
+        ];
+
+        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => FakeTodoHandler::TODO_TYPE,
+        ]);
+
+        $schema = (new TodoService)->schemaFor($todo, $user);
+
+        $this->assertSame([
+            'amount' => [
+                'rules' => ['required', 'integer', 'min:1'],
+                'label' => '金額',
+                'type' => 'number',
+            ],
+        ], $schema);
+    }
+
+    #[Test]
+    public function executeはhandlerを通してtodoを完了する(): void
+    {
+        Todo::$handlers = [
+            FakeTodoHandler::TODO_TYPE => FakeTodoHandler::class,
+        ];
+
+        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => FakeTodoHandler::TODO_TYPE,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+
+        Carbon::setTestNow('2026-08-01 12:00:00');
+
+        try {
+            $refreshedTodo = (new TodoService)->execute($todo, ['amount' => 1200], $user);
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $this->assertSame(Todo::STATUS_COMPLETED, $refreshedTodo->status);
+        $this->assertSame('2026-08-01 12:00:00', $refreshedTodo->completed_at?->format('Y-m-d H:i:s'));
+    }
+
+    #[Test]
+    public function executeはhandler未登録のtodo_typeで拒否する(): void
+    {
+        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => FakeTodoHandler::TODO_TYPE,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('この Todo は実行可能な Handler を持ちません: todo_type=fake_executable');
+
+        (new TodoService)->execute($todo, ['amount' => 1200], $user);
+    }
+
+    #[Test]
+    public function actorが事業体にアクセスできない場合はtodo実行を拒否する(): void
+    {
+        Todo::$handlers = [
+            FakeTodoHandler::TODO_TYPE => FakeTodoHandler::class,
+        ];
+
+        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        $otherUser = User::factory()->create();
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => FakeTodoHandler::TODO_TYPE,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この Todo を実行する権限がありません。');
+
+        (new TodoService)->execute($todo, ['amount' => 1200], $otherUser);
+    }
+
+    #[Test]
+    public function executeはhandler例外を伝播する(): void
+    {
+        Todo::$handlers = [
+            FakeTodoHandler::TODO_TYPE => ThrowingFakeTodoHandler::class,
+        ];
+
+        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => FakeTodoHandler::TODO_TYPE,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('handler failure');
+
+        (new TodoService)->execute($todo, ['amount' => 1200], $user);
     }
 
     #[Test]

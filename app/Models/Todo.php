@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Contracts\ResolvesBusinessUnit;
+use App\Contracts\TodoHandler;
+use Carbon\CarbonInterface;
 use Database\Factories\TodoFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -59,12 +61,18 @@ class Todo extends Model implements ResolvesBusinessUnit
         self::SOURCE_TYPE_SYSTEM => [],
     ];
 
+    /**
+     * @var array<string, class-string<TodoHandler>>
+     */
+    public static array $handlers = [];
+
     protected $fillable = [
         'business_unit_id',
         'fiscal_year_id',
         'source_type',
         'source_model_type',
         'source_model_id',
+        'todo_type',
         'title',
         'body',
         'due_on',
@@ -79,6 +87,30 @@ class Todo extends Model implements ResolvesBusinessUnit
         'completed_at' => 'datetime',
         'dismissed_at' => 'datetime',
     ];
+
+    public function handler(): ?TodoHandler
+    {
+        if ($this->todo_type === null) {
+            return null;
+        }
+
+        $handlerClass = static::$handlers[$this->todo_type] ?? null;
+
+        return $handlerClass !== null ? app($handlerClass) : null;
+    }
+
+    public function isExecutable(): bool
+    {
+        return $this->status === self::STATUS_PENDING && $this->handler() !== null;
+    }
+
+    public function markCompleted(?CarbonInterface $completedAt = null): void
+    {
+        $this->forceFill([
+            'status' => self::STATUS_COMPLETED,
+            'completed_at' => $completedAt ?? now(),
+        ])->save();
+    }
 
     public function businessUnit(): BelongsTo
     {

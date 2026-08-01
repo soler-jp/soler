@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Contracts\ResolvesBusinessUnit;
+use App\Contracts\TodoHandler;
 use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
 use App\Models\Todo;
@@ -27,12 +28,14 @@ class TodoService
         string $priority = Todo::PRIORITY_NORMAL,
         string $sourceType = Todo::SOURCE_TYPE_MANUAL,
         ?Model $sourceModel = null,
+        ?string $todoType = null,
     ): Todo {
         $this->authorizeBusinessUnitAccess($businessUnit, $actor, 'この事業体の Todo を登録する権限がありません。');
 
         $this->assertPriorityIsSupported($priority);
         $this->assertFiscalYearBelongsToBusinessUnit($businessUnit, $fiscalYear);
         $this->assertSourceModelIsValid($businessUnit, $sourceType, $sourceModel);
+        $this->assertTodoTypeIsSupported($todoType);
 
         $todo = new Todo([
             'title' => $title,
@@ -40,6 +43,7 @@ class TodoService
             'due_on' => $dueOn,
             'priority' => $priority,
             'source_type' => $sourceType,
+            'todo_type' => $todoType,
             'status' => Todo::STATUS_PENDING,
         ]);
 
@@ -55,15 +59,38 @@ class TodoService
         return $todo;
     }
 
+    /**
+     * @return array<string, array<string, mixed>>|null
+     */
+    public function schemaFor(Todo $todo, User $actor): ?array
+    {
+        $this->authorizeBusinessUnitAccess($todo, $actor, 'この Todo の入力仕様を参照する権限がありません。');
+
+        return $todo->handler()?->inputSchema($todo);
+    }
+
+    /**
+     * @param  array<string, mixed>  $inputs
+     */
+    public function execute(Todo $todo, array $inputs, User $actor): Todo
+    {
+        $this->authorizeBusinessUnitAccess($todo, $actor, 'この Todo を実行する権限がありません。');
+        $this->assertTodoIsPending($todo);
+
+        $handler = $this->requireHandler($todo);
+        $validatedInputs = $handler->validate($todo, $inputs);
+
+        $handler->execute($todo, $validatedInputs, $actor);
+
+        return $todo->refresh();
+    }
+
     public function complete(Todo $todo, User $actor): void
     {
         $this->authorizeBusinessUnitAccess($todo, $actor, 'この Todo を完了する権限がありません。');
         $this->assertTodoIsPending($todo);
 
-        $todo->forceFill([
-            'status' => Todo::STATUS_COMPLETED,
-            'completed_at' => now(),
-        ])->save();
+        $todo->markCompleted();
     }
 
     public function dismiss(Todo $todo, User $actor): void
@@ -93,7 +120,7 @@ class TodoService
             ->where('status', Todo::STATUS_PENDING)
             ->when(
                 $fiscalYear !== null,
-                fn($query) => $query->where(function ($query) use ($fiscalYear): void {
+                fn ($query) => $query->where(function ($query) use ($fiscalYear): void {
                     $query
                         ->whereBelongsTo($fiscalYear)
                         ->orWhereNull('fiscal_year_id');
@@ -118,6 +145,17 @@ class TodoService
     {
         if (! in_array($priority, Todo::PRIORITIES, true)) {
             throw new DomainException('未対応の Todo priority です。');
+        }
+    }
+
+    protected function assertTodoTypeIsSupported(?string $todoType): void
+    {
+        if ($todoType === null) {
+            return;
+        }
+
+        if (! array_key_exists($todoType, Todo::$handlers)) {
+            throw new DomainException('この todo_type に対応する Handler が登録されていません。');
         }
     }
 
@@ -154,7 +192,7 @@ class TodoService
         }
 
         $isAllowedClass = collect($allowedSourceModels)
-            ->contains(fn(string $allowedClass): bool => $sourceModel instanceof $allowedClass);
+            ->contains(fn (string $allowedClass): bool => $sourceModel instanceof $allowedClass);
 
         if (! $isAllowedClass) {
             throw new DomainException('この source_type では指定された発生源モデルを使用できません。');
@@ -178,5 +216,16 @@ class TodoService
         if ($todo->status !== Todo::STATUS_PENDING) {
             throw new DomainException('pending の Todo のみ状態変更できます。');
         }
+    }
+
+    protected function requireHandler(Todo $todo): TodoHandler
+    {
+        $handler = $todo->handler();
+
+        if ($handler === null) {
+            throw new DomainException("この Todo は実行可能な Handler を持ちません: todo_type={$todo->todo_type}");
+        }
+
+        return $handler;
     }
 }

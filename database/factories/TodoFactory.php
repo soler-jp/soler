@@ -24,6 +24,7 @@ class TodoFactory extends Factory
             'source_type' => Todo::SOURCE_TYPE_MANUAL,
             'source_model_type' => null,
             'source_model_id' => null,
+            'todo_type' => null,
             'title' => $this->faker->sentence(4),
             'body' => $this->faker->optional()->sentence(),
             'due_on' => $this->faker->optional()->dateTimeBetween('-1 week', '+1 month'),
