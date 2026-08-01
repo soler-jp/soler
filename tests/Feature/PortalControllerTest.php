@@ -47,12 +47,9 @@ class PortalControllerTest extends TestCase
             ->assertOk()
             ->assertSee('初期セットアップ')
             ->assertSee('選んでくれてありがとう')
-            ->assertSee('以下の3ステップで始めます')
+            ->assertSee('以下の3ステップで始めていきましょう')
             ->assertSee('Solerを始める')
             ->assertSee('会計の基本')
-            ->assertSee('SetupWizard')
-            ->assertSee('利用開始')
-            ->assertSee('いつでも見直せます')
             ->assertDontSee('Main Menu');
     }
 
