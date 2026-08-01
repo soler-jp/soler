@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Contracts\ResolvesBusinessUnit;
 use App\Contracts\TodoHandler;
 use App\TodoHandlers\BankAccountTodoHandler;
+use App\TodoHandlers\CashOnHandTodoHandler;
 use Carbon\CarbonInterface;
 use Database\Factories\TodoFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,6 +25,8 @@ class Todo extends Model implements ResolvesBusinessUnit
     public const SOURCE_TYPE_SYSTEM = 'system';
 
     public const TODO_TYPE_WIZARD_BANK_ACCOUNT = 'wizard_bank_account';
+
+    public const TODO_TYPE_WIZARD_CASH_ON_HAND = 'wizard_cash_on_hand';
 
     public const PRIORITY_HIGH = 'high';
 
@@ -69,6 +72,7 @@ class Todo extends Model implements ResolvesBusinessUnit
      */
     public static array $handlers = [
         self::TODO_TYPE_WIZARD_BANK_ACCOUNT => BankAccountTodoHandler::class,
+        self::TODO_TYPE_WIZARD_CASH_ON_HAND => CashOnHandTodoHandler::class,
     ];
 
     protected $fillable = [
