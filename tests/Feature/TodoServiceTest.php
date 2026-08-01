@@ -426,15 +426,22 @@ class TodoServiceTest extends TestCase
         $schema = (new TodoService)->schemaFor($todo, $user);
 
         $this->assertSame([
-            'bank_name' => [
-                'rules' => ['required', 'string', 'max:255'],
-                'label' => '銀行名',
-                'type' => 'text',
-            ],
-            'opening_balance' => [
-                'rules' => ['required', 'integer', 'min:0'],
-                'label' => 'その年の期首残高',
-                'type' => 'number',
+            'bank_accounts' => [
+                'rules' => ['required', 'array', 'min:1'],
+                'label' => '銀行口座',
+                'type' => 'array',
+                'item_schema' => [
+                    'label' => [
+                        'rules' => ['required', 'string', 'max:255'],
+                        'label' => '銀行名',
+                        'type' => 'text',
+                    ],
+                    'opening_balance' => [
+                        'rules' => ['required', 'integer', 'min:0'],
+                        'label' => 'その年の期首残高',
+                        'type' => 'number',
+                    ],
+                ],
             ],
         ], $schema);
     }
@@ -455,8 +462,10 @@ class TodoServiceTest extends TestCase
 
         try {
             $refreshedTodo = (new TodoService)->execute($todo, [
-                'bank_name' => 'ひかり青空銀行',
-                'opening_balance' => 120000,
+                'bank_accounts' => [
+                    ['label' => 'ひかり青空銀行', 'opening_balance' => 120000],
+                    ['label' => 'みらい星銀行', 'opening_balance' => 80000],
+                ],
             ], $user);
         } finally {
             Carbon::setTestNow();
@@ -469,10 +478,14 @@ class TodoServiceTest extends TestCase
             'account_id' => $bankAccount?->id,
             'name' => 'ひかり青空銀行',
         ]);
+        $this->assertDatabaseHas('sub_accounts', [
+            'account_id' => $bankAccount?->id,
+            'name' => 'みらい星銀行',
+        ]);
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $capitalSubAccount?->id,
             'type' => JournalEntry::TYPE_CREDIT,
-            'net_amount' => 120000,
+            'net_amount' => 200000,
         ]);
     }
 
@@ -490,8 +503,9 @@ class TodoServiceTest extends TestCase
         $this->expectExceptionMessage('この Todo は実行可能な Handler を持ちません: todo_type=unregistered_handler');
 
         (new TodoService)->execute($todo, [
-            'bank_name' => 'ひかり青空銀行',
-            'opening_balance' => 120000,
+            'bank_accounts' => [
+                ['label' => 'ひかり青空銀行', 'opening_balance' => 120000],
+            ],
         ], $user);
     }
 
@@ -511,8 +525,9 @@ class TodoServiceTest extends TestCase
         $this->expectExceptionMessage('この Todo を実行する権限がありません。');
 
         (new TodoService)->execute($todo, [
-            'bank_name' => 'ひかり青空銀行',
-            'opening_balance' => 120000,
+            'bank_accounts' => [
+                ['label' => 'ひかり青空銀行', 'opening_balance' => 120000],
+            ],
         ], $otherUser);
     }
 
@@ -530,8 +545,9 @@ class TodoServiceTest extends TestCase
         $this->expectException(ValidationException::class);
 
         (new TodoService)->execute($todo, [
-            'bank_name' => '',
-            'opening_balance' => -1,
+            'bank_accounts' => [
+                ['label' => '', 'opening_balance' => -1],
+            ],
         ], $user);
     }
 

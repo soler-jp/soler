@@ -22,28 +22,35 @@ class BankAccountRegistrationServiceTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '銀行口座登録テスト']);
         $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
 
-        $subAccount = app(BankAccountRegistrationService::class)
-            ->register($businessUnit, $fiscalYear, 'ひかり青空銀行', 120000, $user);
+        $subAccounts = app(BankAccountRegistrationService::class)
+            ->register($businessUnit, $fiscalYear, [
+                ['label' => 'ひかり青空銀行', 'opening_balance' => 120000],
+                ['label' => 'みらい星銀行', 'opening_balance' => 80000],
+            ], $user);
 
         $bankAccount = $businessUnit->getAccountByName('その他の預金');
         $capitalSubAccount = $businessUnit->getSubAccountByName('元入金', '元入金');
 
-        $this->assertSame('ひかり青空銀行', $subAccount->name);
-        $this->assertSame($bankAccount?->id, $subAccount->account_id);
+        $this->assertCount(2, $subAccounts);
+        $this->assertSame(['ひかり青空銀行', 'みらい星銀行'], array_map(fn ($subAccount) => $subAccount->name, $subAccounts));
         $this->assertDatabaseHas('sub_accounts', [
-            'id' => $subAccount->id,
             'account_id' => $bankAccount?->id,
             'name' => 'ひかり青空銀行',
         ]);
         $this->assertDatabaseHas('journal_entries', [
-            'sub_account_id' => $subAccount->id,
+            'sub_account_id' => $subAccounts[0]->id,
             'type' => JournalEntry::TYPE_DEBIT,
             'net_amount' => 120000,
         ]);
         $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $subAccounts[1]->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => 80000,
+        ]);
+        $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $capitalSubAccount?->id,
             'type' => JournalEntry::TYPE_CREDIT,
-            'net_amount' => 120000,
+            'net_amount' => 200000,
         ]);
     }
 
@@ -59,7 +66,7 @@ class BankAccountRegistrationServiceTest extends TestCase
         $this->expectExceptionMessage('この事業体に銀行口座を登録する権限がありません。');
 
         app(BankAccountRegistrationService::class)
-            ->register($businessUnit, $fiscalYear, 'ひかり青空銀行', 120000, $otherUser);
+            ->register($businessUnit, $fiscalYear, [['label' => 'ひかり青空銀行', 'opening_balance' => 120000]], $otherUser);
     }
 
     #[Test]
@@ -70,12 +77,28 @@ class BankAccountRegistrationServiceTest extends TestCase
         $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
         $service = app(BankAccountRegistrationService::class);
 
-        $service->register($businessUnit, $fiscalYear, 'ひかり青空銀行', 120000, $user);
+        $service->register($businessUnit, $fiscalYear, [['label' => 'ひかり青空銀行', 'opening_balance' => 120000]], $user);
 
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('同名の銀行口座はすでに登録されています。');
 
-        $service->register($businessUnit, $fiscalYear, 'ひかり青空銀行', 120000, $user);
+        $service->register($businessUnit, $fiscalYear, [['label' => 'ひかり青空銀行', 'opening_balance' => 120000]], $user);
+    }
+
+    #[Test]
+    public function 同一リクエスト内で同名の銀行口座は登録できない(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '銀行口座登録テスト']);
+        $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('同名の銀行口座は同時に登録できません。');
+
+        app(BankAccountRegistrationService::class)->register($businessUnit, $fiscalYear, [
+            ['label' => 'ひかり青空銀行', 'opening_balance' => 120000],
+            ['label' => 'ひかり青空銀行', 'opening_balance' => 80000],
+        ], $user);
     }
 
     #[Test]
@@ -94,7 +117,10 @@ class BankAccountRegistrationServiceTest extends TestCase
             ],
         ], $user);
 
-        $subAccount = $service->register($businessUnit, $fiscalYear, 'ひかり青空銀行', 120000, $user);
+        $subAccounts = $service->register($businessUnit, $fiscalYear, [
+            ['label' => 'ひかり青空銀行', 'opening_balance' => 120000],
+            ['label' => 'みらい星銀行', 'opening_balance' => 80000],
+        ], $user);
 
         $activeOpeningEntry = $fiscalYear->transactions()
             ->where('is_opening_entry', true)
@@ -103,9 +129,15 @@ class BankAccountRegistrationServiceTest extends TestCase
 
         $this->assertDatabaseHas('journal_entries', [
             'transaction_id' => $activeOpeningEntry->id,
-            'sub_account_id' => $subAccount->id,
+            'sub_account_id' => $subAccounts[0]->id,
             'type' => JournalEntry::TYPE_DEBIT,
             'net_amount' => 120000,
+        ]);
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $activeOpeningEntry->id,
+            'sub_account_id' => $subAccounts[1]->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => 80000,
         ]);
 
         $capitalSubAccount = $businessUnit->getSubAccountByName('元入金', '元入金');
@@ -113,7 +145,14 @@ class BankAccountRegistrationServiceTest extends TestCase
             'transaction_id' => $activeOpeningEntry->id,
             'sub_account_id' => $capitalSubAccount?->id,
             'type' => JournalEntry::TYPE_CREDIT,
-            'net_amount' => 170000,
+            'net_amount' => 250000,
+        ]);
+        $cashSubAccount = $businessUnit->getSubAccountByName('現金', '現金');
+        $this->assertDatabaseHas('journal_entries', [
+            'transaction_id' => $activeOpeningEntry->id,
+            'sub_account_id' => $cashSubAccount?->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => 50000,
         ]);
     }
 
@@ -124,20 +163,28 @@ class BankAccountRegistrationServiceTest extends TestCase
         $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '銀行口座登録テスト']);
         $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
 
-        $subAccount = app(BankAccountRegistrationService::class)
-            ->register($businessUnit, $fiscalYear, 'みらい星銀行', 0, $user);
+        $subAccounts = app(BankAccountRegistrationService::class)
+            ->register($businessUnit, $fiscalYear, [
+                ['label' => 'みらい星銀行', 'opening_balance' => 0],
+                ['label' => '地方信用金庫', 'opening_balance' => 0],
+            ], $user);
 
         $bankAccount = $businessUnit->getAccountByName('その他の預金');
 
-        $this->assertSame('みらい星銀行', $subAccount->name);
-        $this->assertSame($bankAccount?->id, $subAccount->account_id);
+        $this->assertCount(2, $subAccounts);
         $this->assertDatabaseHas('sub_accounts', [
-            'id' => $subAccount->id,
             'account_id' => $bankAccount?->id,
             'name' => 'みらい星銀行',
         ]);
+        $this->assertDatabaseHas('sub_accounts', [
+            'account_id' => $bankAccount?->id,
+            'name' => '地方信用金庫',
+        ]);
         $this->assertDatabaseMissing('journal_entries', [
-            'sub_account_id' => $subAccount->id,
+            'sub_account_id' => $subAccounts[0]->id,
+        ]);
+        $this->assertDatabaseMissing('journal_entries', [
+            'sub_account_id' => $subAccounts[1]->id,
         ]);
     }
 
@@ -152,7 +199,7 @@ class BankAccountRegistrationServiceTest extends TestCase
         $this->expectExceptionMessage('銀行名を入力してください。');
 
         app(BankAccountRegistrationService::class)
-            ->register($businessUnit, $fiscalYear, '   ', 1000, $user);
+            ->register($businessUnit, $fiscalYear, [['label' => '   ', 'opening_balance' => 1000]], $user);
     }
 
     #[Test]
@@ -166,7 +213,21 @@ class BankAccountRegistrationServiceTest extends TestCase
         $this->expectExceptionMessage('期首残高は0円以上で入力してください。');
 
         app(BankAccountRegistrationService::class)
-            ->register($businessUnit, $fiscalYear, 'ひかり青空銀行', -1, $user);
+            ->register($businessUnit, $fiscalYear, [['label' => 'ひかり青空銀行', 'opening_balance' => -1]], $user);
+    }
+
+    #[Test]
+    public function 期首残高が欠落している場合は登録を拒否する(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '銀行口座登録テスト']);
+        $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
+
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('期首残高を入力してください。');
+
+        app(BankAccountRegistrationService::class)
+            ->register($businessUnit, $fiscalYear, [['label' => 'ひかり青空銀行']], $user);
     }
 
     #[Test]
@@ -181,7 +242,7 @@ class BankAccountRegistrationServiceTest extends TestCase
         $this->expectExceptionMessage('指定された会計年度は対象の事業体に属していません。');
 
         app(BankAccountRegistrationService::class)
-            ->register($businessUnit, $otherFiscalYear, 'ひかり青空銀行', 1000, $user);
+            ->register($businessUnit, $otherFiscalYear, [['label' => 'ひかり青空銀行', 'opening_balance' => 1000]], $user);
     }
 
     #[Test]
@@ -210,6 +271,6 @@ class BankAccountRegistrationServiceTest extends TestCase
         $this->expectExceptionMessage('既存の期首仕訳に貸方行が複数存在するため、銀行口座の登録を続行できません。');
 
         app(BankAccountRegistrationService::class)
-            ->register($businessUnit, $fiscalYear, 'ひかり青空銀行', 1000, $user);
+            ->register($businessUnit, $fiscalYear, [['label' => 'ひかり青空銀行', 'opening_balance' => 1000]], $user);
     }
 }

@@ -6,6 +6,7 @@ use App\Models\Todo;
 use App\Models\User;
 use App\TodoHandlers\BankAccountTodoHandler;
 use DomainException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -17,22 +18,25 @@ class BankAccountTodoHandlerTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function validateは銀行名をtrimし0円を許可する(): void
+    public function validateは銀行口座行をtrimし0円を許可する(): void
     {
         $todo = Todo::factory()->make([
             'todo_type' => Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
         ]);
 
         $validated = app(BankAccountTodoHandler::class)->validate($todo, [
-            'bank_name' => '  ひかり青空銀行  ',
-            'opening_balance' => 0,
+            'bank_accounts' => [
+                ['label' => '  ひかり青空銀行  ', 'opening_balance' => 0],
+                ['label' => '  みらい星銀行  ', 'opening_balance' => 120000],
+            ],
         ]);
 
         $this->assertSame([
-            'bank_name' => 'ひかり青空銀行',
-            'opening_balance' => 0,
+            'bank_accounts' => [
+                ['label' => 'ひかり青空銀行', 'opening_balance' => 0],
+                ['label' => 'みらい星銀行', 'opening_balance' => 120000],
+            ],
         ], $validated);
-        $this->assertIsInt($validated['opening_balance']);
     }
 
     #[Test]
@@ -45,8 +49,9 @@ class BankAccountTodoHandlerTest extends TestCase
         $this->expectException(ValidationException::class);
 
         app(BankAccountTodoHandler::class)->validate($todo, [
-            'bank_name' => '',
-            'opening_balance' => -1,
+            'bank_accounts' => [
+                ['label' => '', 'opening_balance' => -1],
+            ],
         ]);
     }
 
@@ -66,8 +71,9 @@ class BankAccountTodoHandlerTest extends TestCase
         $this->expectExceptionMessage('会計年度に紐づかない Todo では銀行口座を登録できません。');
 
         app(BankAccountTodoHandler::class)->execute($todo, [
-            'bank_name' => 'ひかり青空銀行',
-            'opening_balance' => 1000,
+            'bank_accounts' => [
+                ['label' => 'ひかり青空銀行', 'opening_balance' => 1000],
+            ],
         ], $user);
     }
 
@@ -88,8 +94,10 @@ class BankAccountTodoHandlerTest extends TestCase
 
         try {
             app(BankAccountTodoHandler::class)->execute($todo, [
-                'bank_name' => 'ひかり青空銀行',
-                'opening_balance' => 120000,
+                'bank_accounts' => [
+                    ['label' => 'ひかり青空銀行', 'opening_balance' => 120000],
+                    ['label' => 'みらい星銀行', 'opening_balance' => 80000],
+                ],
             ], $user);
         } finally {
             Carbon::setTestNow();
@@ -104,9 +112,41 @@ class BankAccountTodoHandlerTest extends TestCase
             'account_id' => $bankAccount?->id,
             'name' => 'ひかり青空銀行',
         ]);
+        $this->assertDatabaseHas('sub_accounts', [
+            'account_id' => $bankAccount?->id,
+            'name' => 'みらい星銀行',
+        ]);
         $this->assertDatabaseHas('journal_entries', [
             'type' => 'debit',
             'net_amount' => 120000,
         ]);
+        $this->assertDatabaseHas('journal_entries', [
+            'type' => 'debit',
+            'net_amount' => 80000,
+        ]);
+    }
+
+    #[Test]
+    public function executeは権限のないユーザーを拒否する(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '銀行口座登録テスト']);
+        $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'fiscal_year_id' => $fiscalYear->id,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('この Todo を実行する権限がありません。');
+
+        app(BankAccountTodoHandler::class)->execute($todo, [
+            'bank_accounts' => [
+                ['label' => 'ひかり青空銀行', 'opening_balance' => 1000],
+            ],
+        ], $otherUser);
     }
 }
