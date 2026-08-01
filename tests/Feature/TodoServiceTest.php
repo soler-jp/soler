@@ -108,6 +108,40 @@ class TodoServiceTest extends TestCase
     }
 
     #[Test]
+    public function 定期支出handler付きtodoを登録できる(): void
+    {
+        [$user, $businessUnit, $fiscalYear] = $this->createBusinessUnitWithFiscalYear();
+
+        $todo = (new TodoService)->register(
+            $businessUnit,
+            '定期支出を登録する',
+            $user,
+            $fiscalYear,
+            todoType: Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES,
+        );
+
+        $this->assertSame(Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES, $todo->todo_type);
+        $this->assertTrue($todo->isExecutable());
+    }
+
+    #[Test]
+    public function 定期収入handler付きtodoを登録できる(): void
+    {
+        [$user, $businessUnit, $fiscalYear] = $this->createBusinessUnitWithFiscalYear();
+
+        $todo = (new TodoService)->register(
+            $businessUnit,
+            '定期収入を登録する',
+            $user,
+            $fiscalYear,
+            todoType: Todo::TODO_TYPE_WIZARD_RECURRING_INCOMES,
+        );
+
+        $this->assertSame(Todo::TODO_TYPE_WIZARD_RECURRING_INCOMES, $todo->todo_type);
+        $this->assertTrue($todo->isExecutable());
+    }
+
+    #[Test]
     public function handler未登録のtodo_typeで登録を拒否する(): void
     {
         [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
@@ -444,6 +478,42 @@ class TodoServiceTest extends TestCase
                 ],
             ],
         ], $schema);
+    }
+
+    #[Test]
+    public function schema_forは定期支出todoの入力スキーマを返す(): void
+    {
+        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES,
+        ]);
+
+        $schema = (new TodoService)->schemaFor($todo, $user);
+
+        $this->assertSame('定期支出', $schema['plans']['label'] ?? null);
+        $this->assertArrayHasKey('business_ratio', $schema['plans']['item_schema'] ?? []);
+        $this->assertArrayNotHasKey('is_withholding', $schema['plans']['item_schema'] ?? []);
+        $this->assertArrayHasKey('start_month', $schema['plans']['item_schema'] ?? []);
+        $this->assertArrayHasKey('is_active', $schema['plans']['item_schema'] ?? []);
+    }
+
+    #[Test]
+    public function schema_forは定期収入todoの入力スキーマを返す(): void
+    {
+        [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_RECURRING_INCOMES,
+        ]);
+
+        $schema = (new TodoService)->schemaFor($todo, $user);
+
+        $this->assertSame('定期収入', $schema['plans']['label'] ?? null);
+        $this->assertArrayHasKey('is_withholding', $schema['plans']['item_schema'] ?? []);
+        $this->assertArrayNotHasKey('business_ratio', $schema['plans']['item_schema'] ?? []);
+        $this->assertArrayHasKey('start_month', $schema['plans']['item_schema'] ?? []);
+        $this->assertArrayHasKey('is_active', $schema['plans']['item_schema'] ?? []);
     }
 
     #[Test]

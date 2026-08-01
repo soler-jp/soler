@@ -6,6 +6,8 @@ use App\Contracts\ResolvesBusinessUnit;
 use App\Contracts\TodoHandler;
 use App\TodoHandlers\BankAccountTodoHandler;
 use App\TodoHandlers\CashOnHandTodoHandler;
+use App\TodoHandlers\RecurringExpenseTodoHandler;
+use App\TodoHandlers\RecurringIncomeTodoHandler;
 use Carbon\CarbonInterface;
 use Database\Factories\TodoFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -27,6 +29,10 @@ class Todo extends Model implements ResolvesBusinessUnit
     public const TODO_TYPE_WIZARD_BANK_ACCOUNT = 'wizard_bank_account';
 
     public const TODO_TYPE_WIZARD_CASH_ON_HAND = 'wizard_cash_on_hand';
+
+    public const TODO_TYPE_WIZARD_RECURRING_EXPENSES = 'wizard_recurring_expenses';
+
+    public const TODO_TYPE_WIZARD_RECURRING_INCOMES = 'wizard_recurring_incomes';
 
     public const PRIORITY_HIGH = 'high';
 
@@ -73,6 +79,8 @@ class Todo extends Model implements ResolvesBusinessUnit
     public static array $handlers = [
         self::TODO_TYPE_WIZARD_BANK_ACCOUNT => BankAccountTodoHandler::class,
         self::TODO_TYPE_WIZARD_CASH_ON_HAND => CashOnHandTodoHandler::class,
+        self::TODO_TYPE_WIZARD_RECURRING_EXPENSES => RecurringExpenseTodoHandler::class,
+        self::TODO_TYPE_WIZARD_RECURRING_INCOMES => RecurringIncomeTodoHandler::class,
     ];
 
     protected $fillable = [
