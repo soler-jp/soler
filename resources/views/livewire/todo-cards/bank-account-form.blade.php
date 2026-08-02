@@ -20,16 +20,7 @@
             @foreach (($inputs['bank_accounts'] ?? []) as $index => $bankAccount)
                 <section wire:key="todo-{{ $todo->id }}-bank-account-{{ $index }}"
                     class="rounded border border-slate-200 bg-slate-50 p-4">
-                    <div class="flex items-center justify-between gap-3">
-                        <p class="text-sm font-semibold text-slate-700">口座 {{ $index + 1 }}</p>
-
-                        <button type="button" wire:click="removeItem('bank_accounts', {{ $index }})"
-                            class="text-sm font-medium text-slate-500 transition hover:text-slate-700">
-                            削除
-                        </button>
-                    </div>
-
-                    <div class="mt-4 grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                    <div class="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto] md:items-start">
                         <div>
                             <x-input-label value="銀行名" />
                             <x-text-input wire:model="inputs.bank_accounts.{{ $index }}.label"
@@ -45,6 +36,13 @@
                                 class="mt-1 block w-full"
                                 placeholder="0" />
                             <x-input-error :messages="$errors->get('inputs.bank_accounts.'.$index.'.opening_balance')" class="mt-2" />
+                        </div>
+
+                        <div class="md:pt-7">
+                            <button type="button" wire:click="removeItem('bank_accounts', {{ $index }})"
+                                class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-400 hover:text-slate-900 md:w-auto">
+                                削除
+                            </button>
                         </div>
                     </div>
                 </section>

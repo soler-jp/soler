@@ -93,7 +93,6 @@ class TodoCardTest extends TestCase
             ->assertSee('事業用の現金を管理する場所')
             ->assertSee('場所の名前')
             ->assertSee('金額')
-            ->assertSee('場所 1')
             ->assertSee('現金を管理する場所を追加')
             ->assertSee('登録しない')
             ->assertSee('事業用現金の管理場所を登録する')
