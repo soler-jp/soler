@@ -3,9 +3,12 @@
 namespace App\Setup\Initializers;
 
 use App\Models\BusinessUnit;
+use App\Models\FiscalYear;
 use App\Models\InitialSetupData;
+use App\Models\Todo;
 use App\Models\User;
 use App\Services\OpeningEntryRegistrar;
+use App\Services\TodoService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -60,7 +63,35 @@ class GeneralBusinessInitializer
                 }
             }
 
+            $this->registerRequestedTodos($unit, $fiscalYear, $initialSetupData, $user);
+
             return $unit->refresh();
         });
+    }
+
+    protected function registerRequestedTodos(
+        BusinessUnit $businessUnit,
+        FiscalYear $fiscalYear,
+        InitialSetupData $initialSetupData,
+        User $actor,
+    ): void {
+        if ($initialSetupData->bank_account_answer === InitialSetupData::ANSWER_YES) {
+            app(TodoService::class)->register(
+                $businessUnit,
+                __('setup_todos.bank_account.title'),
+                $actor,
+                $fiscalYear,
+                body: $this->bankAccountTodoBody($fiscalYear),
+                sourceType: Todo::SOURCE_TYPE_SYSTEM,
+                todoType: Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
+            );
+        }
+    }
+
+    protected function bankAccountTodoBody(FiscalYear $fiscalYear): string
+    {
+        return __('setup_todos.bank_account.body', [
+            'date' => $fiscalYear->start_date->format('Y/n/j'),
+        ]);
     }
 }
