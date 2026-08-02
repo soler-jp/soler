@@ -20,6 +20,6 @@ yarn-error.log
 /.agents
 /.claude
 /.codex
-/.github
+/.github/skills
 boost.json
 .mcp.json
