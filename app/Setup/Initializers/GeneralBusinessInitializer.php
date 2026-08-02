@@ -109,6 +109,17 @@ class GeneralBusinessInitializer
                 todoType: Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES,
             );
         }
+
+        if ($initialSetupData->counterparty_answer === InitialSetupData::ANSWER_YES) {
+            app(TodoService::class)->register(
+                $businessUnit,
+                __('setup_todos.counterparty.title'),
+                $actor,
+                $fiscalYear,
+                sourceType: Todo::SOURCE_TYPE_SYSTEM,
+                todoType: Todo::TODO_TYPE_WIZARD_COUNTERPARTY,
+            );
+        }
     }
 
     protected function bankAccountTodoBody(FiscalYear $fiscalYear): string
