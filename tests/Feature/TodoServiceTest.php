@@ -489,7 +489,7 @@ class TodoServiceTest extends TestCase
                     ],
                     'opening_balance' => [
                         'rules' => ['required', 'integer', 'min:0'],
-                        'label' => 'その年の期首残高',
+                        'label' => '残高',
                         'type' => 'number',
                     ],
                 ],

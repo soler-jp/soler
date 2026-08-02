@@ -62,9 +62,37 @@ class TodoCardTest extends TestCase
             ->assertSee('銀行口座を登録する')
             ->assertSeeHtml('<strong>まとめて</strong>')
             ->assertSeeHtml('<li>銀行名</li>')
+            ->assertSee('普通預金')
             ->assertSee('銀行名')
-            ->assertSee('その年の期首残高')
-            ->assertSee('口座を追加');
+            ->assertSee('残高')
+            ->assertSee('口座を追加')
+            ->assertSee('登録しない')
+            ->assertSee('後で追加する場合は、サイドメニューの[銀行口座]から追加できます');
+    }
+
+    #[Test]
+    public function bank_account_todoは登録せずに完了できる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '銀行口座スキップ事業体']);
+        $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'fiscal_year_id' => $fiscalYear->id,
+            'title' => '銀行口座を登録する',
+            'todo_type' => Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(TodoCard::class, ['todo' => $todo])
+            ->call('complete')
+            ->assertRedirect(route('dashboard'));
+
+        $todo->refresh();
+
+        $this->assertSame(Todo::STATUS_COMPLETED, $todo->status);
+        $this->assertNotNull($todo->completed_at);
     }
 
     #[Test]

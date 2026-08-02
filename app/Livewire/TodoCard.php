@@ -6,6 +6,7 @@ use App\Models\Todo;
 use App\Models\User;
 use App\Services\TodoService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use LogicException;
 
@@ -65,7 +66,14 @@ class TodoCard extends Component
 
     public function submit(TodoService $service): mixed
     {
-        $service->execute($this->todo, $this->inputs, $this->currentUser());
+        try {
+            $service->execute($this->todo, $this->inputs, $this->currentUser());
+        } catch (ValidationException $exception) {
+            $this->mapValidationErrors($exception);
+
+            return null;
+        }
+
         session()->flash('message', 'ToDo を完了しました。');
 
         return $this->redirect(route('dashboard'));
@@ -97,6 +105,7 @@ class TodoCard extends Component
     protected function cardView(): string
     {
         return match ($this->todo->todo_type) {
+            Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT => 'livewire.todo-cards.bank-account-form',
             default => 'livewire.todo-cards.generic-form',
         };
     }
@@ -174,5 +183,16 @@ class TodoCard extends Component
         }
 
         return $user;
+    }
+
+    protected function mapValidationErrors(ValidationException $exception): void
+    {
+        $this->resetErrorBag();
+
+        foreach ($exception->errors() as $field => $messages) {
+            foreach ($messages as $message) {
+                $this->addError('inputs.'.$field, $message);
+            }
+        }
     }
 }

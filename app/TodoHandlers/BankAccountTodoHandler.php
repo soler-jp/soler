@@ -132,7 +132,7 @@ class BankAccountTodoHandler implements TodoHandler
         return [
             'bank_accounts' => '銀行口座',
             'bank_accounts.*.label' => '銀行名',
-            'bank_accounts.*.opening_balance' => 'その年の期首残高',
+            'bank_accounts.*.opening_balance' => '残高',
         ];
     }
 
