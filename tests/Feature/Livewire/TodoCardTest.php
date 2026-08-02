@@ -22,7 +22,7 @@ class TodoCardTest extends TestCase
         $todo = Todo::factory()->create([
             'business_unit_id' => $businessUnit->id,
             'title' => '売上の確認',
-            'body' => '通帳と帳簿を見比べる',
+            'body' => "**通帳**と帳簿を見比べる\n\n<script>alert(\"xss\")</script>",
             'status' => Todo::STATUS_PENDING,
             'todo_type' => null,
         ]);
@@ -30,7 +30,9 @@ class TodoCardTest extends TestCase
         Livewire::actingAs($user)
             ->test(TodoCard::class, ['todo' => $todo])
             ->assertSee('売上の確認')
-            ->assertSee('通帳と帳簿を見比べる')
+            ->assertSee('帳簿を見比べる')
+            ->assertSeeHtml('<strong>通帳</strong>')
+            ->assertDontSeeHtml('<script>alert("xss")</script>')
             ->call('complete')
             ->assertRedirect(route('dashboard'));
 
@@ -50,6 +52,7 @@ class TodoCardTest extends TestCase
             'business_unit_id' => $businessUnit->id,
             'fiscal_year_id' => $fiscalYear->id,
             'title' => '銀行口座を登録する',
+            'body' => "口座を**まとめて**登録します\n\n- 銀行名\n- 期首残高",
             'todo_type' => Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
             'status' => Todo::STATUS_PENDING,
         ]);
@@ -57,9 +60,11 @@ class TodoCardTest extends TestCase
         Livewire::actingAs($user)
             ->test(TodoCard::class, ['todo' => $todo])
             ->assertSee('銀行口座を登録する')
+            ->assertSeeHtml('<strong>まとめて</strong>')
+            ->assertSeeHtml('<li>銀行名</li>')
             ->assertSee('銀行名')
             ->assertSee('その年の期首残高')
-            ->assertSee('行を追加');
+            ->assertSee('口座を追加');
     }
 
     #[Test]
@@ -70,12 +75,14 @@ class TodoCardTest extends TestCase
         $todo = Todo::factory()->create([
             'business_unit_id' => $businessUnit->id,
             'title' => '取引先を登録する',
+            'body' => '`note` を確認して登録する',
             'todo_type' => Todo::TODO_TYPE_WIZARD_COUNTERPARTY,
             'status' => Todo::STATUS_PENDING,
         ]);
 
         Livewire::actingAs($user)
             ->test(TodoCard::class, ['todo' => $todo])
+            ->assertSeeHtml('<code>note</code>')
             ->set('inputs.counterparties.0.name', '株式会社サンプル')
             ->set('inputs.counterparties.0.notes', '毎月請求する相手')
             ->call('submit')

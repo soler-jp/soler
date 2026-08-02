@@ -14,9 +14,7 @@
             <div class="space-y-2">
                 <h2 class="text-xl font-semibold tracking-tight text-slate-900">{{ $todo->title }}</h2>
 
-                @if ($todo->body !== null)
-                    <p class="text-sm leading-6 text-slate-600">{{ $todo->body }}</p>
-                @endif
+                <x-todo-body :body="$todo->body" />
             </div>
         </div>
 
