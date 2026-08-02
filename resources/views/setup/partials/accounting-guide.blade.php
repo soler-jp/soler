@@ -5,6 +5,7 @@
     //   amber   = 仕入
     //   emerald = 具体的な経費項目 (スマホ代、家賃など)
     //   violet  = 会計の専門用語 (勘定科目)
+    //   indigo  = お金の置き場所 (現金、銀行口座、クレジットカードなど)
     $pages = [
         [
             'title' => '個人事業主は、1年分の事業をまとめます',
@@ -31,6 +32,14 @@
                 'たとえば、<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">携帯電話代</span>、<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">交通費</span>、<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">仕事道具</span>、<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">広告費</span>などです。',
                 '会計では、この分類の名前を<span class="rounded-sm bg-violet-100 px-1 py-0.5 font-semibold text-violet-900">勘定科目</span>と呼びます。',
                 'なお、自宅を事務所として使っている場合、「<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">自宅の家賃</span>」や「<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">自宅の電気代</span>」のように、仕事と私生活で共有する支払いが出てきます。こうしたものは、仕事で使った分だけを経費として記録します。',
+            ],
+        ],
+        [
+            'title' => '「どこから払ったか」「どこに入ったか」も記録します',
+            'body' => [
+                'お金の記録では、金額だけでなく<span class="rounded-sm bg-indigo-100 px-1 py-0.5 font-semibold text-indigo-900">お金の置き場所</span>も一緒に記録します。',
+                '<span class="rounded-sm bg-rose-100 px-1 py-0.5 font-semibold text-rose-900">経費</span>や<span class="rounded-sm bg-amber-100 px-1 py-0.5 font-semibold text-amber-900">仕入</span>は、どこから払ったかを記録します。<span class="rounded-sm bg-indigo-100 px-1 py-0.5 font-semibold text-indigo-900">レジのお金で</span>、<span class="rounded-sm bg-indigo-100 px-1 py-0.5 font-semibold text-indigo-900">事業専用の銀行口座から</span>、<span class="rounded-sm bg-indigo-100 px-1 py-0.5 font-semibold text-indigo-900">個人のお金で立て替え</span>、などです。',
+                '<span class="rounded-sm bg-sky-100 px-1 py-0.5 font-semibold text-sky-900">売上</span>も同じで、どこに入金されたかを記録します。<span class="rounded-sm bg-indigo-100 px-1 py-0.5 font-semibold text-indigo-900">レジに入金</span>、<span class="rounded-sm bg-indigo-100 px-1 py-0.5 font-semibold text-indigo-900">事業専用の銀行口座に振込</span>、<span class="rounded-sm bg-indigo-100 px-1 py-0.5 font-semibold text-indigo-900">財布に入れた</span>、などです。',
             ],
         ],
         [
