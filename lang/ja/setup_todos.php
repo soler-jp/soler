@@ -20,6 +20,19 @@ return [
             'footer' => '後で追加する場合は、サイドメニューの[勘定科目]から現金の補助科目を追加できます。',
         ],
     ],
+    'counterparty' => [
+        'form' => [
+            'description' => '売上先や仕入先などで、よく取引する相手や、定期的に取引する相手を入力してください。',
+            'name_label' => '取引先名',
+            'notes_label' => 'メモ',
+            'name_placeholder' => '例: 株式会社ソレル / 山田商店',
+            'notes_placeholder' => '例: 毎月売上あり / お弁当箱の仕入れ先',
+            'add_button' => '取引先を追加',
+            'skip_button' => '登録しない',
+            'submit_button' => '取引先を登録する',
+            'footer' => 'サイドメニューの[取引先]から、後で追加・編集・削除できます。',
+        ],
+    ],
     'recurring_expense' => [
         'title' => '固定費を登録する',
     ],
