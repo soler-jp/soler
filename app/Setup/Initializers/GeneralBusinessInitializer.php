@@ -86,11 +86,30 @@ class GeneralBusinessInitializer
                 todoType: Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
             );
         }
+
+        if ($initialSetupData->cash_on_hand_answer === InitialSetupData::ANSWER_YES) {
+            app(TodoService::class)->register(
+                $businessUnit,
+                __('setup_todos.cash_on_hand.title'),
+                $actor,
+                $fiscalYear,
+                body: $this->cashOnHandTodoBody($fiscalYear),
+                sourceType: Todo::SOURCE_TYPE_SYSTEM,
+                todoType: Todo::TODO_TYPE_WIZARD_CASH_ON_HAND,
+            );
+        }
     }
 
     protected function bankAccountTodoBody(FiscalYear $fiscalYear): string
     {
         return __('setup_todos.bank_account.body', [
+            'date' => $fiscalYear->start_date->format('Y/n/j'),
+        ]);
+    }
+
+    protected function cashOnHandTodoBody(FiscalYear $fiscalYear): string
+    {
+        return __('setup_todos.cash_on_hand.body', [
             'date' => $fiscalYear->start_date->format('Y/n/j'),
         ]);
     }

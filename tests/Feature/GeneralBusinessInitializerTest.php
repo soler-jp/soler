@@ -433,4 +433,35 @@ class GeneralBusinessInitializerTest extends TestCase
             'todo_type' => Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT,
         ]);
     }
+
+    #[Test]
+    public function 初期設定で事業用現金ありを選ぶと現金todoが作成される(): void
+    {
+        $user = User::factory()->create();
+        $initializer = new GeneralBusinessInitializer;
+        $unit = $initializer->initialize($user, [
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'year' => 2023,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'opening_context' => InitialSetupData::OPENING_CONTEXT_FIRST_YEAR,
+            'bank_account_answer' => InitialSetupData::ANSWER_NO,
+            'cash_on_hand_answer' => InitialSetupData::ANSWER_YES,
+            'fixed_asset_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_expense_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_income_answer' => InitialSetupData::ANSWER_NO,
+            'counterparty_answer' => InitialSetupData::ANSWER_NO,
+        ]);
+
+        $this->assertDatabaseHas('todos', [
+            'business_unit_id' => $unit->id,
+            'fiscal_year_id' => $unit->currentFiscalYear->id,
+            'title' => '事業用現金を登録する',
+            'body' => '事業専用のレジや金庫がある場合は、`メインレジ` `バックヤード金庫` `両替用の小銭袋`など、区別するための名称と、2023/1/1 時点での金額を入力してください',
+            'source_type' => Todo::SOURCE_TYPE_SYSTEM,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_CASH_ON_HAND,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+    }
 }
