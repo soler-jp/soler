@@ -464,4 +464,61 @@ class GeneralBusinessInitializerTest extends TestCase
             'status' => Todo::STATUS_PENDING,
         ]);
     }
+
+    #[Test]
+    public function 初期設定で定期支出ありを選ぶと固定費todoが作成される(): void
+    {
+        $user = User::factory()->create();
+        $initializer = new GeneralBusinessInitializer;
+        $unit = $initializer->initialize($user, [
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'opening_context' => InitialSetupData::OPENING_CONTEXT_FIRST_YEAR,
+            'bank_account_answer' => InitialSetupData::ANSWER_NO,
+            'cash_on_hand_answer' => InitialSetupData::ANSWER_NO,
+            'fixed_asset_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_expense_answer' => InitialSetupData::ANSWER_YES,
+            'recurring_income_answer' => InitialSetupData::ANSWER_NO,
+            'counterparty_answer' => InitialSetupData::ANSWER_NO,
+        ]);
+
+        $this->assertDatabaseHas('todos', [
+            'business_unit_id' => $unit->id,
+            'fiscal_year_id' => $unit->currentFiscalYear->id,
+            'title' => '固定費を登録する',
+            'source_type' => Todo::SOURCE_TYPE_SYSTEM,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+    }
+
+    #[Test]
+    public function 初期設定で定期支出なしなら固定費todoは作成されない(): void
+    {
+        $user = User::factory()->create();
+        $initializer = new GeneralBusinessInitializer;
+        $unit = $initializer->initialize($user, [
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'opening_context' => InitialSetupData::OPENING_CONTEXT_FIRST_YEAR,
+            'bank_account_answer' => InitialSetupData::ANSWER_NO,
+            'cash_on_hand_answer' => InitialSetupData::ANSWER_NO,
+            'fixed_asset_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_expense_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_income_answer' => InitialSetupData::ANSWER_NO,
+            'counterparty_answer' => InitialSetupData::ANSWER_NO,
+        ]);
+
+        $this->assertDatabaseMissing('todos', [
+            'business_unit_id' => $unit->id,
+            'title' => '固定費を登録する',
+            'todo_type' => Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES,
+        ]);
+    }
 }

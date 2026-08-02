@@ -98,6 +98,17 @@ class GeneralBusinessInitializer
                 todoType: Todo::TODO_TYPE_WIZARD_CASH_ON_HAND,
             );
         }
+
+        if ($initialSetupData->recurring_expense_answer === InitialSetupData::ANSWER_YES) {
+            app(TodoService::class)->register(
+                $businessUnit,
+                __('setup_todos.recurring_expense.title'),
+                $actor,
+                $fiscalYear,
+                sourceType: Todo::SOURCE_TYPE_SYSTEM,
+                todoType: Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES,
+            );
+        }
     }
 
     protected function bankAccountTodoBody(FiscalYear $fiscalYear): string
