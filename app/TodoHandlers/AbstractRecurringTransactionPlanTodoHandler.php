@@ -27,18 +27,34 @@ abstract class AbstractRecurringTransactionPlanTodoHandler implements TodoHandle
 
     public function inputSchema(Todo $todo): array
     {
-        return [
+        $schema = [
             'plans' => [
-                'rules' => ['required', 'array', 'min:1'],
+                'rules' => $this->plansRules(),
                 'label' => $this->plansLabel(),
                 'type' => 'array',
                 'item_schema' => $this->itemSchema(),
             ],
         ];
+
+        $help = $this->plansHelp();
+
+        if ($help !== null) {
+            $schema['plans']['help'] = $help;
+        }
+
+        $defaultItems = $this->defaultPlanItems();
+
+        if ($defaultItems !== []) {
+            $schema['plans']['default_items'] = $defaultItems;
+        }
+
+        return $schema;
     }
 
     public function validate(Todo $todo, array $inputs): array
     {
+        $inputs['plans'] = $this->filterPlanPayloads($inputs['plans'] ?? []);
+
         $validator = Validator::make(
             $inputs,
             $this->validationRules(),
@@ -74,6 +90,13 @@ abstract class AbstractRecurringTransactionPlanTodoHandler implements TodoHandle
                 }
 
                 $normalizedNames[] = $normalizedName;
+
+                foreach ($this->additionalPlanValidationErrors($rawPlan, $plan, $todo) as $field => $messages) {
+                    foreach ($messages as $message) {
+                        $validator->errors()->add("plans.$index.$field", $message);
+                    }
+                }
+
                 $itemValidator = RecurringTransactionPlan::validator($plan);
 
                 if (! $itemValidator->fails()) {
@@ -107,13 +130,14 @@ abstract class AbstractRecurringTransactionPlanTodoHandler implements TodoHandle
     {
         $this->authorizeBusinessUnitAccess($todo, $actor, 'この Todo を実行する権限がありません。');
         $todo->loadMissing('businessUnit', 'fiscalYear');
+        $validatedInputs['plans'] = $this->filterPlanPayloads($validatedInputs['plans'] ?? []);
 
         if ($todo->fiscalYear === null) {
             throw new DomainException('会計年度に紐づかない Todo では定期取引を登録できません。');
         }
 
         // TodoService::execute() は validate() を先に通すが、CLI から handler を直接叩く経路もあるため防御する。
-        if (($validatedInputs['plans'] ?? []) === []) {
+        if (($validatedInputs['plans'] ?? []) === [] && ! $this->allowsEmptyPlans()) {
             throw ValidationException::withMessages([
                 'plans' => [self::EMPTY_PLANS_MESSAGE],
             ]);
@@ -143,7 +167,7 @@ abstract class AbstractRecurringTransactionPlanTodoHandler implements TodoHandle
     protected function validationRules(): array
     {
         return [
-            'plans' => ['required', 'array', 'min:1'],
+            'plans' => $this->plansRules(),
             'plans.*.name' => ['required', 'string', 'max:255'],
             'plans.*.interval' => ['required', 'in:monthly,bimonthly,yearly'],
             'plans.*.day_of_month' => ['required', 'integer', 'min:1', 'max:31'],
@@ -190,9 +214,16 @@ abstract class AbstractRecurringTransactionPlanTodoHandler implements TodoHandle
      */
     protected function messages(): array
     {
-        return [
+        $messages = [
             'plans.*.name.required' => self::NAME_REQUIRED_MESSAGE,
         ];
+
+        if (! $this->allowsEmptyPlans()) {
+            $messages['plans.min'] = self::EMPTY_PLANS_MESSAGE;
+            $messages['plans.required'] = self::EMPTY_PLANS_MESSAGE;
+        }
+
+        return $messages;
     }
 
     /**
@@ -247,6 +278,7 @@ abstract class AbstractRecurringTransactionPlanTodoHandler implements TodoHandle
                 'rules' => $rules['plans.*.amount'],
                 'label' => '金額',
                 'type' => 'number',
+                'help' => $this->amountHelp(),
             ],
             'tax_amount' => [
                 'rules' => $rules['plans.*.tax_amount'],
@@ -334,6 +366,66 @@ abstract class AbstractRecurringTransactionPlanTodoHandler implements TodoHandle
         $trimmed = trim((string) $value);
 
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function filterPlanPayloads(mixed $plans): array
+    {
+        if (! is_array($plans)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $plans,
+            fn (mixed $plan): bool => is_array($plan),
+        ));
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function plansRules(): array
+    {
+        if ($this->allowsEmptyPlans()) {
+            return ['array'];
+        }
+
+        return ['required', 'array', 'min:1'];
+    }
+
+    protected function allowsEmptyPlans(): bool
+    {
+        return false;
+    }
+
+    protected function plansHelp(): ?string
+    {
+        return null;
+    }
+
+    protected function amountHelp(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function defaultPlanItems(): array
+    {
+        return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $rawPlan
+     * @param  array<string, mixed>  $normalizedPlan
+     * @return array<string, list<string>>
+     */
+    protected function additionalPlanValidationErrors(array $rawPlan, array $normalizedPlan, Todo $todo): array
+    {
+        return [];
     }
 
     /**

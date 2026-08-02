@@ -11,7 +11,11 @@
 
                         <div class="grid gap-4 xl:grid-cols-2">
                             @foreach ($pendingTodos as $todo)
-                                <livewire:todo-card :todo="$todo" :key="'todo-card-'.$todo->id" />
+                                @if ($todo->todo_type === \App\Models\Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES)
+                                    <livewire:todo-cards.recurring-expense-card :todo="$todo" :key="'recurring-expense-card-'.$todo->id" />
+                                @else
+                                    <livewire:todo-card :todo="$todo" :key="'todo-card-'.$todo->id" />
+                                @endif
                             @endforeach
                         </div>
                     </section>

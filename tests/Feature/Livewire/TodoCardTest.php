@@ -3,9 +3,12 @@
 namespace Tests\Feature\Livewire;
 
 use App\Livewire\TodoCard;
+use App\Livewire\TodoCards\RecurringExpenseCard;
+use App\Models\JournalEntry;
 use App\Models\Todo;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\App;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -97,6 +100,56 @@ class TodoCardTest extends TestCase
             ->assertSee('登録しない')
             ->assertSee('事業用現金の管理場所を登録する')
             ->assertSee('後で追加する場合は、サイドメニューの[勘定科目]から現金の補助科目を追加できます。');
+    }
+
+    #[Test]
+    public function recurring_expense_todoは専用コンポーネントでデフォルト固定費と補足文を表示する(): void
+    {
+        App::setLocale('ja');
+
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '定期支出 ToDo 事業体']);
+        $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'fiscal_year_id' => $fiscalYear->id,
+            'title' => '定期支出を登録する',
+            'todo_type' => Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(RecurringExpenseCard::class, ['todo' => $todo])
+            ->assertSee('主な固定費をまとめて登録します。')
+            ->assertSee('主な支払い元')
+            ->assertSee('支払いの見込み金額(税込)')
+            ->assertSee('消費税')
+            ->assertSee('頻度')
+            ->assertSee('毎月')
+            ->assertSee('隔月')
+            ->assertSee('毎年')
+            ->assertSee('10%')
+            ->assertSee('非課税')
+            ->assertSee('住宅用として契約している家賃は非課税です。')
+            ->assertSee('事業専用として契約している家賃は 10% を選んでください。')
+            ->assertSee('国税庁 No.6226 住宅の貸付け')
+            ->assertSee('家事按分がある固定費だけ入力してください。')
+            ->assertSee('経費計上する割合')
+            ->assertSee('プライベートの財布・クレジットで支払い')
+            ->assertSee('登録しない')
+            ->assertSet('inputs.plans.0.name', '家賃')
+            ->assertSet('inputs.plans.0.interval', 'monthly')
+            ->assertSet('inputs.plans.0.tax_type_locked', false)
+            ->assertSet('inputs.plans.0.tax_type', JournalEntry::TAX_TYPE_EXEMPT)
+            ->assertSet('inputs.plans.0.should_register', true)
+            ->assertSet('inputs.plans.1.name', '電気代')
+            ->assertSet('inputs.plans.1.tax_type', JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10)
+            ->assertSet('inputs.plans.3.interval', 'bimonthly')
+            ->assertSet('inputs.plans.3.name', '水道代')
+            ->assertSet('inputs.plans.6.name', '車検代')
+            ->assertSet('inputs.plans.6.interval', 'yearly')
+            ->set('inputs.plans.0.should_register', false)
+            ->assertSee('登録する');
     }
 
     #[Test]

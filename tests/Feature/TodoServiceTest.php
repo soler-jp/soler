@@ -541,7 +541,27 @@ class TodoServiceTest extends TestCase
         $schema = (new TodoService)->schemaFor($todo, $user);
 
         $this->assertSame('定期支出', $schema['plans']['label'] ?? null);
+        $this->assertArrayNotHasKey('help', $schema['plans']);
+        $this->assertCount(7, $schema['plans']['default_items'] ?? []);
+        $this->assertSame('家賃', $schema['plans']['default_items'][0]['name'] ?? null);
+        $this->assertSame(
+            JournalEntry::TAX_TYPE_EXEMPT,
+            $schema['plans']['default_items'][0]['tax_type'] ?? null,
+        );
+        $this->assertSame(
+            __('recurring_transaction_plans.todo_card.fields.credit_source'),
+            $schema['plans']['item_schema']['credit_sub_account_id']['label'] ?? null,
+        );
+        $this->assertSame('radio', $schema['plans']['item_schema']['credit_sub_account_id']['type'] ?? null);
+        $this->assertSame(
+            __('recurring_transaction_plans.todo_card.fields.gross_amount'),
+            $schema['plans']['item_schema']['amount']['label'] ?? null,
+        );
         $this->assertArrayHasKey('business_ratio', $schema['plans']['item_schema'] ?? []);
+        $this->assertSame(
+            __('recurring_transaction_plans.todo_card.help.business_ratio'),
+            $schema['plans']['item_schema']['business_ratio']['help'] ?? null,
+        );
         $this->assertArrayNotHasKey('is_withholding', $schema['plans']['item_schema'] ?? []);
         $this->assertArrayHasKey('start_month', $schema['plans']['item_schema'] ?? []);
         $this->assertArrayHasKey('is_active', $schema['plans']['item_schema'] ?? []);

@@ -317,6 +317,77 @@ class RecurringTransactionPlanTodoHandlerTest extends TestCase
     }
 
     #[Test]
+    public function validateは定期支出テンプレートから補助科目と税込内訳を補完する(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '定期支出テンプレート検証']);
+        $cashSubAccount = $businessUnit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+        $rentSubAccount = $businessUnit->getSubAccountByName('地代家賃', '地代家賃');
+        $todo = Todo::factory()->make([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES,
+        ]);
+
+        $validated = app(RecurringExpenseTodoHandler::class)->validate($todo, [
+            'plans' => [
+                [
+                    'template_key' => 'rent',
+                    'amount_mode' => 'gross',
+                    'name' => '書き換えられても無視される名前',
+                    'interval' => 'monthly',
+                    'day_of_month' => 27,
+                    'debit_sub_account_id' => $rentSubAccount?->id,
+                    'credit_sub_account_id' => $cashSubAccount->id,
+                    'amount' => 90000,
+                    'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
+                ],
+            ],
+        ]);
+
+        $this->assertSame('家賃', $validated['plans'][0]['name']);
+        $this->assertSame(
+            $businessUnit->getSubAccountByName('地代家賃', '地代家賃')?->id,
+            $validated['plans'][0]['debit_sub_account_id'],
+        );
+        $this->assertSame(JournalEntry::TAX_TYPE_EXEMPT, $validated['plans'][0]['tax_type']);
+        $this->assertSame(90000, $validated['plans'][0]['amount']);
+        $this->assertSame(0, $validated['plans'][0]['tax_amount']);
+    }
+
+    #[Test]
+    public function validateは事業専用の家賃を10パーセントで登録できる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '家賃税区分検証']);
+        $cashSubAccount = $businessUnit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+        $rentSubAccount = $businessUnit->getSubAccountByName('地代家賃', '地代家賃');
+        $todo = Todo::factory()->make([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES,
+        ]);
+
+        $validated = app(RecurringExpenseTodoHandler::class)->validate($todo, [
+            'plans' => [
+                [
+                    'template_key' => 'rent',
+                    'amount_mode' => 'gross',
+                    'name' => '家賃',
+                    'interval' => 'monthly',
+                    'day_of_month' => 27,
+                    'debit_sub_account_id' => $rentSubAccount?->id,
+                    'credit_sub_account_id' => $cashSubAccount->id,
+                    'amount' => 110000,
+                    'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+                ],
+            ],
+        ]);
+
+        $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10, $validated['plans'][0]['tax_type']);
+        $this->assertSame(100000, $validated['plans'][0]['amount']);
+        $this->assertSame(10000, $validated['plans'][0]['tax_amount']);
+    }
+
+    #[Test]
     public function executeは会計年度なしtodoを拒否する(): void
     {
         $user = User::factory()->create();
@@ -337,7 +408,7 @@ class RecurringTransactionPlanTodoHandlerTest extends TestCase
     }
 
     #[Test]
-    public function executeは空のplansを拒否する(): void
+    public function executeは登録対象が0件でもtodoを完了できる(): void
     {
         $user = User::factory()->create();
         $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '定期取引空配列テスト']);
@@ -349,20 +420,46 @@ class RecurringTransactionPlanTodoHandlerTest extends TestCase
             'status' => Todo::STATUS_PENDING,
         ]);
 
-        try {
-            app(RecurringExpenseTodoHandler::class)->execute($todo, [
-                'plans' => [],
-            ], $user);
-            $this->fail('ValidationException was not thrown.');
-        } catch (ValidationException $exception) {
-            $this->assertSame(
-                ['定期取引を1件以上入力してください。'],
-                $exception->errors()['plans'] ?? [],
-            );
-        }
+        app(RecurringExpenseTodoHandler::class)->execute($todo, [
+            'plans' => [
+                [
+                    'template_key' => 'rent',
+                    'should_register' => false,
+                ],
+            ],
+        ], $user);
 
         $todo->refresh();
-        $this->assertSame(Todo::STATUS_PENDING, $todo->status);
+        $this->assertSame(Todo::STATUS_COMPLETED, $todo->status);
+        $this->assertDatabaseCount('recurring_transaction_plans', 0);
+    }
+
+    #[Test]
+    public function validateは登録しない行を除外する(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '定期支出除外検証']);
+        $cashSubAccount = $businessUnit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+        $todo = Todo::factory()->make([
+            'business_unit_id' => $businessUnit->id,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES,
+        ]);
+
+        $validated = app(RecurringExpenseTodoHandler::class)->validate($todo, [
+            'plans' => [
+                [
+                    'template_key' => 'rent',
+                    'should_register' => false,
+                    'interval' => 'monthly',
+                    'day_of_month' => 27,
+                    'credit_sub_account_id' => $cashSubAccount->id,
+                    'amount' => 90000,
+                    'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
+                ],
+            ],
+        ]);
+
+        $this->assertSame([], $validated['plans']);
     }
 
     #[Test]
@@ -536,5 +633,43 @@ class RecurringTransactionPlanTodoHandlerTest extends TestCase
         app(RecurringExpenseTodoHandler::class)->execute($todo, [
             'plans' => [],
         ], $otherUser);
+    }
+
+    #[Test]
+    public function executeは定期支出テンプレートを登録できる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '定期支出テンプレート登録テスト']);
+        $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
+        $creditSubAccount = $businessUnit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'fiscal_year_id' => $fiscalYear->id,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+
+        app(RecurringExpenseTodoHandler::class)->execute($todo, [
+            'plans' => [
+                [
+                    'template_key' => 'rent',
+                    'amount_mode' => 'net',
+                    'name' => '家賃',
+                    'interval' => 'monthly',
+                    'day_of_month' => 27,
+                    'credit_sub_account_id' => $creditSubAccount->id,
+                    'amount' => 90000,
+                    'tax_amount' => 0,
+                    'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
+                ],
+            ],
+        ], $user);
+
+        $this->assertDatabaseHas('recurring_transaction_plans', [
+            'business_unit_id' => $businessUnit->id,
+            'name' => '家賃',
+            'type' => RecurringTransactionPlan::TYPE_EXPENSE,
+            'debit_sub_account_id' => $businessUnit->getSubAccountByName('地代家賃', '地代家賃')?->id,
+        ]);
     }
 }
