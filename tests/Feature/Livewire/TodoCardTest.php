@@ -79,7 +79,7 @@ class TodoCardTest extends TestCase
         $todo = Todo::factory()->create([
             'business_unit_id' => $businessUnit->id,
             'fiscal_year_id' => $fiscalYear->id,
-            'title' => '事業用現金を登録する',
+            'title' => '事業用現金の管理場所を登録する',
             'body' => "現金を**まとめて**登録します\n\n- 表示名\n- その年の期首残高",
             'todo_type' => Todo::TODO_TYPE_WIZARD_CASH_ON_HAND,
             'status' => Todo::STATUS_PENDING,
@@ -87,7 +87,7 @@ class TodoCardTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(TodoCard::class, ['todo' => $todo])
-            ->assertSee('事業用現金を登録する')
+            ->assertSee('事業用現金の管理場所を登録する')
             ->assertSeeHtml('<strong>まとめて</strong>')
             ->assertSeeHtml('<li>表示名</li>')
             ->assertSee('事業用の現金を管理する場所')

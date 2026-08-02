@@ -97,7 +97,7 @@ class TodoServiceTest extends TestCase
 
         $todo = (new TodoService)->register(
             $businessUnit,
-            '事業用現金を登録する',
+            '事業用現金の管理場所を登録する',
             $user,
             $fiscalYear,
             todoType: Todo::TODO_TYPE_WIZARD_CASH_ON_HAND,

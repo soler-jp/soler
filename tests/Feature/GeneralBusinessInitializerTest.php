@@ -457,8 +457,8 @@ class GeneralBusinessInitializerTest extends TestCase
         $this->assertDatabaseHas('todos', [
             'business_unit_id' => $unit->id,
             'fiscal_year_id' => $unit->currentFiscalYear->id,
-            'title' => '事業用現金を登録する',
-            'body' => '事業専用のレジや金庫がある場合は、`メインレジ` `バックヤード金庫` `両替用の小銭袋`など、区別するための名称と、2023/1/1 時点での金額を入力してください',
+            'title' => '事業用現金の管理場所を登録する',
+            'body' => '事業専用の現金を管理する場所がある場合は、`メインレジ` `バックヤードの金庫` など、場所の名前と、2023/1/1 時点での金額を入力してください',
             'source_type' => Todo::SOURCE_TYPE_SYSTEM,
             'todo_type' => Todo::TODO_TYPE_WIZARD_CASH_ON_HAND,
             'status' => Todo::STATUS_PENDING,
