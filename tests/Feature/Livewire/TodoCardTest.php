@@ -71,6 +71,36 @@ class TodoCardTest extends TestCase
     }
 
     #[Test]
+    public function cash_on_hand_todoは銀行口座カードと揃えた専用フォームを表示する(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '事業用現金表示事業体']);
+        $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'fiscal_year_id' => $fiscalYear->id,
+            'title' => '事業用現金を登録する',
+            'body' => "現金を**まとめて**登録します\n\n- 表示名\n- その年の期首残高",
+            'todo_type' => Todo::TODO_TYPE_WIZARD_CASH_ON_HAND,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(TodoCard::class, ['todo' => $todo])
+            ->assertSee('事業用現金を登録する')
+            ->assertSeeHtml('<strong>まとめて</strong>')
+            ->assertSeeHtml('<li>表示名</li>')
+            ->assertSee('事業用の現金を管理する場所')
+            ->assertSee('場所の名前')
+            ->assertSee('金額')
+            ->assertSee('場所 1')
+            ->assertSee('現金を管理する場所を追加')
+            ->assertSee('登録しない')
+            ->assertSee('事業用現金の管理場所を登録する')
+            ->assertSee('後で追加する場合は、サイドメニューの[勘定科目]から現金の補助科目を追加できます。');
+    }
+
+    #[Test]
     public function bank_account_todoは登録せずに完了できる(): void
     {
         $user = User::factory()->create();

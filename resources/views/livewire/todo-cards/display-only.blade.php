@@ -1,4 +1,4 @@
-<div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+<div class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
     <div class="flex items-start justify-between gap-4">
         <div class="space-y-3">
             <div class="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -19,7 +19,7 @@
         </div>
 
         <button type="button" wire:click="complete" wire:loading.attr="disabled"
-            class="shrink-0 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
+            class="shrink-0 rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
             完了にする
         </button>
     </div>

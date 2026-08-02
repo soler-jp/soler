@@ -106,6 +106,7 @@ class TodoCard extends Component
     {
         return match ($this->todo->todo_type) {
             Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT => 'livewire.todo-cards.bank-account-form',
+            Todo::TODO_TYPE_WIZARD_CASH_ON_HAND => 'livewire.todo-cards.cash-on-hand-form',
             default => 'livewire.todo-cards.generic-form',
         };
     }
