@@ -4,11 +4,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\TodoService;
 use Illuminate\Http\Request;
 
 class PortalController extends Controller
 {
-    public function __invoke(Request $request)
+    public function __invoke(Request $request, TodoService $todoService)
     {
         $user = $request->user();
 
@@ -28,6 +29,7 @@ class PortalController extends Controller
 
         return view('dashboard', [
             'managementSummaryCards' => $fiscalYear->managementSummaryCards(),
+            'pendingTodos' => $todoService->listPending($unit, $user, $fiscalYear),
         ]);
     }
 

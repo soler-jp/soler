@@ -20,7 +20,7 @@ v1 の Todo は「1 行の title と body、状態（pending/completed/dismissed
 - Handler は UI 非依存にし、Blade/Livewire/CLI/バッチ、どこからでも同じ Handler を呼び出せるようにする
 - UI 側（Dashboard カード、SetupWizard 画面）は **1 本の汎用コンポーネント**で複数の Todo タイプを扱えるようにする
 
-これにより、新しい Todo タイプの追加は **`todo_type` 定数 + Handler クラス 1 本 + presenter 1 本**で済む。
+これにより、新しい Todo タイプの追加は、基本的には **`todo_type` 定数 + Handler クラス 1 本**で済む。UI が汎用フォームで足りない場合に限り、後述の薄い view 分岐を 1 箇所足す。
 
 ## スコープ
 
@@ -37,7 +37,7 @@ v1 の Todo は「1 行の title と body、状態（pending/completed/dismissed
 ### 本ドキュメントで扱わない
 
 - 個別 Handler 実装（銀行口座 setup、月次残高チェック等）は別ドキュメント
-- UI 層の詳細設計。`TodoCardPresenter` と Livewire コンポーネントは Appendix でスケッチのみ示し、次ステップで別途固める
+- UI 層の詳細設計。汎用 `TodoCard` Livewire コンポーネントと Blade の責務分担は Appendix でスケッチのみ示し、必要に応じて次ステップで拡張する
 - 定期 Todo の自動生成（`RecurringTodoPlan` 相当）は [`todo-design.md`](todo-design.md) の今後の拡張として扱う
 - 自動完了検知（対応 Journal 登録で auto-close）
 - スヌーズ・冪等キー
@@ -54,8 +54,9 @@ v1 の Todo は「1 行の title と body、状態（pending/completed/dismissed
 - Handler
   - ある `todo_type` の Todo が「どんな入力を受け取り、submit されたら何をするか」を定義するクラス
   - `TodoHandler` interface を実装する
-- Presenter（詳細は Appendix）
-  - Handler の Todo を UI 上でどう見せるかを定義する。本ドキュメントでは概要のみ触れ、次ステップで固める
+- Card view override（詳細は Appendix）
+  - Handler の Todo のうち、汎用フォームでは足りないものだけが専用 Blade を持てるようにする薄い分岐
+  - 専用の Presenter クラスは導入しない
 
 ## `todo_type` の導入（`source_type` とは別カラム）
 
@@ -234,7 +235,7 @@ PHP には package-private が無いため interface のメソッド自体は `p
 
 Dashboard カードや SetupWizard 画面といった UI の詳細は、Handler / TodoService の形が固まった後に別ドキュメントで設計する。本ドキュメントでは Model 側の設計だけを対象とする。
 
-とはいえ、Handler が UI 非依存であることを維持するには「UI 層をどう繋ぐつもりか」の**方向性**は最低限決めておく必要があるため、想定するかたち（`TodoCardPresenter` interface と `DefaultTodoCardPresenter` フォールバック、汎用 Livewire コンポーネント）を [Appendix A](#appendix-a-ui-層の想定スケッチ) にスケッチとして残す。実装時に見直してよい。
+とはいえ、Handler が UI 非依存であることを維持するには「UI 層をどう繋ぐつもりか」の**方向性**は最低限決めておく必要があるため、想定するかたち（`TodoCard` Livewire コンポーネント、`generic-form` / `display-only` の Blade、必要時のみ追加する薄い `cardView()` 分岐）を [Appendix A](#appendix-a-ui-層の想定スケッチ) にスケッチとして残す。実装時に見直してよい。
 
 ## `todo_type → Handler` の対応表
 
@@ -271,7 +272,7 @@ class Todo extends Model implements ResolvesBusinessUnit
 - `todo_type = null` または `$handlers` に未登録なら `handler()` は `null` を返す（= 実行不可な単なる表示 Todo。既存の v1 Todo はすべてこれに該当）
 - Handler は `app()` 経由で解決するため、コンストラクタで依存注入を受けられる（ステートは持たせない）
 - 追加時に触るファイルは `Todo` モデルのみ。ServiceProvider を編集しない
-- UI 側の Presenter 登録配列は [Appendix A](#appendix-a-ui-層の想定スケッチ) で扱う
+- UI 側の view override は [Appendix A](#appendix-a-ui-層の想定スケッチ) で扱う
 
 ## `TodoService` の変更
 
@@ -467,45 +468,6 @@ UI 側の追加ステップ（Presenter 登録・独自 Blade）は [Appendix A]
 
 Model 側の設計が固まった後に別途詰めるが、方向性を残しておく。実装時に見直してよい。
 
-### `TodoCardPresenter` interface
-
-```php
-namespace App\Todo\Presenters;
-
-interface TodoCardPresenter
-{
-    public function cardView(Todo $todo): string;   // Blade ビューのパス
-    public function icon(Todo $todo): string;
-    public function title(Todo $todo): string;
-}
-```
-
-- 汎用 Presenter として `DefaultTodoCardPresenter` を提供し、`cardView()` は `livewire.todo-cards.generic-form`（入力スキーマから自動生成されるフォーム）を返す
-- 独自 Blade やアイコンが必要な Handler だけ、専用 Presenter を作って `Todo::$presenters` に登録する
-
-### `Todo` モデルでの解決
-
-```php
-/** @var array<string, class-string<TodoCardPresenter>> */
-public static array $presenters = [
-    // self::TODO_TYPE_WIZARD_BANK_ACCOUNT => BankAccountSetupPresenter::class,
-];
-
-public function presenter(): ?TodoCardPresenter
-{
-    // Handler が無ければ Presenter も無し
-    if ($this->handler() === null) {
-        return null;
-    }
-
-    $class = static::$presenters[$this->todo_type] ?? DefaultTodoCardPresenter::class;
-
-    return app($class);
-}
-```
-
-**Handler が存在するのに Presenter が null になることは無い**。UI 側は `presenter() === null` を「純粋な表示 Todo」の判定にだけ使い、それ以外では常に Presenter を経由してビュー・アイコン・タイトルを取得する。
-
 ### 汎用 Livewire コンポーネント
 
 ```php
@@ -519,34 +481,52 @@ class TodoCard extends Component
     public function submit(TodoService $service): void
     {
         $service->execute($this->todo, $this->inputs, auth()->user());
-        $this->dispatch('todo-completed', todoId: $this->todo->id);
+        return $this->redirect(route('dashboard'));
     }
 
     public function render(TodoService $service)
     {
-        $presenter = $this->todo->presenter();
-
-        if ($presenter === null) {
-            return view('livewire.todo-cards.display-only', ['todo' => $this->todo]);
+        if (! $this->todo->isExecutable()) {
+            return view('livewire.todo-cards.display-only', [
+                'todo' => $this->todo,
+            ]);
         }
 
-        return view($presenter->cardView($this->todo), [
-            'todo'      => $this->todo,
-            'presenter' => $presenter,
-            'schema'    => $service->schemaFor($this->todo, auth()->user()) ?? [],
+        return view($this->cardView(), [
+            'todo' => $this->todo,
+            'schema' => $service->schemaFor($this->todo, auth()->user()) ?? [],
+            'icon' => $this->icon(),
         ]);
+    }
+
+    protected function cardView(): string
+    {
+        return match ($this->todo->todo_type) {
+            default => 'livewire.todo-cards.generic-form',
+        };
+    }
+
+    protected function icon(): string
+    {
+        return match ($this->todo->todo_type) {
+            Todo::TODO_TYPE_WIZARD_BANK_ACCOUNT => 'building-library',
+            Todo::TODO_TYPE_WIZARD_COUNTERPARTY => 'users',
+            default => 'check-circle',
+        };
     }
 }
 ```
 
 - スキーマ取得は必ず `TodoService::schemaFor()` を経由する（Handler の `inputSchema()` を直接叩かない）
-- Dashboard は `TodoService::listPending()` の結果をループして `<livewire:todo-card :todo="$todo" />` を並べるだけ
+- Dashboard は `TodoService::listPending()` の結果をループして `<livewire:todo-card :todo="$todo" :key="$todo->id" />` を並べるだけ
+- `title` は当面 `todos.title` をそのまま使う。複雑な表示文言を別クラスに逃がさない
+- アイコンや専用レイアウトが本当に必要になったときだけ、`TodoCard` クラス内の `match` を薄く増やす
 
 ### 追加ステップ（UI 側）
 
 Model 側 3 ステップに加えて、UI が独自になる場合のみ:
 
-4. 専用 Presenter クラスを作成し、`Todo::$presenters` に 1 行追加
+4. `TodoCard::cardView()` の `match` に `todo_type => view path` を 1 行追加
 5. 専用 Blade ビュー（`resources/views/livewire/todo-cards/...blade.php`）を作成
 
-大半の Handler はここをスキップし、`DefaultTodoCardPresenter` + `generic-form` に任せられる想定。
+大半の Handler はここをスキップし、`generic-form` に任せられる想定。
