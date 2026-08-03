@@ -50,6 +50,7 @@ class PortalControllerTest extends TestCase
             ->assertSee('以下の3ステップで始めていきましょう')
             ->assertSee('Solerを始める')
             ->assertSee('会計の基本')
+            ->assertSee(':disabled="guidePage === 1"', false)
             ->assertDontSee('Main Menu');
     }
 

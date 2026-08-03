@@ -214,21 +214,15 @@
 
         <div class="mt-10 flex justify-between">
             @if ($step > 1)
-                <button wire:click="$set('step', {{ $step - 1 }})" class="rounded-xl bg-slate-200 px-6 py-3 text-slate-800">
-                    戻る
-                </button>
+                <x-ui.button-back wire:click="$set('step', {{ $step - 1 }})" />
             @else
                 <div></div>
             @endif
 
             @if ($step < 6)
-                <button wire:click="next" class="rounded-xl bg-blue-600 px-6 py-3 text-white">
-                    次へ
-                </button>
+                <x-ui.button-next wire:click="next" />
             @else
-                <button wire:click="submit" class="rounded-xl bg-emerald-600 px-6 py-3 text-white">
-                    Soler を始める
-                </button>
+                <x-ui.button-submit wire:click="submit">Soler を始める</x-ui.button-submit>
             @endif
         </div>
     </div>

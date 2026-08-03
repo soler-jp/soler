@@ -74,34 +74,26 @@
         @endforeach
 
         <div class="flex items-center justify-between gap-4 border-t border-slate-200 pt-6">
-            <button type="button"
+            <x-ui.button-back type="button"
                 @click="guidePage = Math.max(1, guidePage - 1)"
-                :disabled="guidePage === 1"
-                class="rounded-xl border border-slate-300 px-6 py-3 text-slate-800 transition disabled:cursor-not-allowed disabled:opacity-40">
-                戻る
-            </button>
+                ::disabled="guidePage === 1" />
 
             <div class="flex items-center gap-3">
-                <button type="button"
+                <x-ui.button-next type="button"
                     x-show="guidePage < {{ count($pages) }}"
-                    @click="guidePage = Math.min({{ count($pages) }}, guidePage + 1)"
-                    class="rounded-xl bg-blue-600 px-6 py-3 text-white">
-                    次へ
-                </button>
+                    @click="guidePage = Math.min({{ count($pages) }}, guidePage + 1)" />
 
                 @if (($mode ?? 'initialize') === 'initialize')
-                    <button type="button"
+                    <x-ui.button-submit type="button"
                         x-show="guidePage === {{ count($pages) }}"
-                        @click="$dispatch('onboarding-guide-completed')"
-                        class="rounded-xl bg-emerald-600 px-6 py-3 text-white">
+                        @click="$dispatch('onboarding-guide-completed')">
                         初期設定へ進む
-                    </button>
+                    </x-ui.button-submit>
                 @else
-                    <a href="{{ route('initialize') }}"
-                        x-show="guidePage === {{ count($pages) }}"
-                        class="rounded-xl bg-blue-600 px-6 py-3 text-white">
+                    <x-ui.button-back href="{{ route('initialize') }}"
+                        x-show="guidePage === {{ count($pages) }}">
                         初期設定に戻る
-                    </a>
+                    </x-ui.button-back>
                 @endif
             </div>
         </div>
