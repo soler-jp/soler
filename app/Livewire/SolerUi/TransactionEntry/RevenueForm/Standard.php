@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Livewire;
+namespace App\Livewire\SolerUi\TransactionEntry\RevenueForm;
 
 use App\Services\TransactionRegistrar;
 use Livewire\Component;
 
-class DashboardRevenueInput extends Component
+class Standard extends Component
 {
     public string $date = '';
 
@@ -25,7 +25,7 @@ class DashboardRevenueInput extends Component
 
     public array $receiptGroups;
 
-    public function save()
+    public function save(): void
     {
         $user = auth()->user();
         $unit = $user->selectedBusinessUnitOrFail();
@@ -101,7 +101,7 @@ class DashboardRevenueInput extends Component
         }
     }
 
-    public function mount()
+    public function mount(): void
     {
         $this->date = now()->toDateString();
 
@@ -134,6 +134,6 @@ class DashboardRevenueInput extends Component
 
     public function render()
     {
-        return view('livewire.dashboard-revenue-input');
+        return view('livewire.soler-ui.transaction-entry.revenue-form.standard');
     }
 }

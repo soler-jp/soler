@@ -3,6 +3,7 @@
 namespace Tests\Feature\Livewire;
 
 use App\Livewire\SetupWizard;
+use App\Livewire\SolerUi\TransactionEntry\ExpenseForm\Standard;
 use App\Models\InitialSetupData;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -229,7 +230,7 @@ class SetupWizardTest extends TestCase
 
         $this->get(route('dashboard'))
             ->assertOk()
-            ->assertSeeLivewire('dashboard-expense-input')
-            ->assertSeeLivewire('dashboard-revenue-input');
+            ->assertSeeLivewire(Standard::class)
+            ->assertSeeLivewire(\App\Livewire\SolerUi\TransactionEntry\RevenueForm\Standard::class);
     }
 }

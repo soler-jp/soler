@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Livewire;
+namespace App\Livewire\SolerUi\TransactionEntry\ExpenseForm;
 
 use App\Models\Account;
 use App\Services\TransactionRegistrar;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
-class DashboardExpenseInput extends Component
+class Standard extends Component
 {
     public string $date;
 
@@ -23,7 +23,7 @@ class DashboardExpenseInput extends Component
 
     public Collection $creditAccounts; // name in ['現金', '普通預金', '事業主借']
 
-    public function mount()
+    public function mount(): void
     {
         $this->date = now()->toDateString();
 
@@ -42,7 +42,7 @@ class DashboardExpenseInput extends Component
             ->get();
     }
 
-    public function submit()
+    public function submit(): void
     {
         $user = auth()->user();
         $unit = $user->selectedBusinessUnitOrFail();
@@ -90,6 +90,6 @@ class DashboardExpenseInput extends Component
 
     public function render()
     {
-        return view('livewire.dashboard-expense-input');
+        return view('livewire.soler-ui.transaction-entry.expense-form.standard');
     }
 }

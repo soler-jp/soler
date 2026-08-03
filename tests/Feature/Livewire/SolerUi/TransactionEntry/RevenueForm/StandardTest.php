@@ -1,7 +1,8 @@
 <?php
 
-namespace Tests\Feature\Livewire;
+namespace Tests\Feature\Livewire\SolerUi\TransactionEntry\RevenueForm;
 
+use App\Livewire\SolerUi\TransactionEntry\RevenueForm\Standard;
 use App\Models\Account;
 use App\Models\SubAccount;
 use App\Models\User;
@@ -11,7 +12,7 @@ use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-class DashboardRevenueInputTest extends TestCase
+class StandardTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -39,7 +40,7 @@ class DashboardRevenueInputTest extends TestCase
         $cashSub = $cash->subAccounts()->first();
 
         Livewire::actingAs($user)
-            ->test('dashboard-revenue-input')
+            ->test(Standard::class)
             ->set('date', '2025-04-01')
             ->set('gross_amount', 10000)
             ->set('description', '通常売上テスト')
@@ -85,7 +86,7 @@ class DashboardRevenueInputTest extends TestCase
         $withheldTaxSubAccount = $unit->getSubAccountByName('事業主貸', '源泉徴収');
 
         Livewire::actingAs($user)
-            ->test('dashboard-revenue-input')
+            ->test(Standard::class)
             ->set('date', '2025-04-01')
             ->set('gross_amount', '10000')
             ->set('withholding', true)
@@ -151,7 +152,7 @@ class DashboardRevenueInputTest extends TestCase
         $foreignReceipt = $otherUnit->getAccountByName('現金')->subAccounts()->first();
 
         Livewire::actingAs($user)
-            ->test('dashboard-revenue-input')
+            ->test(Standard::class)
             ->set('date', '2025-04-01')
             ->set('gross_amount', 10000)
             ->set('description', '不正な売上登録')
@@ -188,7 +189,7 @@ class DashboardRevenueInputTest extends TestCase
         $withheldSubAccount = $unit->getSubAccountByName('事業主貸', '源泉徴収');
 
         Livewire::actingAs($user)
-            ->test('dashboard-revenue-input')
+            ->test(Standard::class)
             ->assertSet('revenueSubAccountId', $revenueSubAccount->id)
             ->assertSet('withheldTaxSubAccountId', $withheldSubAccount->id);
     }
@@ -208,7 +209,7 @@ class DashboardRevenueInputTest extends TestCase
         $cashSubAccount = $user->selectedBusinessUnit->getSubAccountByName('現金', '現金');
 
         Livewire::actingAs($user)
-            ->test('dashboard-revenue-input')
+            ->test(Standard::class)
             ->set('date', 'yy') // 未入力
             ->set('gross_amount', 0) // 0円
             ->set('revenueSubAccountId', 999999) // 存在しないID
@@ -246,7 +247,7 @@ class DashboardRevenueInputTest extends TestCase
         ], $user);
 
         $component = Livewire::actingAs($user)
-            ->test('dashboard-revenue-input');
+            ->test(Standard::class);
 
         $groups = $component->instance()->receiptGroups;
 
@@ -276,7 +277,7 @@ class DashboardRevenueInputTest extends TestCase
         ]);
 
         Livewire::actingAs($user)
-            ->test('dashboard-revenue-input')
+            ->test(Standard::class)
             ->set('withholding', true)
             ->assertSee('源泉徴収額');
     }
@@ -294,7 +295,7 @@ class DashboardRevenueInputTest extends TestCase
         $cashSubAccount = $user->selectedBusinessUnit->getAccountByName('現金')->subAccounts()->first();
 
         Livewire::actingAs($user)
-            ->test('dashboard-revenue-input')
+            ->test(Standard::class)
             ->set('date', 'invalid-date') // required, date
             ->set('gross_amount', null) // required, integer, min:1
             ->set('revenueSubAccountId', null) // required
@@ -325,7 +326,7 @@ class DashboardRevenueInputTest extends TestCase
         $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
 
         Livewire::actingAs($user)
-            ->test('dashboard-revenue-input')
+            ->test(Standard::class)
             ->set('date', '2025-04-01')
             ->set('gross_amount', 12000)
             ->set('description', '現金売上テスト')
@@ -368,7 +369,7 @@ class DashboardRevenueInputTest extends TestCase
         ]);
 
         Livewire::actingAs($user)
-            ->test('dashboard-revenue-input')
+            ->test(Standard::class)
             ->set('date', '2025-04-02')
             ->set('gross_amount', 15000)
             ->set('description', '銀行売上テスト')
@@ -405,7 +406,7 @@ class DashboardRevenueInputTest extends TestCase
         ]);
 
         $component = Livewire::actingAs($user)
-            ->test('dashboard-revenue-input')
+            ->test(Standard::class)
             ->set('date', '2025-04-03')
             ->set('gross_amount', 10000)
             ->set('description', '入金先未選択テスト')

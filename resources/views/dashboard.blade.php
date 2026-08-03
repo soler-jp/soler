@@ -31,11 +31,11 @@
             </div>
 
             <div class="py-6 px-4 sm:px-6 lg:px-8">
-                <livewire:dashboard-expense-input />
+                <livewire:soler-ui.transaction-entry.expense-form.standard />
             </div>
 
             <div class="py-6 px-4 sm:px-6 lg:px-8">
-                <livewire:dashboard-revenue-input />
+                <livewire:soler-ui.transaction-entry.revenue-form.standard />
             </div>
 
         </div>

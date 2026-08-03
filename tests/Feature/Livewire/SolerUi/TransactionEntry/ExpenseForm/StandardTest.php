@@ -1,7 +1,8 @@
 <?php
 
-namespace Tests\Feature\Livewire;
+namespace Tests\Feature\Livewire\SolerUi\TransactionEntry\ExpenseForm;
 
+use App\Livewire\SolerUi\TransactionEntry\ExpenseForm\Standard;
 use App\Models\User;
 use App\Setup\Initializers\GeneralBusinessInitializer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -10,7 +11,7 @@ use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-class DashboardExpenseInputTest extends TestCase
+class StandardTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -36,7 +37,7 @@ class DashboardExpenseInputTest extends TestCase
         $response = $this->get(route('dashboard'));
 
         $response->assertStatus(200);
-        $response->assertSeeLivewire('dashboard-expense-input');
+        $response->assertSeeLivewire(Standard::class);
     }
 
     #[Test]
@@ -63,7 +64,7 @@ class DashboardExpenseInputTest extends TestCase
         $this->actingAs($user);
 
         Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->set('date', '2025-05-10')
             ->set('description', '文房具購入')
             ->set('amount', 1500)
@@ -105,7 +106,7 @@ class DashboardExpenseInputTest extends TestCase
         ]);
 
         $creditAccountNames = Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->instance()
             ->creditAccounts
             ->pluck('name')
@@ -149,7 +150,7 @@ class DashboardExpenseInputTest extends TestCase
         $foreignDebit = $otherUnit->getAccountByName('消耗品費')->subAccounts()->first();
 
         Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->set('date', '2025-05-10')
             ->set('description', '不正な経費登録')
             ->set('amount', 1500)
@@ -189,7 +190,7 @@ class DashboardExpenseInputTest extends TestCase
         $credit = $unit->getAccountByName('現金')->subAccounts()->first();
 
         Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->set('date', '')
             ->set('description', '交通費')
             ->set('amount', 1000)
@@ -223,7 +224,7 @@ class DashboardExpenseInputTest extends TestCase
         $credit = $unit->getAccountByName('現金')->subAccounts()->first();
 
         Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->set('date', '2025-05-10')
             ->set('description', '')
             ->set('amount', 1000)
@@ -257,7 +258,7 @@ class DashboardExpenseInputTest extends TestCase
         $credit = $unit->getAccountByName('現金')->subAccounts()->first();
 
         Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->set('date', '2025-05-10')
             ->set('description', '通信費')
             ->set('amount', null)
@@ -290,7 +291,7 @@ class DashboardExpenseInputTest extends TestCase
         $credit = $unit->getSubAccountByName('現金', '現金');
 
         Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->set('date', '2025-05-10')
             ->set('description', '水道光熱費')
             ->set('amount', 3000)
@@ -323,7 +324,7 @@ class DashboardExpenseInputTest extends TestCase
         $expenseSubAccount = $unit->accounts()->where('type', 'expense')->first()->subAccounts()->first();
 
         Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->set('date', '2025-05-10')
             ->set('description', '備品購入')
             ->set('amount', 2000)
@@ -355,7 +356,7 @@ class DashboardExpenseInputTest extends TestCase
         $credit = $unit->getAccountByName('現金')->subAccounts()->first();
 
         Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->set('date', '2025-05-10')
             ->set('description', '交通費')
             ->set('amount', -100)
@@ -384,7 +385,7 @@ class DashboardExpenseInputTest extends TestCase
         $this->actingAs($user);
 
         Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->set('date', '2025-05-10')
             ->set('description', '通信費')
             ->set('amount', 1000)
@@ -419,7 +420,7 @@ class DashboardExpenseInputTest extends TestCase
         $credit = $unit->accounts()->where('name', '現金')->first()->subAccounts()->first();
 
         Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->set('date', '2025-05-10')
             ->set('description', '備品購入')
             ->set('amount', 500)
@@ -454,7 +455,7 @@ class DashboardExpenseInputTest extends TestCase
         $credit = $unit->accounts()->where('name', '現金')->first()->subAccounts()->first();
 
         Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->set('date', '2025-05-10')
             ->set('description', '消耗品購入')
             ->set('amount', 800)
@@ -472,7 +473,7 @@ class DashboardExpenseInputTest extends TestCase
         $this->assertNull($user->current_business_unit_id);
 
         Livewire::actingAs($user)
-            ->test('dashboard-expense-input')
+            ->test(Standard::class)
             ->assertForbidden();
     }
 }
