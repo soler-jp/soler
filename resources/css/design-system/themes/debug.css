@@ -1,0 +1,42 @@
+[data-theme="debug"] {
+  --color-canvas:               255 247 237;
+  --color-surface:              255 255 255;
+  --color-surface-muted:        254 235 200;
+  --color-line:                 253 186 116;
+
+  --color-content:              67 20 7;
+  --color-content-muted:        154 52 18;
+  --color-content-onbrand:      255 255 255;
+
+  --color-brand:                194 65 12;
+  --color-link:                 194 65 12;
+  --color-focus:                194 65 12;
+
+  --color-action-primary-bg:    194 65 12;
+  --color-action-primary-fg:    255 255 255;
+  --color-action-primary-hover: 154 52 18;
+  --color-action-danger-bg:     185 28 28;
+  --color-action-danger-fg:     255 255 255;
+  --color-action-danger-hover:  153 27 27;
+
+  --color-status-danger-bg:      254 202 202;
+  --color-status-danger-fg:      127 29 29;
+  --color-status-danger-border:  248 113 113;
+  --color-status-warning-bg:     253 230 138;
+  --color-status-warning-fg:     120 53 15;
+  --color-status-warning-border: 251 191 36;
+  --color-status-success-bg:     187 247 208;
+  --color-status-success-fg:     20 83 45;
+  --color-status-success-border: 74 222 128;
+  --color-status-info-bg:        191 219 254;
+  --color-status-info-fg:        30 58 138;
+  --color-status-info-border:    96 165 250;
+
+  --radius-control: 9999px;
+  --radius-card:    1.5rem;
+  --radius-badge:   9999px;
+  --radius-modal:   2rem;
+
+  --shadow-card:    0 4px 12px rgb(0 0 0 / 0.15);
+  --shadow-popover: 0 20px 40px rgb(0 0 0 / 0.20);
+}

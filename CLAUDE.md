@@ -255,3 +255,16 @@ class ProjectService
 - カタログは `messages.php` へ集約せず、`transactions.php` など機能単位で分ける。`common.php` には機能横断で意味が変わらない短い文言だけを置く。
 - 既存の日本語直書きは一括置換しない。新機能追加時、既存画面の大きな修正時、重複解消が必要な時に段階的に移行する。
 - 現段階では日本語カタログのみを扱い、英語カタログ、言語切り替え UI、ユーザーごとの言語設定、入力内容の自動翻訳は実装しない。
+
+## テーマ規約
+
+- 色・アール（角丸）・影は、テーマ契約由来のユーティリティ（例: `bg-canvas` / `bg-surface` / `text-content` / `text-content-muted` / `border-line` / `rounded-card` / `shadow-card` / `bg-action-primary` / `bg-status-danger`）だけを使う。Blade / Livewire でこれらの用途に Tailwind の素のスケール（`bg-blue-500` / `rounded-xl` / `shadow-md` / `border-gray-200` など）を使わない。
+- レイアウト・スペーシング・タイポ（`p-4` / `flex` / `gap-2` / `text-sm` など）は素の Tailwind をそのまま使ってよい。
+- 主 CTA と危険 CTA は `bg-action-primary` / `bg-action-danger` を使う。淡背景のステータス表示は三点セット（`bg-status-danger text-status-danger-fg border-status-danger-border` 等）で組む。両者を混同しない。
+- ステータス系（`status-danger` / `status-warning` / `status-success` / `status-info`）は意味カテゴリを裏切る変更をしない（`status-danger` を緑にする等）。テーマ内での彩度・明度の調整は可。
+- 各テーマは自分のパレットをテーマファイル内の `--theme-*` として私的に持つ。共通プリミティブファイルは作らない。Blade からは `--theme-*` を参照しない。
+- 繰り返し使う UI（ボタン、カード、入力）は `resources/views/components/ui/` の `<x-ui.button>` / `<x-ui.card>` / `<x-ui.input>` を優先して使う。新しく増やす場合も同じディレクトリに置き、契約由来のユーティリティだけで組む。
+- `resources/views/components/ui/**` は `tests/Unit/Architecture/ThemeTokenTest.php` で規約を機械強制する。禁止パターン（生の Tailwind スケール）は CI で落ちる。
+- 既存の日本語直書きと同様、`components/ui/**` 以外の既存 UI の素の Tailwind スケールは一括置換しない。新規追加時と、既存画面を大きく触るときに段階的に移行する。
+- 現段階では `default` テーマのみ。テーマ切替 UI、複数テーマ、ダークモード、密度・タイポグラフィのテーマ化、業務コンテキスト（クライアント識別・年度状態）の可視化は実装しない。
+- 詳細ルールは `docs/theme-design.md` を参照する。

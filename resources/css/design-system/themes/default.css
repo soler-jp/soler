@@ -1,0 +1,74 @@
+:root,
+[data-theme="default"] {
+  /* ── テーマ内部の私的パレット（契約ではない・Blade から参照しない） ── */
+  --theme-blue-600:   37 99 235;
+  --theme-blue-700:   29 78 216;
+  --theme-slate-50:   248 250 252;
+  --theme-slate-100:  241 245 249;
+  --theme-slate-200:  226 232 240;
+  --theme-slate-500:  100 116 139;
+  --theme-slate-900:  15 23 42;
+  --theme-red-50:     254 242 242;
+  --theme-red-200:    254 202 202;
+  --theme-red-600:    220 38 38;
+  --theme-red-700:    185 28 28;
+  --theme-green-50:   240 253 244;
+  --theme-green-200:  187 247 208;
+  --theme-green-600:  22 163 74;
+  --theme-green-700:  21 128 61;
+  --theme-amber-50:   255 251 235;
+  --theme-amber-200:  253 230 138;
+  --theme-amber-500:  245 158 11;
+  --theme-amber-700:  180 83 9;
+  --theme-blue-50:    239 246 255;
+  --theme-blue-200:   191 219 254;
+  --theme-blue-800:   30 64 175;
+
+  /* ── 契約: 表層 ── */
+  --color-canvas:         var(--theme-slate-50);
+  --color-surface:        255 255 255;
+  --color-surface-muted:  var(--theme-slate-100);
+  --color-line:           var(--theme-slate-200);
+
+  /* ── 契約: テキスト ── */
+  --color-content:         var(--theme-slate-900);
+  --color-content-muted:   var(--theme-slate-500);
+  --color-content-onbrand: 255 255 255;
+
+  /* ── 契約: ブランド・リンク・フォーカス ── */
+  --color-brand: var(--theme-blue-600);
+  --color-link:  var(--theme-blue-600);
+  --color-focus: var(--theme-blue-600);
+
+  /* ── 契約: アクション ── */
+  --color-action-primary-bg:    var(--theme-blue-600);
+  --color-action-primary-fg:    255 255 255;
+  --color-action-primary-hover: var(--theme-blue-700);
+  --color-action-danger-bg:     var(--theme-red-600);
+  --color-action-danger-fg:     255 255 255;
+  --color-action-danger-hover:  var(--theme-red-700);
+
+  /* ── 契約: ステータス ── */
+  --color-status-danger-bg:      var(--theme-red-50);
+  --color-status-danger-fg:      var(--theme-red-700);
+  --color-status-danger-border:  var(--theme-red-200);
+  --color-status-warning-bg:     var(--theme-amber-50);
+  --color-status-warning-fg:     var(--theme-amber-700);
+  --color-status-warning-border: var(--theme-amber-200);
+  --color-status-success-bg:     var(--theme-green-50);
+  --color-status-success-fg:     var(--theme-green-700);
+  --color-status-success-border: var(--theme-green-200);
+  --color-status-info-bg:        var(--theme-blue-50);
+  --color-status-info-fg:        var(--theme-blue-800);
+  --color-status-info-border:    var(--theme-blue-200);
+
+  /* ── 契約: 形 ── */
+  --radius-control: 0.5rem;
+  --radius-card:    0.75rem;
+  --radius-badge:   9999px;
+  --radius-modal:   1rem;
+
+  /* ── 契約: 濃度 ── */
+  --shadow-card:    0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-popover: 0 10px 15px -3px rgb(0 0 0 / 0.10);
+}
