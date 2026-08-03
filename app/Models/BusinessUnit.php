@@ -24,6 +24,10 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
 
     public const HOUSEHOLD_ALLOCATION_SUB_ACCOUNT_NAME = '家事按分';
 
+    public const UNCLASSIFIED_EXPENSE_ACCOUNT_NAME = '未分類費用';
+
+    public const UNCLASSIFIED_EXPENSE_SUB_ACCOUNT_NAME = '未分類';
+
     public const CREDIT_SOURCE_CATEGORY_CASH = 'cash';
 
     public const CREDIT_SOURCE_CATEGORY_BANK = 'bank';
@@ -213,10 +217,12 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         ['name' => '貸倒金', 'type' => Account::TYPE_EXPENSE],
         ['name' => '専従者給与', 'type' => Account::TYPE_EXPENSE],
         ['name' => '雑費', 'type' => Account::TYPE_EXPENSE],
+        ['name' => self::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME, 'type' => Account::TYPE_EXPENSE],
     ];
 
     public static array $defaultSubAccounts = [
         '事業主貸' => ['事業主貸', '源泉徴収'],
+        self::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME => [self::UNCLASSIFIED_EXPENSE_SUB_ACCOUNT_NAME],
     ];
 
     /**

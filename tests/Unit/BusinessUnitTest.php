@@ -153,6 +153,75 @@ class BusinessUnitTest extends TestCase
     }
 
     #[Test]
+    public function 未分類費用_accountが初期作成され_未分類_sub_accountを持つ()
+    {
+        $user = User::factory()->create();
+
+        $businessUnit = BusinessUnit::createWithDefaultAccounts([
+            'user_id' => $user->id,
+            'name' => '未分類費用テスト',
+            'type' => BusinessUnit::TYPE_GENERAL,
+        ]);
+
+        $unclassifiedAccount = $businessUnit->getAccountByName(BusinessUnit::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME);
+
+        $this->assertNotNull($unclassifiedAccount, '未分類費用の勘定科目が見つかりません。');
+        $this->assertSame(Account::TYPE_EXPENSE, $unclassifiedAccount->type);
+
+        $subAccounts = $unclassifiedAccount->subAccounts;
+
+        $this->assertCount(1, $subAccounts);
+        $this->assertSame(BusinessUnit::UNCLASSIFIED_EXPENSE_SUB_ACCOUNT_NAME, $subAccounts->first()->name);
+    }
+
+    #[Test]
+    public function 未分類費用のmigrationで既存事業体に予約科目を作成できる()
+    {
+        $user = User::factory()->create();
+
+        $businessUnit = BusinessUnit::factory()->create([
+            'user_id' => $user->id,
+            'name' => '既存事業体（未分類費用未作成）',
+            'type' => BusinessUnit::TYPE_GENERAL,
+        ]);
+
+        $this->assertNull($businessUnit->getAccountByName(BusinessUnit::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME));
+
+        $migration = require base_path('database/migrations/2026_08_03_115149_add_unclassified_expense_account_to_business_units.php');
+        $migration->up();
+
+        $unclassifiedAccount = $businessUnit->fresh()->getAccountByName(BusinessUnit::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME);
+
+        $this->assertNotNull($unclassifiedAccount);
+        $this->assertSame(Account::TYPE_EXPENSE, $unclassifiedAccount->type);
+
+        $subAccounts = $unclassifiedAccount->subAccounts;
+
+        $this->assertCount(1, $subAccounts);
+        $this->assertSame(BusinessUnit::UNCLASSIFIED_EXPENSE_SUB_ACCOUNT_NAME, $subAccounts->first()->name);
+    }
+
+    #[Test]
+    public function 未分類費用のmigrationは既に存在する事業体に対して冪等である()
+    {
+        $user = User::factory()->create();
+
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'テスト事業所',
+        ]);
+
+        $originalAccountId = $businessUnit->getAccountByName(BusinessUnit::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME)->id;
+
+        $migration = require base_path('database/migrations/2026_08_03_115149_add_unclassified_expense_account_to_business_units.php');
+        $migration->up();
+
+        $unclassifiedAccount = $businessUnit->fresh()->getAccountByName(BusinessUnit::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME);
+
+        $this->assertSame($originalAccountId, $unclassifiedAccount->id);
+        $this->assertCount(1, $unclassifiedAccount->subAccounts);
+    }
+
+    #[Test]
     public function nameで_accountを取得できる()
     {
         $user = User::factory()->create();

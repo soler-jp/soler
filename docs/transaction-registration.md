@@ -35,6 +35,14 @@
 - `Transaction` と `JournalEntry` の永続化
 - DB トランザクション境界の管理
 
+## 勘定科目未確定の経費
+
+初心者向けに、借方の勘定科目が未確定の状態で経費を登録する経路を許容する。
+
+- 借方は予約 SubAccount（`未分類費用 / 未分類`）を Registrar が明示的に埋める
+- 貸方の `sub_account_id` は必須（`nullable` は許容しない）
+- 分類の後日確定・決算前ブロック・Todo 集約の扱いは `unclassified-expense-design.md` を正とする
+
 ## 取引先の扱い
 
 `TransactionRegistrar` は、取引先の入力を次の 3 パターンで解釈する。

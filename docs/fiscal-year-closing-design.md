@@ -101,6 +101,7 @@
 
 - error: 未処理の予定取引が残っている（`is_planned = true` かつ `is_active = true`）
 - error: 償却が発生すべき固定資産について、その年度の `DepreciationEntry` が存在しない、または存在しても `transaction_id` が null のものがある
+- error: 未分類費用が残っている（借方 `sub_account_id` が予約 `未分類費用 / 未分類` の有効な `JournalEntry` が 1 件以上ある）。詳細は `unclassified-expense-design.md`
 - warning: 棚卸資産の残高があるのに期末棚卸の振替（`adjusting_entry_type = inventory_closing`）がない
 
 `validate()` は read-only を保ち、呼び出し時点で `DepreciationEntry` が未生成でも検出漏れしないようにする。
