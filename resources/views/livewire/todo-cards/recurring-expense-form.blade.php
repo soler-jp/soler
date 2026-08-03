@@ -253,10 +253,7 @@
         </div>
 
         <div class="flex justify-end pt-2">
-            <button type="submit" wire:loading.attr="disabled"
-                class="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
-                {{ __('recurring_transaction_plans.todo_card.actions.submit') }}
-            </button>
+            <x-ui.button-submit wire:loading.attr="disabled">{{ __('recurring_transaction_plans.todo_card.actions.submit') }}</x-ui.button-submit>
         </div>
     </form>
 </div>

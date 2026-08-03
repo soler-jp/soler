@@ -18,9 +18,6 @@
             </div>
         </div>
 
-        <button type="button" wire:click="complete" wire:loading.attr="disabled"
-            class="shrink-0 rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
-            完了にする
-        </button>
+        <x-ui.button-submit type="button" wire:click="complete" wire:loading.attr="disabled" class="shrink-0">完了にする</x-ui.button-submit>
     </div>
 </div>

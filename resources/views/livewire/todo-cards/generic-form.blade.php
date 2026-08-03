@@ -34,10 +34,7 @@
                             @endif
                         </div>
 
-                        <button type="button" wire:click="addItem('{{ $field }}')"
-                            class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:text-slate-900">
-                            行を追加
-                        </button>
+                        <x-ui.button-add wire:click="addItem('{{ $field }}')" />
                     </div>
 
                     <div class="space-y-4">
@@ -47,10 +44,7 @@
                                 <div class="flex items-center justify-between gap-3">
                                     <p class="text-sm font-semibold text-slate-700">{{ $definition['label'] }} {{ $index + 1 }}</p>
 
-                                    <button type="button" wire:click="removeItem('{{ $field }}', {{ $index }})"
-                                        class="text-sm font-medium text-slate-500 transition hover:text-slate-700">
-                                        行を削除
-                                    </button>
+                                    <x-ui.button-delete type="button" wire:click="removeItem('{{ $field }}', {{ $index }})" show-icon="false" />
                                 </div>
 
                                 <div class="mt-4 grid gap-4 md:grid-cols-2">
@@ -116,10 +110,7 @@
         @endforeach
 
         <div class="flex justify-end pt-2">
-            <button type="submit" wire:loading.attr="disabled"
-                class="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
-                登録して完了する
-            </button>
+            <x-ui.button-submit wire:loading.attr="disabled">登録して完了する</x-ui.button-submit>
         </div>
     </form>
 </div>

@@ -39,35 +39,23 @@
                         </div>
 
                         <div class="md:pt-7">
-                            <button type="button" wire:click="removeItem('cash_accounts', {{ $index }})"
-                                class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-400 hover:text-slate-900 md:w-auto">
-                                削除
-                            </button>
+                            <x-ui.button-delete type="button" wire:click="removeItem('cash_accounts', {{ $index }})" class="w-full md:w-auto" />
                         </div>
                     </div>
                 </section>
             @endforeach
 
             <div>
-                <button type="button" wire:click="addItem('cash_accounts')"
-                    class="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:text-slate-900">
-                    {{ __('setup_todos.cash_on_hand.form.add_button') }}
-                </button>
+                <x-ui.button-add type="button" wire:click="addItem('cash_accounts')">{{ __('setup_todos.cash_on_hand.form.add_button') }}</x-ui.button-add>
             </div>
 
             <x-input-error :messages="$errors->get('inputs.cash_accounts')" />
         </div>
 
         <div class="flex flex-wrap items-center justify-end gap-3 pt-2">
-            <button type="button" wire:click="complete" wire:loading.attr="disabled"
-                class="rounded border border-slate-300 px-4 py-3 text-sm font-medium text-slate-600 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60">
-                {{ __('setup_todos.cash_on_hand.form.skip_button') }}
-            </button>
+            <x-ui.button-cancel type="button" wire:click="complete" wire:loading.attr="disabled">{{ __('setup_todos.cash_on_hand.form.skip_button') }}</x-ui.button-cancel>
 
-            <button type="submit" wire:loading.attr="disabled"
-                class="rounded bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
-                {{ __('setup_todos.cash_on_hand.form.submit_button') }}
-            </button>
+            <x-ui.button-submit wire:loading.attr="disabled">{{ __('setup_todos.cash_on_hand.form.submit_button') }}</x-ui.button-submit>
         </div>
 
         <p class="text-sm text-slate-500">
