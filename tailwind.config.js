@@ -36,10 +36,22 @@ export default {
                     fg:      withAlpha('--color-action-primary-fg'),
                     hover:   withAlpha('--color-action-primary-hover'),
                 },
+                'action-confirm': {
+                    DEFAULT: withAlpha('--color-action-confirm-bg'),
+                    fg:      withAlpha('--color-action-confirm-fg'),
+                    hover:   withAlpha('--color-action-confirm-hover'),
+                },
                 'action-danger': {
                     DEFAULT: withAlpha('--color-action-danger-bg'),
                     fg:      withAlpha('--color-action-danger-fg'),
                     hover:   withAlpha('--color-action-danger-hover'),
+                },
+
+                chrome: {
+                    DEFAULT: withAlpha('--color-chrome-bg'),
+                    fg:      withAlpha('--color-chrome-fg'),
+                    muted:   withAlpha('--color-chrome-muted'),
+                    hover:   withAlpha('--color-chrome-hover'),
                 },
 
                 'status-danger': {

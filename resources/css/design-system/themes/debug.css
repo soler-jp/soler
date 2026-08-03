@@ -15,9 +15,17 @@
   --color-action-primary-bg:    194 65 12;
   --color-action-primary-fg:    255 255 255;
   --color-action-primary-hover: 154 52 18;
+  --color-action-confirm-bg:    91 33 182;
+  --color-action-confirm-fg:    255 255 255;
+  --color-action-confirm-hover: 76 29 149;
   --color-action-danger-bg:     185 28 28;
   --color-action-danger-fg:     255 255 255;
   --color-action-danger-hover:  153 27 27;
+
+  --color-chrome-bg:            67 20 7;
+  --color-chrome-fg:            255 237 213;
+  --color-chrome-muted:         253 186 116;
+  --color-chrome-hover:         120 53 15;
 
   --color-status-danger-bg:      254 202 202;
   --color-status-danger-fg:      127 29 29;

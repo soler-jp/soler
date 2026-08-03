@@ -1,28 +1,37 @@
 :root,
 [data-theme="default"] {
   /* ── テーマ内部の私的パレット（契約ではない・Blade から参照しない） ── */
-  --theme-blue-600:   37 99 235;
-  --theme-blue-700:   29 78 216;
-  --theme-slate-50:   248 250 252;
-  --theme-slate-100:  241 245 249;
-  --theme-slate-200:  226 232 240;
-  --theme-slate-500:  100 116 139;
-  --theme-slate-900:  15 23 42;
-  --theme-red-50:     254 242 242;
-  --theme-red-200:    254 202 202;
-  --theme-red-600:    220 38 38;
-  --theme-red-700:    185 28 28;
-  --theme-green-50:   240 253 244;
-  --theme-green-200:  187 247 208;
-  --theme-green-600:  22 163 74;
-  --theme-green-700:  21 128 61;
-  --theme-amber-50:   255 251 235;
-  --theme-amber-200:  253 230 138;
-  --theme-amber-500:  245 158 11;
-  --theme-amber-700:  180 83 9;
-  --theme-blue-50:    239 246 255;
-  --theme-blue-200:   191 219 254;
-  --theme-blue-800:   30 64 175;
+  --theme-blue-50:      239 246 255;
+  --theme-blue-200:     191 219 254;
+  --theme-blue-600:     37 99 235;
+  --theme-blue-700:     29 78 216;
+  --theme-blue-800:     30 64 175;
+  --theme-slate-50:     248 250 252;
+  --theme-slate-100:    241 245 249;
+  --theme-slate-200:    226 232 240;
+  --theme-slate-500:    100 116 139;
+  --theme-slate-900:    15 23 42;
+  --theme-red-50:       254 242 242;
+  --theme-red-200:      254 202 202;
+  --theme-red-600:      220 38 38;
+  --theme-red-700:      185 28 28;
+  --theme-rose-700:     190 18 60;
+  --theme-rose-800:     159 18 57;
+  --theme-green-50:     240 253 244;
+  --theme-green-200:    187 247 208;
+  --theme-green-700:    21 128 61;
+  --theme-amber-50:     255 251 235;
+  --theme-amber-200:    253 230 138;
+  --theme-amber-700:    180 83 9;
+  --theme-emerald-100:  209 250 229;
+  --theme-emerald-400:  52 211 153;
+  --theme-emerald-600:  5 150 105;
+  --theme-emerald-700:  4 120 87;
+  --theme-emerald-800:  6 95 70;
+  --theme-emerald-900:  6 78 59;
+  --theme-emerald-950:  2 44 34;
+  --theme-teal-700:     15 118 110;
+  --theme-teal-800:     17 94 89;
 
   /* ── 契約: 表層 ── */
   --color-canvas:         var(--theme-slate-50);
@@ -36,17 +45,26 @@
   --color-content-onbrand: 255 255 255;
 
   /* ── 契約: ブランド・リンク・フォーカス ── */
-  --color-brand: var(--theme-blue-600);
-  --color-link:  var(--theme-blue-600);
-  --color-focus: var(--theme-blue-600);
+  --color-brand: var(--theme-emerald-600);
+  --color-link:  var(--theme-emerald-700);
+  --color-focus: var(--theme-emerald-600);
 
   /* ── 契約: アクション ── */
-  --color-action-primary-bg:    var(--theme-blue-600);
+  --color-action-primary-bg:    var(--theme-emerald-600);
   --color-action-primary-fg:    255 255 255;
-  --color-action-primary-hover: var(--theme-blue-700);
-  --color-action-danger-bg:     var(--theme-red-600);
+  --color-action-primary-hover: var(--theme-emerald-700);
+  --color-action-confirm-bg:    var(--theme-teal-700);
+  --color-action-confirm-fg:    255 255 255;
+  --color-action-confirm-hover: var(--theme-teal-800);
+  --color-action-danger-bg:     var(--theme-rose-700);
   --color-action-danger-fg:     255 255 255;
-  --color-action-danger-hover:  var(--theme-red-700);
+  --color-action-danger-hover:  var(--theme-rose-800);
+
+  /* ── 契約: chrome (navmenu 等の濃色クローム) ── */
+  --color-chrome-bg:    var(--theme-emerald-950);
+  --color-chrome-fg:    var(--theme-emerald-100);
+  --color-chrome-muted: var(--theme-emerald-400);
+  --color-chrome-hover: var(--theme-emerald-900);
 
   /* ── 契約: ステータス ── */
   --color-status-danger-bg:      var(--theme-red-50);

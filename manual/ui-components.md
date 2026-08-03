@@ -30,9 +30,10 @@ Soler の UI は、テーマ契約に基づいた共通コンポーネントを 
 
 ### `<x-ui.button>`
 
-`variant` で見た目を切り替えるボタンです。省略時は `primary` です。
+`variant` で見た目を切り替える基底ボタンです。省略時は `primary` です。
 
-- `primary` … 主 CTA
+- `primary` … 進めるアクション（追加・編集・次へ・保存など、繰り返し押される日常操作）
+- `confirm` … **押したら戻れない最終確定**（送信・確定・締めなど）。色相を primary と分けて誤操作を防ぐ
 - `secondary` … 地味なボタン
 - `danger` … 削除など危険操作
 - `ghost` … 背景なし。ツールバー等
@@ -53,6 +54,60 @@ Soler の UI は、テーマ契約に基づいた共通コンポーネントを 
 ```blade
 <x-ui.button variant="primary" disabled>保存する</x-ui.button>
 ```
+
+#### アイコンを付ける
+
+`icon` prop でアイコンを、`icon-position` で位置 (`left` / `right`、省略時は `left`) を指定できます。使えるアイコン名は [`<x-ui.icon>`](#x-uiicon) の一覧を参照してください。
+
+```blade
+<x-ui.button variant="primary" icon="plus">追加</x-ui.button>
+<x-ui.button variant="primary" icon="arrow-right" icon-position="right">次へ</x-ui.button>
+```
+
+### specialized ボタン
+
+頻出するアクションについては、意味・アイコン・variant・デフォルトラベルを固定した薄いラッパーを用意しています。ラベルはスロットで上書きできます。`show-icon="false"` でアイコンを非表示にできます。
+
+| コンポーネント | variant | icon | 位置 | デフォルトラベル | type |
+| --- | --- | --- | --- | --- | --- |
+| `<x-ui.button-next>` | primary | arrow-right | right | 次へ | button |
+| `<x-ui.button-back>` | ghost | arrow-left | left | 戻る | button |
+| `<x-ui.button-submit>` | **confirm** | check | left | 送信 | **submit** |
+| `<x-ui.button-cancel>` | secondary | x-mark | left | キャンセル | button |
+| `<x-ui.button-delete>` | danger | trash | left | 削除 | button |
+| `<x-ui.button-add>` | primary | plus | left | 追加 | button |
+| `<x-ui.button-edit>` | secondary | pencil | left | 編集 | button |
+| `<x-ui.button-close>` | ghost | x-mark | left | 閉じる | button |
+| `<x-ui.button-download>` | secondary | arrow-down-tray | left | ダウンロード | button |
+
+#### code例
+
+```blade
+<x-ui.button-next />                             {{-- 「次へ →」 --}}
+<x-ui.button-next>確認へ進む</x-ui.button-next>  {{-- ラベル上書き --}}
+<x-ui.button-delete wire:click="destroy" />
+<x-ui.button-download :show-icon="false">CSV</x-ui.button-download>
+
+<form method="post" action="...">
+    @csrf
+    <x-ui.button-submit>登録する</x-ui.button-submit>
+</form>
+```
+
+`wire:click`、`disabled`、`href` を付けたいときの `type="button"` 上書きなど、追加属性はそのまま渡ります。
+
+### `<x-ui.icon>`
+
+`name` で SVG アイコンを描画します。ボタン外でも使えます。色は `currentColor` を継承するので、親の `text-*` で色付けします。
+
+現在使えるアイコン: `plus` / `pencil` / `x-mark` / `arrow-right` / `arrow-left` / `arrow-down-tray` / `trash` / `check`
+
+```blade
+<x-ui.icon name="plus" />
+<x-ui.icon name="trash" class="w-5 h-5 text-status-danger-fg" />
+```
+
+新しいアイコンを追加する場合は `resources/views/components/ui/icon.blade.php` の `$paths` に SVG path (`d`) を足してください。
 
 ### `<x-ui.card>` / `<x-ui.card-header>` / `<x-ui.card-body>`
 
@@ -114,7 +169,8 @@ Blade から使えるユーティリティのうち、色・アール・影は�
 - 表層: `bg-canvas` `bg-surface` `bg-surface-muted` `border-line`
 - テキスト: `text-content` `text-content-muted` `text-content-onbrand`
 - ブランド: `text-brand` `text-link` `ring-focus`
-- アクション: `bg-action-primary` `text-action-primary-fg` `hover:bg-action-primary-hover`（`action-danger` も同形）
+- アクション: `bg-action-primary` `text-action-primary-fg` `hover:bg-action-primary-hover`（`action-confirm` / `action-danger` も同形）
+- chrome (navmenu 等): `bg-chrome` `text-chrome-fg` `text-chrome-muted` `hover:bg-chrome-hover`
 - ステータス: `bg-status-danger` `text-status-danger-fg` `border-status-danger-border`（`warning` / `success` / `info` も同形）
 
 ### アール

@@ -96,9 +96,21 @@ tests/Unit/Architecture/
 ### アクション（CTA）
 
 - `--color-action-primary-bg` / `--color-action-primary-fg` / `--color-action-primary-hover`
+- `--color-action-confirm-bg` / `--color-action-confirm-fg` / `--color-action-confirm-hover`
 - `--color-action-danger-bg`  / `--color-action-danger-fg`  / `--color-action-danger-hover`
 
+`primary` は「進める」アクション（追加・編集・次へ）。`confirm` は「押したら戻れない最終確定」アクション（送信・確定・締め）で、色相を primary と別にして誤操作を防ぐ。`danger` は削除。
+
 セカンダリボタン（地味なボタン）はテーマ契約に持たない。`--color-surface` / `--color-line` / `--color-content` の組み合わせで組む。
+
+### chrome (navmenu 等の濃色クローム)
+
+- `--color-chrome-bg`    … navmenu 等の濃色領域の背景
+- `--color-chrome-fg`    … chrome 上のテキスト（本文相当）
+- `--color-chrome-muted` … chrome 上の補助テキスト・境界線色（透過して使う）
+- `--color-chrome-hover` … chrome 上のホバー背景
+
+chrome は「本文エリア (canvas/surface) とは対照的な、常時濃色で表示される領域」のための独立系統。ブランド色と同系統の濃色にすることが多い（default では emerald-950）。
 
 ### ステータス（bg / fg / border の三点セット）
 
@@ -384,7 +396,9 @@ private const ALLOWED_COLOR_NAMES = [
     'content', 'content-muted', 'content-onbrand',
     'brand', 'link', 'focus',
     'action-primary', 'action-primary-fg', 'action-primary-hover',
+    'action-confirm', 'action-confirm-fg', 'action-confirm-hover',
     'action-danger', 'action-danger-fg', 'action-danger-hover',
+    'chrome', 'chrome-fg', 'chrome-muted', 'chrome-hover',
     'status-danger', 'status-danger-fg', 'status-danger-border',
     'status-warning', 'status-warning-fg', 'status-warning-border',
     'status-success', 'status-success-fg', 'status-success-border',
@@ -420,7 +434,9 @@ private const EXPECTED_COLOR_TOKENS = [
     'color-content', 'color-content-muted', 'color-content-onbrand',
     'color-brand', 'color-link', 'color-focus',
     'color-action-primary-bg', 'color-action-primary-fg', 'color-action-primary-hover',
+    'color-action-confirm-bg', 'color-action-confirm-fg', 'color-action-confirm-hover',
     'color-action-danger-bg', 'color-action-danger-fg', 'color-action-danger-hover',
+    'color-chrome-bg', 'color-chrome-fg', 'color-chrome-muted', 'color-chrome-hover',
     'color-status-danger-bg', 'color-status-danger-fg', 'color-status-danger-border',
     'color-status-warning-bg', 'color-status-warning-fg', 'color-status-warning-border',
     'color-status-success-bg', 'color-status-success-fg', 'color-status-success-border',
