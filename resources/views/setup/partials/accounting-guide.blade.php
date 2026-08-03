@@ -26,12 +26,26 @@
             ],
         ],
         [
-            'title' => '経費は、種類ごとに分ける必要があります',
+            'title' => '経費は、「何のために使ったか」で決まります',
             'body' => [
-                '<span class="rounded-sm bg-rose-100 px-1 py-0.5 font-semibold text-rose-900">経費</span>は、全部まとめて経費として記録するのではなく、何に使ったお金なのかを種類ごとに分けます。',
-                'たとえば、<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">携帯電話代</span>、<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">交通費</span>、<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">仕事道具</span>、<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">広告費</span>などです。',
-                '会計では、この分類の名前を<span class="rounded-sm bg-violet-100 px-1 py-0.5 font-semibold text-violet-900">勘定科目</span>と呼びます。',
-                'なお、自宅を事務所として使っている場合、「<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">自宅の家賃</span>」や「<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">自宅の電気代</span>」のように、仕事と私生活で共有する支払いが出てきます。こうしたものは、仕事で使った分だけを経費として記録します。',
+                '経費は、仕事のために必要だった支払いです。',
+                '同じ支払いでも、何のために使ったかによって、<span class="rounded-sm bg-rose-100 px-1 py-0.5 font-semibold text-rose-900">経費</span>になるかどうかが変わります。',
+                'たとえば、同じカフェ代でも、仕事相手との打ち合わせなら経費、自分の昼食なら経費ではありません。',
+                '高速道路で県外へ行った場合も、行った先で仕事をすればその高速代は経費ですが、仕事をしていなければ経費にはなりません。',
+                '判断の軸は、いつも同じです。仕事のために使ったかどうかです。',
+                '支払いの中には、仕事のために使った部分と、生活のために使った部分が混ざっているものもあります。たとえば自宅の家賃やスマートフォン代です。こうしたものは、仕事で使った分だけを経費と考えます。決まった割合はなく、実際の使い方に合わせて分けます。',
+                '仕事のために必要だったものは、経費として計上できます。そうでないものは、計上できません。慣れないうちは悩むかもしれませんが、だんだんわかってきます。後から修正もできます。',
+                '大切なのは、経費かそうでないかの「正解」を覚えることではありません。なぜそう判断したのか、その理由を自分で説明できるようにしておくことです。',
+            ],
+        ],
+        [
+            'title' => '経費は、まとめずに分けて記録します',
+            'body' => [
+                '経費は、<span class="rounded-sm bg-rose-100 px-1 py-0.5 font-semibold text-rose-900">経費</span>とひとまとめにするのではなく、何に使ったお金なのかがわかるように、種類ごとに分けて記録します。',
+                'こうしておくと、あとから「何にいくら使ったのか」を見返せます。<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">移動にかかったお金</span>、<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">広告にかかったお金</span>、といった内訳が見えるようになります。',
+                'この「種類」には、会計で使う決まった呼び名があります。これを<span class="rounded-sm bg-violet-100 px-1 py-0.5 font-semibold text-violet-900">勘定科目</span>と呼びます。たとえば、<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">移動に使ったお金</span>は<span class="rounded-sm bg-violet-100 px-1 py-0.5 font-semibold text-violet-900">旅費交通費</span>、<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">広告に使ったお金</span>は<span class="rounded-sm bg-violet-100 px-1 py-0.5 font-semibold text-violet-900">広告宣伝費</span>、<span class="rounded-sm bg-emerald-100 px-1 py-0.5 font-semibold text-emerald-900">仕事の勉強</span>に使ったお金は<span class="rounded-sm bg-violet-100 px-1 py-0.5 font-semibold text-violet-900">研修費</span>といった具合です。',
+                '同じ経費でも、人によって選ぶ科目が違うことがあります。たとえば、仕事で使うペンやノートは、<span class="rounded-sm bg-violet-100 px-1 py-0.5 font-semibold text-violet-900">消耗品費</span>とする人もいれば<span class="rounded-sm bg-violet-100 px-1 py-0.5 font-semibold text-violet-900">事務用品費</span>とする人もいます。取引先との打ち合わせで払ったカフェ代も、<span class="rounded-sm bg-violet-100 px-1 py-0.5 font-semibold text-violet-900">会議費</span>と考える人もいれば<span class="rounded-sm bg-violet-100 px-1 py-0.5 font-semibold text-violet-900">接待交際費</span>とする人もいます。',
+                '分け方に、たった一つの正解があるわけではありません。あまり気負わず、迷ったら近いものを選んでおけば十分です。',
             ],
         ],
         [

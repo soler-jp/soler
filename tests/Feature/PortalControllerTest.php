@@ -64,6 +64,8 @@ class PortalControllerTest extends TestCase
             ->assertOk()
             ->assertSee('個人事業主としての会計の説明')
             ->assertSee('事業のお金は、まず3つに分けます')
+            ->assertSeeText('仕事のために使ったかどうかです。')
+            ->assertSeeText('仕事の勉強に使ったお金は')
             ->assertSee('Help');
     }
 }
