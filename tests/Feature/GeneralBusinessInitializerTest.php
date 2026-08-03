@@ -408,6 +408,63 @@ class GeneralBusinessInitializerTest extends TestCase
     }
 
     #[Test]
+    public function 初期設定でcarry_forwardを選ぶと開始残高確認todoが作成される(): void
+    {
+        $user = User::factory()->create();
+        $initializer = new GeneralBusinessInitializer;
+        $unit = $initializer->initialize($user, [
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'year' => 2023,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'opening_context' => InitialSetupData::OPENING_CONTEXT_CARRY_FORWARD,
+            'bank_account_answer' => InitialSetupData::ANSWER_NO,
+            'cash_on_hand_answer' => InitialSetupData::ANSWER_NO,
+            'fixed_asset_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_expense_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_income_answer' => InitialSetupData::ANSWER_NO,
+            'counterparty_answer' => InitialSetupData::ANSWER_NO,
+        ]);
+
+        $this->assertDatabaseHas('todos', [
+            'business_unit_id' => $unit->id,
+            'fiscal_year_id' => $unit->currentFiscalYear->id,
+            'title' => '開始時点の資産と負債を確認する',
+            'body' => '前年の決算書を見ながら、2023/1/1 時点で残っていた現金・銀行口座以外の資産や負債を確認します。売掛金、借入金、棚卸資産などがある場合は、後で入力してください。',
+            'source_type' => Todo::SOURCE_TYPE_SYSTEM,
+            'todo_type' => Todo::TODO_TYPE_WIZARD_OPENING_BALANCE,
+            'status' => Todo::STATUS_PENDING,
+        ]);
+    }
+
+    #[Test]
+    public function 初期設定でfirst_yearなら開始残高確認todoは作成されない(): void
+    {
+        $user = User::factory()->create();
+        $initializer = new GeneralBusinessInitializer;
+        $unit = $initializer->initialize($user, [
+            'name' => 'テスト事業体',
+            'type' => 'general',
+            'year' => 2025,
+            'is_taxable' => false,
+            'is_tax_exclusive' => false,
+            'opening_context' => InitialSetupData::OPENING_CONTEXT_FIRST_YEAR,
+            'bank_account_answer' => InitialSetupData::ANSWER_NO,
+            'cash_on_hand_answer' => InitialSetupData::ANSWER_NO,
+            'fixed_asset_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_expense_answer' => InitialSetupData::ANSWER_NO,
+            'recurring_income_answer' => InitialSetupData::ANSWER_NO,
+            'counterparty_answer' => InitialSetupData::ANSWER_NO,
+        ]);
+
+        $this->assertDatabaseMissing('todos', [
+            'business_unit_id' => $unit->id,
+            'title' => '開始時点の資産と負債を確認する',
+        ]);
+    }
+
+    #[Test]
     public function 初期設定で銀行口座なしなら銀行口座todoは作成されない(): void
     {
         $user = User::factory()->create();

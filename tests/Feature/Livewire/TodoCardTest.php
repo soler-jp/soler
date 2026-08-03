@@ -3,13 +3,16 @@
 namespace Tests\Feature\Livewire;
 
 use App\Livewire\TodoCard;
+use App\Livewire\TodoCards\OpeningBalanceCard;
 use App\Livewire\TodoCards\RecurringExpenseCard;
 use App\Models\JournalEntry;
 use App\Models\Todo;
 use App\Models\User;
+use App\Services\TodoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;
 use Livewire\Livewire;
+use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -153,6 +156,92 @@ class TodoCardTest extends TestCase
     }
 
     #[Test]
+    public function opening_balance_todoは専用コンポーネントで資産負債フォームを表示する(): void
+    {
+        App::setLocale('ja');
+
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '開始残高 ToDo 事業体']);
+        $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'fiscal_year_id' => $fiscalYear->id,
+            'title' => '開始時点の資産と負債を確認する',
+            'body' => '前年の**決算書**を見ながら入力します。',
+            'status' => Todo::STATUS_PENDING,
+            'todo_type' => 'wizard_opening_balance',
+        ]);
+
+        $service = Mockery::mock(TodoService::class);
+        $service->shouldReceive('schemaFor')
+            ->atLeast()
+            ->once()
+            ->andReturn($this->openingBalanceSchema());
+        app()->instance(TodoService::class, $service);
+
+        Livewire::actingAs($user)
+            ->test(OpeningBalanceCard::class, ['todo' => $todo])
+            ->assertSee('開始時点の資産と負債を確認する')
+            ->assertSeeHtml('<strong>決算書</strong>')
+            ->assertSee('提出した青色申告決算書の3ページ目を見ながら、前年の青色申告決算書の、期末に書かれている金額を転記してください。')
+            ->assertSee('青色申告決算書3ページの開始残高入力箇所')
+            ->assertSee('受取手形')
+            ->assertSee('売掛金')
+            ->assertSee('支払手形')
+            ->assertSee('借入金')
+            ->assertSee('その他の資産')
+            ->assertSee('その他の負債')
+            ->assertSee('その他の資産を追加')
+            ->assertSee('その他の負債を追加')
+            ->assertSeeHtml('opening-entry-masked.png')
+            ->assertSet('inputs.asset_accounts.0.account_name', '受取手形')
+            ->assertSet('inputs.asset_accounts.3.account_name', '棚卸資産')
+            ->assertSet('inputs.liability_accounts.2.account_name', '借入金')
+            ->call('addItem', 'custom_asset_accounts')
+            ->assertCount('inputs.custom_asset_accounts', 2)
+            ->call('removeItem', 'custom_asset_accounts', 1)
+            ->assertCount('inputs.custom_asset_accounts', 1);
+    }
+
+    #[Test]
+    public function opening_balance_todoは入力をsubmitできる(): void
+    {
+        App::setLocale('ja');
+
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '開始残高 submit 事業体']);
+        $fiscalYear = $businessUnit->createFiscalYear(2026, $user);
+        $todo = Todo::factory()->create([
+            'business_unit_id' => $businessUnit->id,
+            'fiscal_year_id' => $fiscalYear->id,
+            'title' => '開始時点の資産と負債を確認する',
+            'status' => Todo::STATUS_PENDING,
+            'todo_type' => 'wizard_opening_balance',
+        ]);
+
+        $service = Mockery::mock(TodoService::class);
+        $service->shouldReceive('schemaFor')
+            ->atLeast()
+            ->once()
+            ->andReturn($this->openingBalanceSchema());
+        $service->shouldReceive('execute')
+            ->once()
+            ->andReturnUsing(fn (Todo $todo, array $inputs, User $actor): Todo => $todo);
+        app()->instance(TodoService::class, $service);
+
+        Livewire::actingAs($user)
+            ->test(OpeningBalanceCard::class, ['todo' => $todo])
+            ->set('inputs.asset_accounts.1.amount', 120000)
+            ->set('inputs.liability_accounts.2.amount', 500000)
+            ->set('inputs.custom_asset_accounts.0.account_name', '敷金')
+            ->set('inputs.custom_asset_accounts.0.amount', 30000)
+            ->set('inputs.custom_liability_accounts.0.account_name', '未払費用')
+            ->set('inputs.custom_liability_accounts.0.amount', 15000)
+            ->call('submit')
+            ->assertRedirect(route('dashboard'));
+    }
+
+    #[Test]
     public function bank_account_todoは登録せずに完了できる(): void
     {
         $user = User::factory()->create();
@@ -211,5 +300,58 @@ class TodoCardTest extends TestCase
             'name' => '株式会社サンプル',
             'notes' => '毎月請求する相手',
         ]);
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function openingBalanceSchema(): array
+    {
+        return [
+            'asset_accounts' => [
+                'type' => 'array',
+                'item_schema' => [
+                    'account_name' => ['type' => 'text'],
+                    'amount' => ['type' => 'number'],
+                ],
+                'default_items' => [
+                    ['account_name' => '受取手形', 'amount' => null],
+                    ['account_name' => '売掛金', 'amount' => null],
+                    ['account_name' => '有価証券', 'amount' => null],
+                    ['account_name' => '棚卸資産', 'amount' => null],
+                    ['account_name' => '前払金', 'amount' => null],
+                    ['account_name' => '貸付金', 'amount' => null],
+                ],
+            ],
+            'custom_asset_accounts' => [
+                'type' => 'array',
+                'item_schema' => [
+                    'account_name' => ['type' => 'text'],
+                    'amount' => ['type' => 'number'],
+                ],
+            ],
+            'liability_accounts' => [
+                'type' => 'array',
+                'item_schema' => [
+                    'account_name' => ['type' => 'text'],
+                    'amount' => ['type' => 'number'],
+                ],
+                'default_items' => [
+                    ['account_name' => '支払手形', 'amount' => null],
+                    ['account_name' => '買掛金', 'amount' => null],
+                    ['account_name' => '借入金', 'amount' => null],
+                    ['account_name' => '未払金', 'amount' => null],
+                    ['account_name' => '前受金', 'amount' => null],
+                    ['account_name' => '預かり金', 'amount' => null],
+                ],
+            ],
+            'custom_liability_accounts' => [
+                'type' => 'array',
+                'item_schema' => [
+                    'account_name' => ['type' => 'text'],
+                    'amount' => ['type' => 'number'],
+                ],
+            ],
+        ];
     }
 }

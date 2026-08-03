@@ -159,6 +159,23 @@ class TodoServiceTest extends TestCase
     }
 
     #[Test]
+    public function 開始残高handler付きtodoを登録できる(): void
+    {
+        [$user, $businessUnit, $fiscalYear] = $this->createBusinessUnitWithFiscalYear();
+
+        $todo = (new TodoService)->register(
+            $businessUnit,
+            '開始時点の資産と負債を確認する',
+            $user,
+            $fiscalYear,
+            todoType: Todo::TODO_TYPE_WIZARD_OPENING_BALANCE,
+        );
+
+        $this->assertSame(Todo::TODO_TYPE_WIZARD_OPENING_BALANCE, $todo->todo_type);
+        $this->assertTrue($todo->isExecutable());
+    }
+
+    #[Test]
     public function handler未登録のtodo_typeで登録を拒否する(): void
     {
         [$user, $businessUnit] = $this->createBusinessUnitWithFiscalYear();

@@ -75,6 +75,18 @@ class GeneralBusinessInitializer
         InitialSetupData $initialSetupData,
         User $actor,
     ): void {
+        if ($initialSetupData->opening_context === InitialSetupData::OPENING_CONTEXT_CARRY_FORWARD) {
+            app(TodoService::class)->register(
+                $businessUnit,
+                __('setup_todos.opening_balance.title'),
+                $actor,
+                $fiscalYear,
+                body: $this->openingBalanceTodoBody($fiscalYear),
+                sourceType: Todo::SOURCE_TYPE_SYSTEM,
+                todoType: Todo::TODO_TYPE_WIZARD_OPENING_BALANCE,
+            );
+        }
+
         if ($initialSetupData->bank_account_answer === InitialSetupData::ANSWER_YES) {
             app(TodoService::class)->register(
                 $businessUnit,
@@ -132,6 +144,13 @@ class GeneralBusinessInitializer
     protected function cashOnHandTodoBody(FiscalYear $fiscalYear): string
     {
         return __('setup_todos.cash_on_hand.body', [
+            'date' => $fiscalYear->start_date->format('Y/n/j'),
+        ]);
+    }
+
+    protected function openingBalanceTodoBody(FiscalYear $fiscalYear): string
+    {
+        return __('setup_todos.opening_balance.body', [
             'date' => $fiscalYear->start_date->format('Y/n/j'),
         ]);
     }

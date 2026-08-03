@@ -13,6 +13,8 @@
                             @foreach ($pendingTodos as $todo)
                                 @if ($todo->todo_type === \App\Models\Todo::TODO_TYPE_WIZARD_RECURRING_EXPENSES)
                                     <livewire:todo-cards.recurring-expense-card :todo="$todo" :key="'recurring-expense-card-'.$todo->id" />
+                                @elseif ($todo->todo_type === \App\Models\Todo::TODO_TYPE_WIZARD_OPENING_BALANCE)
+                                    <livewire:todo-cards.opening-balance-card :todo="$todo" :key="'opening-balance-card-'.$todo->id" />
                                 @else
                                     <livewire:todo-card :todo="$todo" :key="'todo-card-'.$todo->id" />
                                 @endif
