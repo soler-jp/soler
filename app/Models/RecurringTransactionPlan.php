@@ -287,7 +287,8 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
                 [
                     'sub_account_id' => $this->credit_sub_account_id,
                     'type' => JournalEntry::TYPE_CREDIT,
-                    'net_amount' => $this->gross_amount,
+                    'gross_amount' => $this->gross_amount,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ];
         } elseif ($this->is_withholding) {
@@ -295,12 +296,14 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
                 [
                     'sub_account_id' => $this->debit_sub_account_id,
                     'type' => JournalEntry::TYPE_DEBIT,
-                    'net_amount' => $this->gross_amount - (int) $this->withholding_tax_amount,
+                    'gross_amount' => $this->gross_amount - (int) $this->withholding_tax_amount,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
                 [
                     'sub_account_id' => $this->withholding_sub_account_id,
                     'type' => JournalEntry::TYPE_DEBIT,
-                    'net_amount' => (int) $this->withholding_tax_amount,
+                    'gross_amount' => (int) $this->withholding_tax_amount,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
                 [
                     'sub_account_id' => $this->credit_sub_account_id,
@@ -314,7 +317,8 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
                 [
                     'sub_account_id' => $this->debit_sub_account_id,
                     'type' => JournalEntry::TYPE_DEBIT,
-                    'net_amount' => $this->gross_amount,
+                    'gross_amount' => $this->gross_amount,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
                 [
                     'sub_account_id' => $this->credit_sub_account_id,

@@ -295,7 +295,8 @@ class CreditCardStatementLineRegistrar
             [
                 'sub_account_id' => $creditSubAccountId,
                 'type' => JournalEntry::TYPE_CREDIT,
-                'net_amount' => (int) $line->amount,
+                'gross_amount' => (int) $line->amount,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ];
     }

@@ -106,9 +106,11 @@ class TransactionRegistrar
     public function prepareJournalEntries(FiscalYear $fiscalYear, array $journalEntriesData): array
     {
         $preparedEntries = [];
+        $containsGrossAmountEntry = collect($journalEntriesData)
+            ->contains(fn (array $entry): bool => array_key_exists('gross_amount', $entry));
 
         foreach ($journalEntriesData as $index => $entry) {
-            foreach ($this->prepareJournalEntry($fiscalYear, $entry, $index) as $preparedEntry) {
+            foreach ($this->prepareJournalEntry($fiscalYear, $entry, $index, $containsGrossAmountEntry) as $preparedEntry) {
                 $preparedEntries[] = $preparedEntry;
             }
         }
@@ -172,7 +174,8 @@ class TransactionRegistrar
                 [
                     'sub_account_id' => $overrides['credit_sub_account_id'] ?? $creditEntry->sub_account_id,
                     'type' => JournalEntry::TYPE_CREDIT,
-                    'net_amount' => $grossAmount,
+                    'gross_amount' => $grossAmount,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ];
         }
@@ -190,9 +193,10 @@ class TransactionRegistrar
             [
                 'sub_account_id' => $overrides['debit_sub_account_id'] ?? $primaryDebitEntry->sub_account_id,
                 'type' => JournalEntry::TYPE_DEBIT,
-                'net_amount' => $plan->is_withholding
+                'gross_amount' => $plan->is_withholding
                     ? $grossAmount - (int) $plan->withholding_tax_amount
                     : $grossAmount,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ];
 
@@ -200,7 +204,8 @@ class TransactionRegistrar
             $entries[] = [
                 'sub_account_id' => $plan->withholding_sub_account_id,
                 'type' => JournalEntry::TYPE_DEBIT,
-                'net_amount' => (int) $plan->withholding_tax_amount,
+                'gross_amount' => (int) $plan->withholding_tax_amount,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ];
         }
 
@@ -342,13 +347,19 @@ class TransactionRegistrar
         ]);
     }
 
-    protected function prepareJournalEntry(FiscalYear $fiscalYear, array $entry, int $index): array
+    protected function prepareJournalEntry(FiscalYear $fiscalYear, array $entry, int $index, bool $containsGrossAmountEntry): array
     {
         $hasGrossAmount = array_key_exists('gross_amount', $entry) && ! array_key_exists('net_amount', $entry);
         $hasBusinessRatio = array_key_exists('business_ratio', $entry) && $entry['business_ratio'] !== null;
         $taxTypeProvided = array_key_exists('tax_type', $entry) && $entry['tax_type'] !== null;
 
         if (! $hasGrossAmount) {
+            if ($containsGrossAmountEntry && ! $taxTypeProvided) {
+                throw ValidationException::withMessages([
+                    "journal_entries.$index.tax_type" => ['税込入力の取引で消費税区分を省略する行は gross_amount を指定してください。'],
+                ]);
+            }
+
             if ($hasBusinessRatio) {
                 throw ValidationException::withMessages([
                     "journal_entries.$index.business_ratio" => ['事業割合は税込入力の借方経費行でのみ指定できます。'],

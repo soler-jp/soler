@@ -177,7 +177,7 @@ class RecurringTransactionPlanTest extends TestCase
 
         $this->assertSame(11000, $debitEntry?->net_amount);
         $this->assertSame(0, $debitEntry?->tax_amount);
-        $this->assertNull($debitEntry?->tax_type);
+        $this->assertSame(JournalEntry::TAX_TYPE_OUT_OF_SCOPE, $debitEntry?->tax_type);
         $this->assertSame(10000, $creditEntry?->net_amount);
         $this->assertSame(1000, $creditEntry?->tax_amount);
         $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_SALES_10, $creditEntry?->tax_type);

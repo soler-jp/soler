@@ -65,6 +65,7 @@ class StandardTest extends TestCase
             'sub_account_id' => $cashSub->id,
             'type' => JournalEntry::TYPE_DEBIT,
             'net_amount' => 11000,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
         ]);
     }
 

@@ -1357,6 +1357,34 @@ class TransactionRegistrarTest extends TestCase
     }
 
     #[Test]
+    public function gross_amountを含む取引でtax_type未指定のnet_amount行は登録できない()
+    {
+        [$fiscalYear, $actor] = $this->createBusinessUnitFiscalYearWithActor();
+        $cashSubAccount = $fiscalYear->businessUnit->getSubAccountByName('現金', '現金');
+        $salesSubAccount = $fiscalYear->businessUnit->getSubAccountByName('売上高', '売上高');
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('税込入力の取引で消費税区分を省略する行は gross_amount を指定してください。');
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => 'mixed gross and taxless net',
+        ], [
+            [
+                'sub_account_id' => $cashSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 2200,
+            ],
+            [
+                'sub_account_id' => $salesSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 2200,
+                'tax_type' => JournalEntry::TAX_TYPE_DEEMED_TAXABLE_SALES_10,
+            ],
+        ], $actor);
+    }
+
+    #[Test]
     public function 決算済み会計年度には新規取引を登録できない()
     {
         $fiscalYear = FiscalYear::factory()->create([

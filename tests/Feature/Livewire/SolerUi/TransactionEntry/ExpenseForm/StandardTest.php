@@ -80,6 +80,7 @@ class StandardTest extends TestCase
             'sub_account_id' => $credit->id,
             'type' => JournalEntry::TYPE_CREDIT,
             'net_amount' => 1100,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
         ]);
 
         $this->assertDatabaseHas('transactions', [

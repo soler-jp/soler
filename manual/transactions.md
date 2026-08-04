@@ -21,6 +21,8 @@
 - `computed_from_gross`
   - `gross_amount` と `tax_type` から内部的に `net_amount` と `tax_amount` を計算した
 
+この manual では、税額計算の主体でない相手行も、総受払額として `gross_amount` で書く例にそろえます。
+
 現時点では、主に課税事業者の通常入力と、`gross_amount` ベースの定期取引実行時の扱いを整理するための項目です。
 免税事業者の「課税だった場合のシミュレーション」かどうかまでは表さず、その意味づけが必要な場合は別のフラグで扱います。
 
@@ -67,7 +69,11 @@ app(TransactionRegistrar::class)->register(
 ### 免税業者の売上
 
 免税業者では、`gross_amount` を入力して登録できます。  
-売上側は `deemed_taxable_sales_10` として扱われ、内部的に本体額と消費税額へ分解されます。
+`TransactionRegistrar` に渡すうえで重要なのは、貸方の売上側を
+`JournalEntry::TAX_TYPE_DEEMED_TAXABLE_SALES_10` として登録することです。
+これにより、`gross_amount` は内部的に本体額と消費税額へ分解されます。
+
+借方の入金先は `out_of_scope` を明示しつつ、`gross_amount` で渡します。
 
 ```php
 use App\Models\JournalEntry;
@@ -101,6 +107,9 @@ app(TransactionRegistrar::class)->register(
     ],
 );
 ```
+
+この例では、貸方の売上 10,000 円が内部的に 9,091 円の本体額と 909 円の消費税額へ分解され、
+`tax_type` は `deemed_taxable_sales_10` で保存されます。
 
 ### 課税業者の売上
 
