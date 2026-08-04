@@ -4,6 +4,8 @@
 > 全体方針は [setupwizard-spec.md](setupwizard-spec.md) を参照。
 > 実装の「どう作るか」は [setupwizard-design.md](setupwizard-design.md) を参照。
 
+> **実装状況**: 在庫 Todo / Handler は未実装。`initial_setup_data` にも `inventory_answer` カラムはない。継続事業の棚卸資産の開始残高は、現時点では `wizard_opening_balance` Todo の資産項目「棚卸資産」で入力する。以下は将来仕様として記述している。
+
 ## 目的
 
 仕入・在庫がある事業かを確認し、必要なら開始時点の棚卸資産を登録する。
@@ -34,11 +36,10 @@
 
 ---
 
-## 表示条件
+## 表示条件（将来）
 
 ```text
-opening_context = carry_forward
-inventory_setup_status != completed
+opening_context = carry_forward で生成される wizard_inventory Todo が pending
 ```
 
 ```text
@@ -89,8 +90,8 @@ inventory_setup_status != completed
 サービス業では、ほとんどないこともあります。
 ```
 
-- ここで `answer(inventory)` を確定させる
-- 「いいえ」の場合は `answer = no`, `status = not_needed` で終了
+- ここで在庫の有無を確定させる
+- 「いいえ」の場合は Todo を完了扱いにする
 
 ### この年のはじめの在庫（「はい」の場合のみ）
 
@@ -117,7 +118,7 @@ inventory_setup_status != completed
 
 理由: 期首在庫は前年決算書の期末棚卸高、または開業時点の実地棚卸で確認できるため。
 
-ただし、画面全体に対して「あとで登録する」は許す（`status = skipped`）。
+Todo を「あとで登録する」形で残すことは許すが、現行の Todo モデルに `skipped` はない。後回しにする場合は `pending` のまま Dashboard に残す。
 
 ### 年末棚卸の案内（入力なし）
 
@@ -133,30 +134,26 @@ inventory_setup_status != completed
 
 ---
 
-## 完了条件
+## 完了条件（将来）
 
-### status の遷移
+### Todo status の遷移
 
-| 状態 | 遷移条件 |
+| status | 遷移条件 |
 | --- | --- |
-| `not_needed` | 「いいえ」を選び `answer = no` になった時点 |
-| `pending` | `answer = yes` または `unknown` で、まだ「保存」していない |
-| `completed` | 「はい」を選び、期首在庫金額を入力（0 を含む）して「保存」した |
-| `skipped` | 「あとで登録する」を選んだ |
+| `pending` | Todo が発行されてから、まだ Handler の実行が成功していない |
+| `completed` | Handler が「はい」＋期首在庫金額入力、または「いいえ」を受けて完了扱いにした |
+| `dismissed` | 利用者が明示的にこの Todo を取りやめた |
 
 ### completed の判定条件
 
-- `answer(inventory) = yes`
-- 当該 `FiscalYear` の期首棚卸高が入力されている（0 を含む）
-- 利用者が「保存」を押した
+- 「はい」の場合: 当該 `FiscalYear` の期首棚卸高が入力されている（0 を含む）
+- 「いいえ」の場合: 在庫を扱わない旨を確定させて Todo を閉じる
 
 ---
 
 ## answer 遷移
 
-- `unknown → yes`: Step 1 で「はい」を選択 → Step 2 へ
-- `unknown → no`: Step 1 で「いいえ」を選択 → `status = not_needed`、カードを閉じる
-- `yes → no`: Dashboard のカード操作から変更
+在庫の有無は Todo 画面上でのみ確定させる。現行実装に `unknown` はない。
 
 ---
 

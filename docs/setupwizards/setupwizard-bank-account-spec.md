@@ -38,38 +38,26 @@ UI 上では1つの流れで聞くが、内部責務は分ける。
 Dashboard に次の条件でカードを表示する。
 
 ```text
-answer(bank_account) = yes  or  unknown
-bank_account_setup_status != completed
+bank_account_answer = yes で生成された wizard_bank_account Todo が pending
 ```
 
 ### answer 別の見え方
 
 #### answer = yes
 
-具体的な setup カードを表示する。
+`GeneralBusinessInitializer::registerRequestedTodos()` が `wizard_bank_account` Todo を作り、Dashboard に次のカードとして並ぶ。
 
 ```text
 銀行口座を登録しましょう
 ```
 
-#### answer = unknown
-
-確認カードを表示する。
-
-```text
-事業用の銀行口座があるか確認しましょう
-```
-
-確認カード内で「はい／いいえ」を選び直せるようにする。
-
-- 「はい」を選んだ場合、そのまま setup フローに進む
-- 「いいえ」を選んだ場合、`answer = no`, `status = not_needed` で確定し、カードを閉じる
-
 #### answer = no
 
-通常はカードを表示しない。
+Todo は作られず、Dashboard には表示されない。
 
-決算前チェックのタイミングでのみ、再確認カードを表示してもよい。
+決算前チェックのタイミングで再確認したい場合は、その時点で別途 Todo を作る形になる（現時点でそのような自動再確認機能はない）。
+
+現行実装に `unknown` は存在せず、初回 SetupWizard も yes / no のみを扱う。
 
 ---
 
@@ -91,35 +79,19 @@ bank_account_setup_status != completed
 
 各行が1つの銀行口座に対応する。行の追加・削除がその場でできる。
 
-### 「口座情報」と「開始残高」を分ける理由
-
-利用者から見ると1行の中でまとめて入力するが、内部責務は次のように分かれる。
-
-| 入力欄 | 内部モデル | 年度依存 |
-| --- | --- | --- |
-| 表示名 / 銀行名 / 種別 / 下4桁 | `BusinessUnit` に紐づく `SubAccount` | なし |
-| この年のはじめの残高 | `FiscalYear` の Opening Setup（期首仕訳） | あり |
-
-そのため、2年目以降に Wizard を再度実行した場合、口座情報はすでに登録済みの行として表示し、残高だけを聞き直す形になる（実装の詳細は design 側で扱う）。
 
 ---
 
 ## 入力欄（各行）
 
-### 口座情報
+現行の `BankAccountTodoHandler` は次の 2 項目のみを受け付ける。
 
 | 項目 | 必須 | 説明 |
 | --- | --- | --- |
-| 表示名 | 必須 | 一覧で識別しやすい名称。例:「メインバンク」「〇〇銀行 営業用」 |
-| 銀行名 | 任意 | |
-| 口座種別 | 任意 | 普通 / 当座 / 貯蓄 |
-| 口座番号の下4桁 | 任意 | 複数口座を持つ場合の識別用 |
+| 表示名（銀行名） | 必須 | 一覧で識別しやすい名称。例:「メインバンク」「〇〇銀行 営業用」。`SubAccount.name` に保存 |
+| この年のはじめの残高 | 必須（0 以上） | 年始時点の残高。円単位 |
 
-### この年のはじめの残高
-
-| 項目 | 必須 | 説明 |
-| --- | --- | --- |
-| この年のはじめの残高 | 必須 | 年始時点の残高。円単位 |
+将来的に銀行名 / 口座種別 / 下4桁を分けて持ちたい場合は、`BankAccountTodoHandler::inputSchema()` と `BankAccountRegistrationService` の `bank_accounts` 入力仕様を拡張する。
 
 ### 画面文言案
 
@@ -145,10 +117,9 @@ bank_account_setup_status != completed
 
 ### 方針
 
-- 銀行名・口座種別・下4桁は任意にする。これらが不明でも記録・仕訳には支障がないため
 - 表示名と残高は必須にする
 - 「期首残高」「期首仕訳」という会計用語は UI に出さない
-- 内部では Opening Setup の期首仕訳に反映される（詳細は [opening-entry-design.md](../opening-entry-design.md) と setupwizard-design.md を参照）
+- 内部では Opening Setup の期首仕訳に反映される（詳細は [setupwizard-design.md](setupwizard-design.md) を参照）
 - 元入金は利用者に入力させない。ここで入力した残高は、元入金の自動計算に組み込まれる
 
 ### 「わからない」の扱い
@@ -157,61 +128,34 @@ bank_account_setup_status != completed
 
 理由: 銀行口座の残高は、通帳・アプリで必ず確認できるため。
 
-ただし、画面全体に対して「あとで登録する」は許す。その場合は Wizard 全体が `status = skipped` となる（後述）。
+Todo 全体を「あとで登録する」形で残すことは許すが、現行の Todo モデルに `skipped` は存在しない。後回しにする場合は `pending` のまま Dashboard に残る。
 
 ---
 
 ## 完了条件
 
-### status の遷移
+### Todo status の遷移
 
-| 状態 | 遷移条件 |
+| status | 遷移条件 |
 | --- | --- |
-| `not_needed` | `answer = no` になった時点 |
-| `pending` | `answer = yes` または `unknown` で、まだ「保存」していない |
-| `completed` | 「保存」を押し、少なくとも1つの銀行口座と開始残高が登録された |
-| `skipped` | 「あとで登録する」を選んだ |
+| `pending` | `bank_account_answer = yes` で Todo が発行されてから、まだ Handler の実行が成功していない |
+| `completed` | `BankAccountTodoHandler::execute()` が成功し、`Todo::markCompleted()` が呼ばれた |
+| `dismissed` | 利用者が明示的にこの Todo を取りやめた |
+
+`answer = no` の場合は Todo 自体が発行されない。
 
 ### completed の判定条件
 
-次のすべてを満たしたときに `bank_account_setup_status = completed` とする。
+`BankAccountTodoHandler::execute()` は次を1トランザクションで行い、成功すると Todo を `completed` にする。
 
-- `answer(bank_account) = yes`
-- 少なくとも1つの `SubAccount`（銀行口座）が登録されている
-- 登録された各口座に対して、当該 `FiscalYear` の開始残高が入力されている
-- 利用者が「保存」を押した
-
-### skipped の扱い
-
-- Dashboard カードは表示され続ける
-- ただし、カードの文言は「あとで登録する」を選んだことを反映する
-
-```text
-銀行口座の登録は保留中です
-```
-
-- 「今すぐ登録する」から Wizard を再開できる
+- 「その他の預金」配下に、入力された銀行口座ごとに `SubAccount` を作成する（同名は `DomainException`）
+- 開始残高が 0 を超える口座について、期首仕訳へ追記する（既存の期首仕訳があれば `TransactionRevisor::revise()` で借方追記・貸方再計算、なければ `FiscalYear::registerOpeningEntry()` で新規登録）
 
 ---
 
 ## answer 遷移
 
-Wizard の中でも `answer(bank_account)` を変更できる場面がある。
-
-### unknown → yes
-
-- 「事業用の銀行口座がある」を選んだ時点で `answer = yes` に更新する
-- Wizard は Step 1 に進む
-
-### unknown → no
-
-- 「事業用の銀行口座はない」を選んだ時点で `answer = no`, `status = not_needed` で確定する
-- Dashboard カードは閉じる
-
-### yes → no への変更
-
-- 初回 SetupWizard 完了後に「やっぱりない」となるケース
-- Wizard 内では扱わず、Dashboard のカード操作から `answer` を変更できるようにする（詳細は setupwizard-design.md）
+`bank_account_answer` は初回 SetupWizard の Step 4 で確定させ、以降は `initial_setup_data` に固定される。初回 SetupWizard 完了後に「やっぱりない」となるケースは、現時点では専用の UI を持たない。将来的に Dashboard から回答を変えられるようにするなら、`initial_setup_data.bank_account_answer` を更新する API と、対応する `wizard_bank_account` Todo の扱い（dismiss または削除）を追加する必要がある。
 
 ---
 

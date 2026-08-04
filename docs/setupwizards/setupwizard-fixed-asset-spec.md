@@ -5,6 +5,8 @@
 > 固定資産・減価償却モデルの設計は [fixed-asset-design.md](../fixed-asset-design.md) を参照。
 > 実装の「どう作るか」は [setupwizard-design.md](setupwizard-design.md) を参照。
 
+> **実装状況**: 固定資産 Todo / Handler は未実装。`fixed_asset_answer` の値は `initial_setup_data` に保存されるが、`GeneralBusinessInitializer` からは Todo が発行されない。以下は将来仕様として記述している。
+
 ## 目的
 
 仕事で使う高額なものを登録し、当年度の減価償却見込みを作る。
@@ -39,30 +41,25 @@ SetupWizard は入力収集に専念し、台帳登録・償却計算は専用�
 
 ## 表示条件
 
+将来的に固定資産 Todo が実装された段階では、次を想定する。
+
 ```text
-answer(fixed_asset) = yes  or  unknown
-fixed_asset_setup_status != completed
+fixed_asset_answer = yes で生成された wizard_fixed_asset Todo が pending
 ```
 
 ### answer 別の見え方
 
 #### answer = yes
 
+Dashboard に次のカードとして並ぶ想定。
+
 ```text
 固定資産を登録しましょう
 ```
 
-#### answer = unknown
-
-```text
-仕事で使う高額なものがあるか確認しましょう
-```
-
-確認カード内で「はい／いいえ」を選び直せるようにする。
-
 #### answer = no
 
-通常はカードを表示しない。決算前チェックでのみ再確認してもよい。
+Todo を作らないため、Dashboard には表示されない。現行実装に `unknown` はない。
 
 ---
 
@@ -160,30 +157,25 @@ fixed_asset_setup_status != completed
 
 ## 完了条件
 
-### status の遷移
+### Todo status の遷移（将来）
 
-| 状態 | 遷移条件 |
+| status | 遷移条件 |
 | --- | --- |
-| `not_needed` | `answer = no` になった時点 |
-| `pending` | `answer = yes` または `unknown` で、まだ「保存」していない |
-| `completed` | 「保存」を押し、少なくとも1つの固定資産が登録され、償却明細が生成された |
-| `skipped` | 「あとで登録する」を選んだ |
+| `pending` | Todo が発行されてから、まだ Handler の実行が成功していない |
+| `completed` | Handler が固定資産の登録と当年度償却明細生成に成功した |
+| `dismissed` | 利用者が明示的にこの Todo を取りやめた |
 
-### completed の判定条件
+### completed の判定条件（将来）
 
-- `answer(fixed_asset) = yes`
 - 少なくとも1つの `FixedAsset` が登録されている
 - 各固定資産に対して、当該 `FiscalYear` の償却明細（`DepreciationEntry`）が生成されている
 - carry_forward の場合、期首帳簿価額が Opening Setup に反映されている
-- 利用者が「保存」を押した
 
 ---
 
 ## answer 遷移
 
-- `unknown → yes`: 「仕事で使う高額なものがある」を選択 → Step 1 へ
-- `unknown → no`: 「ない」を選択 → `status = not_needed`、カードを閉じる
-- `yes → no`: Dashboard のカード操作から変更
+`fixed_asset_answer` は初回 SetupWizard の Step 4 で確定させ、`initial_setup_data` に固定される。現行実装に `unknown` はなく、初回完了後に回答を変える UI もまだ持たない。
 
 ---
 

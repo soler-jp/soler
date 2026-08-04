@@ -5,6 +5,10 @@
 > `RecurringTransactionPlan` のモデル/API 仕様は [recurring-transaction-design.md](../recurring-transaction-design.md) を参照。
 > 実装の「どう作るか」は [setupwizard-design.md](setupwizard-design.md) を参照。
 
+> **実装状況**:
+> - `RecurringExpenseTodoHandler` / `RecurringIncomeTodoHandler` は実装済み（`AbstractRecurringTransactionPlanTodoHandler` を継承）。
+> - `GeneralBusinessInitializer` は `wizard_recurring_expenses` Todo のみ発行する。`wizard_recurring_incomes` Todo を発行する枝は未実装のため、収入カードは現状 Dashboard に自動では現れない。
+
 ## 目的
 
 毎月・毎年くり返す収入と支出を登録し、月次確認を楽にする。
@@ -41,21 +45,20 @@
 
 支出は「用意された項目から削る」、収入は「自分で足す」を基本操作にする。
 
-### answer と status は item ごとに 1:1
+### answer と Todo は item ごとに 1:1
 
 初回 SetupWizard で、定期支出・定期収入をそれぞれ別の質問として聞く（質問5=定期支出、質問6=定期収入）。
-そのため、他の Wizard と同じく **answer 1 : status 1** で対応する。
+そのため、`initial_setup_data` の回答カラムも Todo 種別も別々に持つ。
 
-| item | answer の key | status の key |
+| item | answer カラム | todo_type |
 | --- | --- | --- |
-| 定期支出 | `recurring_expense` | `recurring_expense_setup_status` |
-| 定期収入 | `recurring_income` | `recurring_income_setup_status` |
+| 定期支出 | `recurring_expense_answer` | `wizard_recurring_expenses` |
+| 定期収入 | `recurring_income_answer` | `wizard_recurring_incomes`（Handler は実装済み、Todo 発行は未実装） |
 
-2つは完全に独立している。「支出はあるが、くり返す収入はない」といった事業でも、
-それぞれ別々に yes / no / unknown を答えられる。
+2つは完全に独立している。「支出はあるが、くり返す収入はない」といった事業でも、それぞれ別々に yes / no を答えられる。`unknown` は現行実装にない。
 
 > このファイルは、性質が近い定期支出・定期収入をまとめて記述しているが、
-> データ上・UI 上は2つの独立した Wizard（カード）である。
+> データ上・UI 上は2つの独立した Wizard（Todo / カード）である。
 
 ---
 
@@ -64,38 +67,29 @@
 ### 定期支出カード
 
 ```text
-answer(recurring_expense) = yes  or  unknown
-recurring_expense_setup_status != completed
+recurring_expense_answer = yes で生成された wizard_recurring_expenses Todo が pending
 ```
 
-### 定期収入カード
+### 定期収入カード（将来）
 
 ```text
-answer(recurring_income) = yes  or  unknown
-recurring_income_setup_status != completed
+recurring_income_answer = yes で生成された wizard_recurring_incomes Todo が pending
 ```
 
 ### answer 別の見え方
 
 #### answer = yes
 
+Dashboard に次のカードとして並ぶ。
+
 ```text
 （定期支出）毎月・毎年の支払いを登録しましょう
 （定期収入）毎月・毎年の収入を登録しましょう
 ```
 
-#### answer = unknown
-
-```text
-（定期支出）毎月・毎年くり返す支払いがあるか確認しましょう
-（定期収入）毎月・毎年くり返す収入があるか確認しましょう
-```
-
-確認カード内で「はい／いいえ」を選び直せるようにする。
-
 #### answer = no
 
-そのカードは表示しない（支出・収入それぞれ独立に判定する）。
+Todo は作られず、そのカードは表示されない（支出・収入それぞれ独立に判定する）。現行実装に `unknown` はない。
 
 ---
 
@@ -301,47 +295,35 @@ Dashboard の並びでは取引相手を定期支出・定期収入より前に�
 
 ## 完了条件
 
-定期支出・定期収入は、それぞれ独立した item として完了する。answer も status も別々に持つ。
+定期支出・定期収入は、それぞれ独立した Todo として完了する。answer も Todo も別々に持つ。
 
-### 定期支出の status
+### 定期支出の Todo status
 
-| 状態 | 遷移条件 |
+| status | 遷移条件 |
 | --- | --- |
-| `not_needed` | `answer(recurring_expense) = no` になった時点 |
-| `pending` | `answer(recurring_expense) = yes` または `unknown` で、まだ「保存」していない |
-| `completed` | 「保存」を押し、少なくとも1つの支出 `RecurringTransactionPlan` を登録した（金額 0 を含む） |
-| `skipped` | 「あとで登録する」を選んだ、またはプリセットをすべて外して1つも登録せずに保存した |
+| `pending` | `recurring_expense_answer = yes` で Todo が発行されてから、まだ Handler の実行が成功していない |
+| `completed` | `RecurringExpenseTodoHandler::execute()` が成功し、`Todo::markCompleted()` が呼ばれた |
+| `dismissed` | 利用者が明示的にこの Todo を取りやめた |
 
-### 定期収入の status
+### 定期収入の Todo status（将来）
 
-| 状態 | 遷移条件 |
+| status | 遷移条件 |
 | --- | --- |
-| `not_needed` | `answer(recurring_income) = no` になった時点 |
-| `pending` | `answer(recurring_income) = yes` または `unknown` で、まだ「保存」していない |
-| `completed` | 「保存」を押し、少なくとも1つの収入 `RecurringTransactionPlan` を登録した（金額 0 を含む） |
-| `skipped` | 「あとで登録する」を選んだ、または1つも追加せずに保存した |
+| `pending` | `recurring_income_answer = yes` で Todo が発行されてから、まだ Handler の実行が成功していない |
+| `completed` | `RecurringIncomeTodoHandler::execute()` が成功し、`Todo::markCompleted()` が呼ばれた |
+| `dismissed` | 利用者が明示的にこの Todo を取りやめた |
 
 ### completed の判定条件（各カード共通）
 
-- 当該 item の `answer` が `yes`
-- 当該カードの区分（支出 or 収入）で、少なくとも1つの `RecurringTransactionPlan` が登録されている
-- 利用者が「保存」を押した
-
-金額は 0 円でも登録として成立する。金額の有無は completed の判定に影響しない。
+`AbstractRecurringTransactionPlanTodoHandler` は `plans` を 1 件以上要求する（`EMPTY_PLANS_MESSAGE` を参照）。保存時に少なくとも 1 件の `RecurringTransactionPlan` を作れないと `completed` にはならない。金額は 0 円でも登録として成立する。
 
 ---
 
 ## answer 遷移
 
-`recurring_expense` と `recurring_income` は独立した answer を持ち、互いに影響しない。
+`recurring_expense_answer` と `recurring_income_answer` は独立し、互いに影響しない。いずれも初回 SetupWizard の Step 4 で確定させ、以降は `initial_setup_data` に固定される。現行実装に `unknown` はなく、初回完了後に回答を変える UI もまだ持たない。
 
-各 item について:
-
-- `unknown → yes`: 「ある」を選択 → そのカードが登録可能になる
-- `unknown → no`: 「ない」を選択 → その item の status を `not_needed`、そのカードを閉じる
-- `yes → no`: Dashboard のカード操作から変更
-
-「支出だけ登録して収入は後回し」「収入は no、支出だけ設定する」なども自然に表現できる。
+「支出だけ登録して収入は後回し」「収入は no、支出だけ設定する」のような組み合わせは、初回 SetupWizard で自然に表現できる。
 
 ---
 

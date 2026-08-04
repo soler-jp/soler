@@ -511,42 +511,35 @@ Soler を始める
 
 □ 銀行口座を登録する
 □ 事業専用現金を登録する
-□ 固定資産を登録する
 □ 取引相手を登録する
 □ 毎月・毎年の支払いを登録する
-□ 毎月・毎年の収入を登録する
 ```
 
-継続事業（`opening_context = carry_forward`）の場合は、必要に応じて次も表示する。
+継続事業（`opening_context = carry_forward`）の場合は、追加で次も表示する。
 
 ```text
-□ 在庫の扱いを確認する
+□ 開始残高を登録する
 ```
+
+固定資産・定期収入・在庫のカードは、対応する Todo / Handler が未実装のため現時点では表示しない。実装状況は [setupwizard-design.md](setupwizard-design.md) の「未実装の Wizard」を参照。
 
 ## 基本ルール
 
 ### answer = yes
 
-具体的な setup カードを表示する。
+対応する Todo を Dashboard に表示する。
 
 例:
 
 ```text
-固定資産を登録しましょう
+銀行口座を登録しましょう
 ```
 
 ### answer = no
 
-通常はカードを表示しない。
+Todo を作らないため、Dashboard には表示されない。
 
-ただし、決算前チェックでは再確認してもよい。
-
-例:
-
-```text
-固定資産は「なし」と登録されています。
-車・パソコン・機械などを事業で使っている場合は登録してください。
-```
+決算前チェックのタイミングで再確認カードを出したくなった場合は、その時点で別途 Todo を作る形になる（現状はそういう自動再確認機能はない）。
 
 ---
 
@@ -600,7 +593,7 @@ Soler を始める
 
 ### 概要
 
-- 表示条件: `answer(bank_account) = yes or unknown` かつ `bank_account_setup_status != completed`
+- 表示条件: `bank_account_answer = yes` で生成された `wizard_bank_account` Todo が `pending` の間
 - 目的: 事業用として残高管理する銀行口座と、その年の開始残高を登録する
 - UI 上は1つの流れで聞くが、内部責務は分ける
 
@@ -620,7 +613,7 @@ Soler を始める
 
 ### 概要
 
-- 表示条件: `answer(cash_on_hand) = yes or unknown` かつ `cash_on_hand_setup_status != completed`
+- 表示条件: `cash_on_hand_answer = yes` で生成された `wizard_cash_on_hand` Todo が `pending` の間
 - 目的: 事業用として分けている現金と、その年の開始金額を登録する
 - 構造は銀行口座 SetupWizard の簡易版（識別情報がない分だけ簡素）
 - 表示例: レジ現金 / 金庫 / 小口現金 / イベント用現金
@@ -633,10 +626,12 @@ Soler を始める
 
 ### 概要
 
-- 表示条件: `answer(fixed_asset) = yes or unknown` かつ `fixed_asset_setup_status != completed`
+- 表示条件（将来）: `fixed_asset_answer = yes` で生成される `wizard_fixed_asset` Todo が `pending` の間
 - 目的: 仕事で使う高額なものを登録し、当年度の減価償却見込みを作る
 - SetupWizard は入力収集に専念し、台帳登録・償却計算は `DepreciationService` に委ねる
 - 開始時点で存在する固定資産は Opening Setup と連携する
+
+現時点では固定資産 Todo / Handler は未実装。`fixed_asset_answer` は `initial_setup_data` に保存されるが、Dashboard には Todo として現れない。
 
 ---
 
@@ -646,10 +641,12 @@ Soler を始める
 
 ### 概要
 
-- 表示条件: `opening_context = carry_forward` かつ `inventory_setup_status != completed`
+- 表示条件（将来）: `opening_context = carry_forward` で生成される `wizard_inventory` Todo が `pending` の間
 - 目的: 仕入・在庫がある事業かを確認し、必要なら開始時点の棚卸資産を登録する
 - 他の Wizard と異なり管理対象（SubAccount）は作らず、金額ベースで扱う
 - 年末棚卸が必要であることを周知する
+
+現時点では在庫 Todo / Handler は未実装。`initial_setup_data` にも `inventory_answer` カラムはない。継続事業の棚卸資産の開始残高は、当面 `wizard_opening_balance` Todo の資産項目「棚卸資産」で入力する。
 
 ---
 
@@ -659,7 +656,7 @@ Soler を始める
 
 ### 概要
 
-- 表示条件: `answer(recurring_expense) = yes or unknown` かつ `recurring_expense_setup_status != completed`
+- 表示条件: `recurring_expense_answer = yes` で生成された `wizard_recurring_expenses` Todo が `pending` の間
 - 目的: 毎月・毎年くり返す支払いを登録し、月次確認を楽にする
 - プリセットを最初から表示して、使わないものを削る方式
 - 金額は概算・0 円でも保存できる（実際の金額で確定するため）
@@ -674,12 +671,14 @@ Soler を始める
 
 ### 概要
 
-- 表示条件: `answer(recurring_income) = yes or unknown` かつ `recurring_income_setup_status != completed`
+- 表示条件（将来）: `recurring_income_answer = yes` で生成される `wizard_recurring_incomes` Todo が `pending` の間
 - 目的: 毎月・毎年くり返す収入を登録し、月次確認を楽にする
 - 事業ごとに異なるため、候補は例示のみで自分で追加する方式
 - 金額は概算・0 円でも保存できる（実際の金額で確定するため）
 - `RecurringTransactionPlan`（`type = income`）として登録する（源泉徴収あり・なしに対応済み）
 - 数字に直接影響しない「入力を楽にする」設定（Dashboard 優先度は低）
+
+`RecurringIncomeTodoHandler` は実装済みだが、`GeneralBusinessInitializer::registerRequestedTodos()` から `wizard_recurring_incomes` Todo を作成する枝が未実装のため、現時点では Dashboard に自動的には表示されない。
 
 ---
 
@@ -689,7 +688,7 @@ Soler を始める
 
 ### 概要
 
-- 表示条件: `answer(counterparty) = yes or unknown` かつ `counterparty_setup_status != completed`
+- 表示条件: `counterparty_answer = yes` で生成された `wizard_counterparty` Todo が `pending` の間
 - 目的: よく請求する相手や、よく支払う相手を `Counterparty` として登録する
 - 売掛金・買掛金・売上高の補助科目は作らない
 - 適格請求書発行事業者の状態は、必要に応じて後続で確認する（Wizard では確定させない）
@@ -705,48 +704,28 @@ Soler を始める
 | --- | --- |
 | `yes` | 該当すると答えた |
 | `no` | 該当しないと答えた |
-値の集合をどう定義するか（`SetupAnswer` クラス）は [setupwizard-design.md](setupwizard-design.md) を参照。
+
+値の集合は `InitialSetupData::ANSWER_YES` / `ANSWER_NO`。実装の詳細は [setupwizard-design.md](setupwizard-design.md) を参照。
+
+`unknown` は現行モデルには存在せず、初回 SetupWizard でも使わない。
 
 ---
 
-# setup status の扱い
+# setup の進行状態
 
-Yes / No は「該当するかどうか」である。
+Yes / No は「該当するかどうか」を表す。
 
-それとは別に、setup の進行状態を持つ。
+それとは別に、個別 SetupWizard の進行状態が必要になる。現行実装では、これは対応する Todo (`todos.status`) で持つ。専用の setup_status カラムや `SetupStatus` クラスは持たない。
 
-| status | 意味 |
+| Todo の status | 意味 |
 | --- | --- |
-| `not_needed` | 該当しないため設定不要 |
-| `pending` | 設定が必要だが未完了 |
-| `completed` | 設定完了 |
-| `skipped` | 利用者があとで設定することを選んだ |
+| `pending` | Todo が発行され、未完了 |
+| `completed` | Handler の `execute()` が成功した |
+| `dismissed` | 利用者が明示的に取りやめた |
 
-## answer と status の組み合わせ例
+`answer = no` の場合は Todo が発行されないため、Dashboard には出てこない（別途「該当しない」ことを示す状態カラムは持たない）。
 
-```text
-answer = yes
-status = pending
-```
-
-意味:
-
-```text
-該当すると答えたが、詳細設定はまだ終わっていない
-```
-
-```text
-answer = no
-status = not_needed
-```
-
-意味:
-
-```text
-該当しないため、設定不要
-```
-
-値の集合をどう定義するか（`SetupStatus` クラス）は [setupwizard-design.md](setupwizard-design.md) を参照。
+「あとで登録する」に相当する `skipped` は現行 Todo モデルにはない。後回しにする場合は `pending` のまま Dashboard に残す。
 
 ---
 
@@ -759,12 +738,12 @@ Dashboard に表示する開始準備カードは、次の優先順位で並べ�
 数字に直接影響するもの。
 
 ```text
-銀行口座を登録する
-事業専用現金を登録する
-開始時点の金額を確認する
-固定資産を登録する
-在庫の扱いを確認する
+銀行口座を登録する（wizard_bank_account）
+事業専用現金を登録する（wizard_cash_on_hand）
+開始残高を登録する（wizard_opening_balance）
 ```
+
+将来: 固定資産・在庫。
 
 ## 優先度 低
 
@@ -773,10 +752,11 @@ Dashboard に表示する開始準備カードは、次の優先順位で並べ�
 取引相手は、定期支出・定期収入への紐付けの前提になるため、先に案内する。
 
 ```text
-取引相手を登録する
-毎月・毎年の支払いを登録する
-毎月・毎年の収入を登録する
+取引相手を登録する（wizard_counterparty）
+毎月・毎年の支払いを登録する（wizard_recurring_expenses）
 ```
+
+将来: 毎月・毎年の収入を登録する（`wizard_recurring_incomes`）。Handler は実装済みだが initializer 側の Todo 作成が未実装。
 
 ---
 
@@ -889,9 +869,7 @@ UI 上は次のようにする。
 
 ## Unknown の扱い
 
-`unknown` は初回 SetupWizard では使わない。
-
-個別 SetupWizard や後続の判定で必要になった場合のみ使う。
+`unknown` は現行実装のどこにも存在しない。初回 SetupWizard も個別 SetupWizard も、`yes` / `no` の 2 値だけで扱う。「わからない」と答えたい利用者には、後で変更できる前提でどちらかを選んでもらう。
 
 ---
 

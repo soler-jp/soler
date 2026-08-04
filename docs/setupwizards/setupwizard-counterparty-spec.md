@@ -30,29 +30,22 @@
 ## 表示条件
 
 ```text
-answer(counterparty) = yes  or  unknown
-counterparty_setup_status != completed
+counterparty_answer = yes で生成された wizard_counterparty Todo が pending
 ```
 
 ### answer 別の見え方
 
 #### answer = yes
 
+`GeneralBusinessInitializer::registerRequestedTodos()` が `wizard_counterparty` Todo を作り、次のカードとして並ぶ。
+
 ```text
 取引相手を登録しましょう
 ```
 
-#### answer = unknown
-
-```text
-よく請求する相手・よく支払う相手があるか確認しましょう
-```
-
-確認カード内で「はい／いいえ」を選び直せるようにする。
-
 #### answer = no
 
-通常はカードを表示しない。
+Todo は作られず、Dashboard には表示されない。現行実装に `unknown` はない。
 
 ---
 
@@ -63,8 +56,8 @@ counterparty_setup_status != completed
 ```text
 1画面: 取引相手の一覧入力
 
-  行1:  取引相手名 / 区分 / メモ
-  行2:  取引相手名 / 区分 / メモ
+  行1:  取引相手名 / メモ
+  行2:  取引相手名 / メモ
   [＋ 取引相手を追加]
 
   [保存]
@@ -76,10 +69,11 @@ counterparty_setup_status != completed
 
 ## 入力欄（各行）
 
+現行の `CounterpartyTodoHandler` は次の 2 項目を受け付ける。
+
 | 項目 | 必須 | 説明 |
 | --- | --- | --- |
-| 取引相手名 | 必須 | 会社名・屋号・個人名など |
-| 区分 | 必須 | 請求先 / 支払先 / 両方 |
+| 取引相手名 | 必須 | 会社名・屋号・個人名など。同じ名前は同時入力・既存登録済みのどちらでもエラー |
 | メモ | 任意 | 備考。担当者名など |
 
 ### 画面文言案
@@ -94,39 +88,36 @@ counterparty_setup_status != completed
 ### 方針
 
 - 各行を `Counterparty` として登録する
-- 「区分」は請求先・支払先の絞り込み表示に使う
 - 売掛金・買掛金・売上高の補助科目は作らない（取引相手ごとに勘定科目を分けない）
+- 「請求先／支払先／両方」の区分は現行の `Counterparty` に持たせていない。必要になった段階でモデルとハンドラの両方に追加する
 
 ---
 
 ## 完了条件
 
-### status の遷移
+### Todo status の遷移
 
-| 状態 | 遷移条件 |
+| status | 遷移条件 |
 | --- | --- |
-| `not_needed` | `answer = no` になった時点 |
-| `pending` | `answer = yes` または `unknown` で、まだ「保存」していない |
-| `completed` | 「保存」を押し、少なくとも1つの `Counterparty` を登録した |
-| `skipped` | 「あとで登録する」を選んだ、または1つも登録せずに終えた |
+| `pending` | `counterparty_answer = yes` で Todo が発行されてから、まだ Handler の実行が成功していない |
+| `completed` | `CounterpartyTodoHandler::execute()` が成功し、`Todo::markCompleted()` が呼ばれた |
+| `dismissed` | 利用者が明示的にこの Todo を取りやめた |
+
+`answer = no` の場合は Todo 自体が発行されない。
 
 ### completed の判定条件
 
-- `answer(counterparty) = yes`
-- 少なくとも1つの `Counterparty` が登録されている
-- 利用者が「保存」を押した
+現行の `CounterpartyTodoHandler` は `counterparties` を `required|array|min:1` で受けるため、1件以上を「保存」した場合のみ Todo が `completed` になる。同名の Counterparty が既に登録済みだとバリデーションエラーになる。
 
 ### 「1つも登録せずに終える」場合
 
-1人も登録しないまま終えた場合は、`status = skipped` として扱う。カードは残す。
+1人も登録しないままの「保存」は現状バリデーションで弾かれる。後回しにしたい場合は Todo を `pending` のまま残す。
 
 ---
 
 ## answer 遷移
 
-- `unknown → yes`: 「よく取引する相手がいる」を選択 → Step 1 へ
-- `unknown → no`: 「いない」を選択 → `status = not_needed`、カードを閉じる
-- `yes → no`: Dashboard のカード操作から変更
+`counterparty_answer` は初回 SetupWizard の Step 4 で確定させ、`initial_setup_data` に固定される。現行実装に `unknown` はなく、初回完了後に回答を変える UI もまだ持たない。
 
 ---
 
@@ -185,8 +176,6 @@ counterparty_setup_status != completed
 | 会計用語（内部） | UI 表現 |
 | --- | --- |
 | Counterparty | 取引相手 |
-| 請求先 | 請求する相手 |
-| 支払先 | 支払う相手 |
 | 適格請求書発行事業者 | （この Wizard では扱わない） |
 
 ---

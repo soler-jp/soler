@@ -12,10 +12,18 @@ SetupWizard は、大きく次の3層で構成する。
 | 層 | 役割 | 永続化 |
 | --- | --- | --- |
 | Livewire コンポーネント | 画面の描画と入力途中の状態の保持 | しない（コンポーネントのプロパティ） |
-| Service | ドメイン処理（BusinessUnit / FiscalYear / 期首仕訳 / 個別 setup） | 各ドメインモデルへ |
+| Service | ドメイン処理（BusinessUnit / FiscalYear / 期首仕訳 / 個別登録） | 各ドメインモデルへ |
 | 初回導線データ | 初回 SetupWizard の回答と完了記録 | `initial_setup_data` |
 
-「入力途中の状態はモデルにしない・判定結果は永続化する」という分離が全体の前提になる（後述）。
+「入力途中の状態はモデルにしない・確定した回答は永続化する」という分離が全体の前提になる。
+
+## 初回 SetupWizard と個別 SetupWizard の関係
+
+- 初回 SetupWizard は 1 つの Livewire コンポーネント (`App\Livewire\SetupWizard`) で、submit 時に `BusinessUnit` / `InitialSetupData` / `FiscalYear` / 初回 Todo をまとめて作成する。
+- 個別 SetupWizard は独立した Livewire コンポーネント群としては実装せず、**Todo と TodoHandler の組**として実装する。Dashboard の Todo 一覧に並び、`App\Livewire\TodoCard` などの汎用/専用 Card が入力 UI を描画する。
+- 進行状態は次の 2 つに分けて保持する。
+  - 初回回答（該当するかどうか）: `initial_setup_data.*_answer`
+  - 個別 Wizard の進行状態: 対応する `todos.status`
 
 ---
 
@@ -23,162 +31,156 @@ SetupWizard は、大きく次の3層で構成する。
 
 ## 初回 SetupWizard
 
-初回 SetupWizard は 1 つの Livewire コンポーネントで、複数 Step を持つ。
-
 ```text
 App\Livewire\SetupWizard
 ```
 
 ### 方針
 
-- Step 遷移は `public int $step` で管理する（現行実装を踏襲）
+- Step 遷移は `public int $step` で管理する（`max_unlocked_step` も持ち、戻り遷移だけを許す）
 - 各 Step の入力値はコンポーネントのプロパティに持つ
 - これらの入力途中の状態はモデルとして保存しない
-- `submit()` 時に `GeneralBusinessInitializer` を1回だけ呼び、まとめて確定する
+- `submit()` 時に `GeneralBusinessInitializer::initialize()` を1回だけ呼び、まとめて確定する
 
-### 現行との差分
+### Step 構成（現行実装）
 
-現行の `SetupWizard`（`app/Livewire/SetupWizard.php`）は、期首残高・売上補助科目まで1画面群で入力させている。本設計では、初回はほぼ「判定」に絞り、詳細入力は個別ウィザードへ移す。
+| Step | 内容 | プロパティ |
+| --- | --- | --- |
+| 1 | 事業名 | `name`, `business_type` |
+| 2 | 記録開始年 | `year`（`MIN_SUPPORTED_YEAR` から当年まで） |
+| 3 | 開始状態 | `opening_context` |
+| 4 | 6 問の Yes / No | `bank_account_answer` ほか 5 つの `*_answer` |
+| 5 | 消費税申告の要否 | `is_taxable` |
+| 6 | 確認して開始 | ― |
 
-## 個別 SetupWizard
+Step 4 の 6 問は spec の `bank_account` / `cash_on_hand` / `fixed_asset` / `recurring_expense` / `recurring_income` / `counterparty` に対応する。在庫は初回 SetupWizard の質問には含めない。
 
-個別 SetupWizard は、Dashboard のカードから開く。フォームの形が違うため、原則 **key ごとに専用の Livewire コンポーネント**を持つ。ただし定期支出・定期収入はフォームが近いため、1コンポーネントを `type` で出し分ける（下記）。
+## 個別 SetupWizard = Todo + TodoHandler + TodoCard
+
+個別 SetupWizard 用に Livewire コンポーネントを 1 つずつ作らない。次の 3 要素で実装する。
 
 ```text
-App\Livewire\Setup\BankAccountSetupWizard
-App\Livewire\Setup\CashOnHandSetupWizard
-App\Livewire\Setup\FixedAssetSetupWizard
-App\Livewire\Setup\InventorySetupWizard
-App\Livewire\Setup\CounterpartySetupWizard
-App\Livewire\Setup\RecurringTransactionSetupWizard  // recurring_expense / recurring_income を type で共用
+Todo（DB レコード）
+  ├─ todo_type = 'wizard_bank_account' などが実装の Wizard 種別
+  ├─ TodoHandler が入力仕様（inputSchema）と実行ロジック（execute）を持つ
+  └─ TodoCard が入力 UI を描画する（汎用または todo_type ごとの専用）
 ```
 
-### 方針
+### Livewire 側の実装
 
-- 各コンポーネントは入力途中の状態のみ保持する
-- 完了時に、対応する `*SetupService` を呼ぶ
-- Service がドメインモデルへ保存する
+| クラス | 役割 |
+| --- | --- |
+| `App\Livewire\TodoCard` | Handler の `inputSchema()` を汎用に描画する既定の Card |
+| `App\Livewire\TodoCards\OpeningBalanceCard` | 開始残高 Todo の専用 Card |
+| `App\Livewire\TodoCards\RecurringExpenseCard` | 定期支出 Todo の専用 Card |
 
-### 定期支出・定期収入の共用（recurring_expense / recurring_income）
+現状、専用 Card があるのは開始残高と定期支出のみ。それ以外の Todo は汎用 `TodoCard` を使う。
 
-- `RecurringTransactionSetupWizard` は、開く key（`recurring_expense` / `recurring_income`）に応じて `type`（`expense` / `income`）を受け取り、支出モード・収入モードを出し分ける
-- カード・answer・status は key ごとに独立（`recurring_expense` / `recurring_income`）。コンポーネントと `RecurringTransactionSetupService` のみ共用する
-- 各行は任意で `Counterparty` を紐づけられる。`RecurringTransactionSetupService` は入力に `counterparty_id`（任意）を受け取り、`RecurringTransactionPlan.counterparty_id` に保存する。紐付け候補は当該 `business_unit_id` の `Counterparty` に限る
+各 Card は入力途中の状態のみプロパティで保持し、保存時に `TodoService::execute()` → Handler の `validate()` → `execute()` → 対応する Registration Service を呼ぶ流れになる。
 
 ## Dashboard カード
 
-```text
-App\Livewire\SetupDashboard （またはダッシュボード内のカード一覧コンポーネント）
-```
-
-- `InitialSetupData` と各ドメインモデルの状態から「表示すべきカード一覧」を判定して描画する
-- カードの見出し・優先度・遷移先は、後述の「key → 設定マッピング」に従う
+Dashboard は Todo 一覧を priority / status で並べ、todo_type に応じた Card を描画する。SetupDashboard 専用の Livewire クラスは持たない。
 
 ---
 
-# key → 設定マッピング
+# key → 実装マッピング
 
-各 SetupWizard は、初回 SetupWizard が保存した `InitialSetupData` の回答と、各ドメインモデルの実在状態を組み合わせて判定する。
+現行実装の「初回 SetupWizard の質問キー ↔ 発行される Todo ↔ Handler ↔ Service ↔ 成果物」の対応表。
 
-- **初回回答（DB に保存）**: `bank_account_answer` など。初回導線で 1 回だけ保存する。
-- **固定の設定（コードに定義）**: 見出し・優先度・Livewire コンポーネント・Service・成果物の保存先。key ごとに決まっている。
+## Todo Handler マッピング
 
-## 設定テーブル
+`App\Models\Todo::$handlers` に定義される。
 
-| key | Dashboard カード見出し | 優先度 | Livewire コンポーネント | Service | 成果物の保存先 |
-| --- | --- | --- | --- | --- | --- |
-| `bank_account` | 銀行口座を登録する | 高 | `BankAccountSetupWizard` | `BankAccountSetupService` | `SubAccount`（その他の預金）＋ 期首仕訳 |
-| `cash_on_hand` | 事業専用現金を登録する | 高 | `CashOnHandSetupWizard` | `CashOnHandSetupService` | `SubAccount`（現金）＋ 期首仕訳 |
-| `fixed_asset` | 固定資産を登録する | 高 | `FixedAssetSetupWizard` | `FixedAssetSetupService` | `FixedAsset` ＋ 期首仕訳 |
-| `inventory` | 在庫の扱いを確認する | 高 | `InventorySetupWizard` | `InventorySetupService` | 棚卸資産の期首仕訳 |
-| `counterparty` | 取引相手を登録する | 低 | `CounterpartySetupWizard` | `CounterpartySetupService` | `Counterparty` |
-| `recurring_expense` | 毎月・毎年の支払いを登録する | 低 | `RecurringTransactionSetupWizard`（`type = expense`） | `RecurringTransactionSetupService` | `RecurringTransactionPlan`（`type = expense`） |
-| `recurring_income` | 毎月・毎年の収入を登録する | 低 | `RecurringTransactionSetupWizard`（`type = income`） | `RecurringTransactionSetupService` | `RecurringTransactionPlan`（`type = income`） |
+| todo_type | Handler | Registration Service | 成果物 |
+| --- | --- | --- | --- |
+| `wizard_bank_account` | `BankAccountTodoHandler` | `BankAccountRegistrationService` | `SubAccount`（その他の預金）＋ 期首仕訳 |
+| `wizard_cash_on_hand` | `CashOnHandTodoHandler` | `CashOnHandRegistrationService` | `SubAccount`（現金）＋ 期首仕訳 |
+| `wizard_opening_balance` | `OpeningBalanceTodoHandler` | `OpeningBalanceRegistrationService` | 期首仕訳（資産・負債） |
+| `wizard_recurring_expenses` | `RecurringExpenseTodoHandler` | ― | `RecurringTransactionPlan`（`type = expense`） |
+| `wizard_recurring_incomes` | `RecurringIncomeTodoHandler` | ― | `RecurringTransactionPlan`（`type = income`） |
+| `wizard_counterparty` | `CounterpartyTodoHandler` | ― | `Counterparty` |
 
-`recurring_expense` / `recurring_income` は、キー・カード・answer / status は分けるが、フォームの形が近いため Livewire コンポーネントと Service は共用し、`type`（`expense` / `income`）で出し分ける。優先度低グループでは、紐付けの前提となる `counterparty` を定期支出・定期収入より前に並べる。
+定期支出・定期収入は共通の `AbstractRecurringTransactionPlanTodoHandler` を継承した Handler で処理する。
 
-消費税は Step 5 で課税 / 免税を確定させ、`fiscal_years.is_taxable` に保存する。詳細な消費税設定（本則 / 簡易 / 2割特例 / 税抜経理など）は消費税計算機能の実装時に扱うため、現時点では専用の SetupWizard も Dashboard カードも設けない。
+## 初回 SetupWizard の回答 → Todo 登録
 
-申告方法（青色 / 白色）も初回 SetupWizard でも Dashboard でも扱わない。決算書作成フローで扱うため、`fiscal_years` に列も追加しない。
+`GeneralBusinessInitializer::registerRequestedTodos()` が回答を見て Todo を作る。
 
-売掛金（請求後入金の売上）と家事按分（共用支払い）は、SetupWizard ではなくそれぞれ売上登録画面・経費登録画面で扱う。詳細は [setupwizard-spec.md](setupwizard-spec.md) を参照。
+- `opening_context = carry_forward` → `wizard_opening_balance` Todo を登録
+- `bank_account_answer = yes` → `wizard_bank_account` Todo を登録
+- `cash_on_hand_answer = yes` → `wizard_cash_on_hand` Todo を登録
+- `recurring_expense_answer = yes` → `wizard_recurring_expenses` Todo を登録
+- `counterparty_answer = yes` → `wizard_counterparty` Todo を登録
 
-在庫は初回 SetupWizard の質問項目には含めない。継続事業（`opening_context = carry_forward`）で開始時点の棚卸資産が必要になる可能性があるため、Dashboard 側の個別 SetupWizard として扱う。
+## 未実装の Wizard
 
-## 設定の持ち方（コード側）
+現行の initializer は以下の回答に対する Todo を登録しない。回答自体は `initial_setup_data` に保存される。
 
-```php
-FiscalYearSetupKey::BANK_ACCOUNT => [
-    'label'     => '銀行口座を登録する',
-    'priority'  => 'high',
-    'component' => Setup\BankAccountSetupWizard::class,
-    'service'   => BankAccountSetupService::class,
-],
-FiscalYearSetupKey::FIXED_ASSET => [
-    'label'     => '固定資産を登録する',
-    'priority'  => 'high',
-    'component' => Setup\FixedAssetSetupWizard::class,
-    'service'   => FixedAssetSetupService::class,
-],
-// ...
-```
+- `fixed_asset_answer` → 固定資産 Todo / Handler が未実装
+- `recurring_income_answer` → Handler と `todo_type` は存在するが、initializer から Todo を登録するコードが未実装
+- 在庫 → 初回 SetupWizard に質問がなく、Todo 種別・Handler も未実装
 
-この定義は、`FiscalYearSetupKey`（key の集合）とあわせて1箇所に置き、Dashboard カード生成と個別ウィザードの起動の両方から参照する。
+これらの spec は将来像として書かれている。実装のタイミングで initializer と Handler / Service の追加が必要になる。
 
-## 新モデルは作らない
+## 消費税と申告方法
 
-各 key の成果物は、すべて既存のドメインモデル（`SubAccount` / `FixedAsset` / `RecurringTransactionPlan` / `Counterparty` / 期首仕訳）に保存する。
-
-家事按分の初期割合を保持する新モデル（当初検討していた `HouseholdAllocationDefault` など）は、家事按分を経費登録画面側で扱う方針にしたため不要になった。
+- 消費税は Step 5 で課税 / 免税を確定させ、`fiscal_years.is_taxable` に保存する。詳細（本則 / 簡易 / 2割特例 / 税抜経理など）は消費税計算機能の実装時に扱うため、現時点では専用の SetupWizard も Dashboard カードも設けない。
+- 申告方法（青色 / 白色）は初回 SetupWizard でも Dashboard でも扱わない。決算書作成フローで扱うため、`fiscal_years` に列も追加しない。
+- 売掛金（請求後入金の売上）と家事按分（共用支払い）は、SetupWizard ではなくそれぞれ売上登録画面・経費登録画面で扱う。
 
 ---
 
 # 値の集合（定数クラス）
 
-`answer` / `status` に入る文字列の集合は、既存の `JournalEntry::TAX_TYPE_*` などと同じモデル定数方式のクラスで定義する。これは永続化の要否とは別で、値のバリデーションと参照のためである。
+`answer` に入る文字列や `opening_context` の値は、`InitialSetupData` のモデル定数として定義する。`SetupAnswer` / `SetupStatus` のような専用クラスは持たない。
 
-## SetupAnswer
+## InitialSetupData の定数
 
 ```php
-class SetupAnswer
+class InitialSetupData extends Model
 {
-    public const YES = 'yes';
+    public const ANSWER_YES = 'yes';
+    public const ANSWER_NO  = 'no';
 
-    public const NO = 'no';
-
-    public const UNKNOWN = 'unknown';
-
-    public static array $values = [
-        self::YES,
-        self::NO,
-        self::UNKNOWN,
+    public const BINARY_ANSWERS = [
+        self::ANSWER_YES,
+        self::ANSWER_NO,
     ];
+
+    public const OPENING_CONTEXT_FIRST_YEAR   = 'first_year';
+    public const OPENING_CONTEXT_CARRY_FORWARD = 'carry_forward';
+
+    public const OPENING_CONTEXTS = [
+        self::OPENING_CONTEXT_FIRST_YEAR,
+        self::OPENING_CONTEXT_CARRY_FORWARD,
+    ];
+
+    public const KEY_BANK_ACCOUNT      = 'bank_account';
+    public const KEY_CASH_ON_HAND      = 'cash_on_hand';
+    public const KEY_FIXED_ASSET       = 'fixed_asset';
+    public const KEY_RECURRING_EXPENSE = 'recurring_expense';
+    public const KEY_RECURRING_INCOME  = 'recurring_income';
+    public const KEY_COUNTERPARTY      = 'counterparty';
 }
 ```
 
-初回 SetupWizard では `YES` / `NO` だけを使う。`UNKNOWN` は個別 SetupWizard や後続判定で必要になった場合にのみ扱う。
+現行の初回 SetupWizard は `yes` / `no` のみ扱う。`unknown` はモデルの定数にも含まれておらず、Wizard 内でも使用しない。
 
-## SetupStatus
+## Todo の進行状態
+
+個別 SetupWizard の進行状態は Todo 自身で持つ。
 
 ```php
-class SetupStatus
-{
-    public const NOT_NEEDED = 'not_needed';
-
-    public const PENDING = 'pending';
-
-    public const COMPLETED = 'completed';
-
-    public const SKIPPED = 'skipped';
-
-    public static array $values = [
-        self::NOT_NEEDED,
-        self::PENDING,
-        self::COMPLETED,
-        self::SKIPPED,
-    ];
-}
+Todo::STATUS_PENDING   = 'pending';
+Todo::STATUS_COMPLETED = 'completed';
+Todo::STATUS_DISMISSED = 'dismissed';
 ```
+
+- 初期状態は `pending`
+- Handler の `execute()` が成功したときに `Todo::markCompleted()` が呼ばれ `completed` になる
+- 明示的に取りやめる場合は `dismissed`
+- 「あとで登録する」に相当する `skipped` は現行モデルにはない。利用者が後回しにする場合は `pending` のまま Dashboard に残る
 
 ---
 
@@ -186,20 +188,19 @@ class SetupStatus
 
 ## コンポーネントの入力途中の状態は保存しない
 
-初回 SetupWizard および個別 SetupWizard の「入力途中の状態」（現在の step、まだ確定していないフォームの値）は、モデルとして永続化しない。
+初回 SetupWizard および TodoCard の「入力途中の状態」（現在の step、まだ確定していないフォームの値）は、モデルとして永続化しない。
 
 これらは Livewire コンポーネントのプロパティとして、その場限りのメモリ上でのみ保持する。
 
 ## 初回回答は永続化する
 
-一方で、Dashboard に表示する個別 SetupWizard を判定するための初回回答は、セッションやリロードをまたいで必要になる。
-
-そのため、これらは使い捨てのメモリ空間では不足で、`initial_setup_data` として永続化する。
+Dashboard に出す個別 SetupWizard（Todo）を判定するための初回回答は、セッションやリロードをまたいで必要になるため、`initial_setup_data` として永続化する。
 
 | 種類 | 例 | 保存方法 |
 | --- | --- | --- |
 | 入力途中の状態 | 現在の step、未確定の入力値 | 保存しない（コンポーネントのプロパティ） |
 | 初回回答 | 銀行口座の有無、固定資産の有無、開始年 | `initial_setup_data` に保存 |
+| 個別 Wizard の進行状態 | pending / completed / dismissed | `todos.status` |
 | 確定した年度設定 | 消費税、opening_context | `fiscal_years` のカラム |
 
 ---
@@ -208,59 +209,44 @@ class SetupStatus
 
 ## initial_setup_data
 
-初回 SetupWizard の回答を管理する。
+初回 SetupWizard の回答を保存する（1 business_unit につき 1 レコード）。実装のマイグレーションと同じ形。
 
 ```php
 Schema::create('initial_setup_data', function (Blueprint $table) {
     $table->id();
-
-    $table->foreignId('business_unit_id')
-        ->constrained()
-        ->cascadeOnDelete()
-        ->comment('対象事業体ID');
-
-    $table->integer('year')
-        ->comment('記録を始める年');
-
-    $table->string('opening_context')
-        ->comment('開始状態。first_year, carry_forward');
-
-    $table->boolean('is_taxable')
-        ->default(false)
-        ->comment('消費税申告が必要かどうか');
-
+    $table->foreignId('business_unit_id')->constrained()->cascadeOnDelete();
+    $table->integer('year');
+    $table->string('opening_context');
+    $table->boolean('is_taxable')->default(false);
     $table->string('bank_account_answer');
     $table->string('cash_on_hand_answer');
     $table->string('fixed_asset_answer');
     $table->string('recurring_expense_answer');
     $table->string('recurring_income_answer');
     $table->string('counterparty_answer');
-
-    $table->timestamp('completed_at')
-        ->nullable()
-        ->comment('初回セットアップ完了日時');
-
+    $table->timestamp('completed_at')->nullable();
     $table->timestamps();
 
     $table->unique('business_unit_id');
 });
 ```
 
+- 個別 Wizard の完了状態を示す `*_setup_status` カラムは持たない。完了状態は対応する Todo の status で判定する。
+- 在庫の回答カラム（`inventory_answer`）も現状は持たない。
+
 ## fiscal_years の追加項目
 
 年度そのものに強く紐づく基本設定は `fiscal_years` に持たせる。
 
-```php
-Schema::table('fiscal_years', function (Blueprint $table) {
-    $table->string('opening_context')
-        ->default('first_year')
-        ->comment('期首設定の文脈。first_year, carry_forward');
+| カラム | 型 | 説明 |
+| --- | --- | --- |
+| `opening_context` | string | `first_year` / `carry_forward` |
+| `is_taxable` | boolean | 課税事業者なら true、免税事業者なら false |
+| `is_tax_exclusive` | boolean | 税抜経理は現時点で常に false（true は initializer 側で拒否） |
 
-    $table->boolean('is_taxable')
-        ->default(false)
-        ->comment('課税事業者なら true、免税事業者なら false');
-});
-```
+## Todo
+
+`todos` テーブル。SetupWizard から作られる Todo は `source_type = system`、`todo_type = wizard_*`、対応する `business_unit_id` / `fiscal_year_id` を持つ。
 
 ---
 
@@ -268,111 +254,136 @@ Schema::table('fiscal_years', function (Blueprint $table) {
 
 期首仕訳は、年度につき1本のみとする。
 
-複数のカード（銀行口座・現金・固定資産・在庫など）から少しずつ入力されるため、下書きを別テーブルに貯めるのではなく、その1本の期首仕訳を追加・修正できる API を用意し、各カードはそれを呼ぶ。
+複数の入口（銀行口座 Todo・現金 Todo・開始残高 Todo・将来的な固定資産や在庫）から少しずつ入力されるため、下書きを別テーブルに貯めるのではなく、その1本の期首仕訳を追加・修正できる仕組みで組み立てる。
 
 ```text
-カードで残高を入力
+Todo で残高を入力
   ↓
-期首仕訳（1本）に、その科目の行を追加・修正する
+その年度の期首仕訳（1本）に、該当科目の行を追加・修正する
   ↓
 元入金の行を差額として再計算する
 ```
 
-これにより、下書き用の一時テーブルを持たずに、常に整合した期首仕訳を1本だけ維持できる。
+## 責務分担（現行実装）
 
-## OpeningEntryRegistrar の拡張
+- `App\Services\OpeningEntryRegistrar`
+  - 期首仕訳の低レベルな登録部品
+  - `register(FiscalYear, entries, actor)`: 単発登録。同年度に有効な期首仕訳が既にあれば `DomainException`
+  - `registerForRollover(FiscalYear, entries, capitalEntry, actor)`: 資産負債＋元入金を受け取って新規登録（翌期繰越用）
+  - upsert 自体はここでは実装しない
+- `App\Services\OpeningBalanceRegistrationService`
+  - 資産・負債の開始残高を受け取る上位入口
+  - 既存の期首仕訳がなければ `OpeningEntryRegistrar::registerForRollover()` で新規登録
+  - 既存がある場合は `TransactionRevisor::revise()` を通じて対象の借方・貸方行だけを差し替え、元入金を差額として再計算する
+- `App\Services\BankAccountRegistrationService` / `App\Services\CashOnHandRegistrationService`
+  - SubAccount の作成と、期首残高がある場合の期首仕訳の追記
+  - 既存の期首仕訳があれば `TransactionRevisor::revise()` で追記し、貸方（元入金相当）を合計に合わせて再構成する
 
-現状の `OpeningEntryRegistrar`（`app/Services/OpeningEntryRegistrar.php`）は、次の点を拡張する。
+各サービスは `AuthorizesBusinessUnitAccess` トレイトを通して actor による認可を行う。
 
-- 2本目の登録で例外を投げるのではなく、既存の期首仕訳に対する追加・修正を許可する
-- 借方の許可科目を、資産科目だけでなく負債科目（買掛金・未払金・借入金）や売掛金にも広げる
-- 追加・修正のたびに、元入金の行を資産・負債の差額として再計算する
-- 元入金は利用者に入力させず、常に差額として自動計算する
+## 元入金の扱い
 
-現状は `register()` が単発登録で、`is_opening_entry` が既にあると `DomainException` を投げる。この単発前提を、追加・修正（upsert）できる形に変える。
+- 資産・負債の入力を受けるたびに、元入金の行を差額として再計算する
+- 利用者に元入金を入力させない。Wizard 上にも表示しない
+
+## 将来的な統一
+
+現状は BankAccount / CashOnHand / OpeningBalance が個別に「期首仕訳の追記・改訂」ロジックを持っている。将来的には `OpeningBalanceRegistrationService` を開始残高全体の統一入口に寄せ、`OpeningEntryRegistrar` に upsert API を持たせる方針。詳細は [opening-balance-registration-service-todo.md](../opening-balance-registration-service-todo.md) を参照。
 
 ---
 
 # サービス設計
 
-## BusinessUnitSetupService
+## GeneralBusinessInitializer
 
-### 責務
+```text
+App\Setup\Initializers\GeneralBusinessInitializer
+```
 
-- `BusinessUnit` を作成する
-- 標準 `Account` を作成する
-- 標準 `SubAccount` を作成する
-- 作成者を単一オーナー（`business_units.user_id`）として設定する
-- 選択中の事業体に設定する
+初回 SetupWizard の submit を受け、単一トランザクションで次を行う。
 
----
+- `is_tax_exclusive = true` は `InvalidArgumentException` で拒否（現時点で税抜経理は未対応）
+- `User::createBusinessUnitWithDefaults()` で `BusinessUnit` と標準 `Account` / `SubAccount` を作り、単一オーナー（`business_units.user_id`）で紐づける
+- `InitialSetupData` を `business_unit_id` 配下に作成し、`completed_at = now()` を記録
+- `InitialSetupData::toGeneralBusinessInitializerInputs()` で年度作成向けの input へ整形
+- `FiscalYear` を作成し、`is_active` / `is_taxable` / `is_tax_exclusive` / `opening_context` を確定
+- 事前に渡された `opening_entries` / `revenue_sub_accounts` を反映
+- `registerRequestedTodos()` で初回回答に応じた Todo を作る
 
 ## InitialSetupData
 
-### 責務
-
-- 初回 SetupWizard の回答を 1 レコードにまとめて保存する
-- `GeneralBusinessInitializer` 向けの input 配列へ変換する
-- `FiscalYear` に確定保存する前の導線データを保持する
-
----
-
-## OpeningSetupService
-
-### 責務
-
-- 各カードから渡された開始残高を、1本の期首仕訳へ追加・修正する
-- 銀行口座・現金・売掛金・在庫・買掛金・未払金・借入金などの開始状態を扱う
-- 固定資産 setup と連携する
-- 必要な検証を行う
-- 元入金の差額計算を含め、`OpeningEntryRegistrar` の追加・修正 API を呼ぶ
-
----
-
-## Individual Setup Services
-
-個別 SetupWizard はそれぞれ専用サービスを持つ。
-
 ```text
-BankAccountSetupService
-CashOnHandSetupService
-FixedAssetSetupService
-InventorySetupService
-RecurringTransactionSetupService
-CounterpartySetupService
+App\Models\InitialSetupData
 ```
 
----
+- 初回 SetupWizard の回答を 1 レコードにまとめる
+- `toGeneralBusinessInitializerInputs()`: 年度作成向けの input を返す。`is_tax_exclusive` は現状 false 固定
 
-# 既存実装の修正
-
-## GeneralBusinessInitializer の修正
-
-消費税の状態は `FiscalYear` を正とし、`BusinessUnit` には持たせない。
-
-`GeneralBusinessInitializer`（`app/Setup/Initializers/GeneralBusinessInitializer.php`）は、初回 SetupWizard の submit 時に単一 transaction の中で `BusinessUnit` 作成、`InitialSetupData` 保存、`FiscalYear` 作成を行う。
-
-そのため、初期化処理を次のように修正する。
-
-- `BusinessUnit` を作成する
-- `InitialSetupData` を `business_unit_id` 配下に保存する
-- `InitialSetupData` を `toGeneralBusinessInitializerInputs()` で整形する
-- 整形済み input から `FiscalYear` を作成する
-- 消費税・税抜経理の状態は `FiscalYear` にのみ保存する
-
-## 銀行口座 setup の責務分離
-
-銀行口座の setup では、ユーザーの使いやすさを優先し、銀行口座の登録と開始残高の入力を同じ画面で扱ってよい。
-
-ただし、内部では責務を分ける。
+## OpeningBalanceRegistrationService
 
 ```text
-銀行口座登録
-  -> SubAccount
-
-開始残高
-  -> Opening Setup（期首仕訳）
+App\Services\OpeningBalanceRegistrationService
 ```
+
+開始残高の入口。詳細は「期首仕訳の作り方」および [opening-balance-registration-service-todo.md](../opening-balance-registration-service-todo.md) を参照。
+
+## その他の Registration Service / 部品
+
+| クラス | 役割 |
+| --- | --- |
+| `App\Services\BankAccountRegistrationService` | 銀行口座 SubAccount 登録＋開始残高の期首仕訳への追記 |
+| `App\Services\CashOnHandRegistrationService` | 事業用現金 SubAccount 登録＋開始残高の期首仕訳への追記 |
+| `App\Services\OpeningEntryRegistrar` | 期首仕訳の低レベル登録部品 |
+| `App\Services\TransactionRevisor` | 期首仕訳を含む Transaction の改訂 |
+| `App\Services\DepreciationService` | 固定資産の登録と償却明細生成（固定資産 Wizard 実装時に接続予定） |
+| `App\Services\TodoService` | Todo の登録・入力仕様取得・実行 |
+
+## Todo Handler の契約
+
+```text
+App\Contracts\TodoHandler
+```
+
+```php
+interface TodoHandler
+{
+    public function todoType(): string;
+
+    public function inputSchema(Todo $todo): array;
+
+    public function validate(Todo $todo, array $inputs): array;
+
+    public function execute(Todo $todo, array $validatedInputs, User $actor): void;
+}
+```
+
+`inputSchema()` が返す配列を汎用 `TodoCard` が読んで UI を組み立てる。`execute()` の中で対応する Service を呼び、成功時に `Todo::markCompleted()` を呼ぶ実装が原則。
+
+## SubAccount の system_purpose / visibility
+
+Soler 標準の SubAccount は次の 2 カラムを持つ（[SubAccount モデル](../../app/Models/SubAccount.php) 参照）。
+
+- `system_purpose`: `unclassified` / `household_allocation` など内部用途（null 可）
+- `visibility`: `standard`（既定）または `expanded`
+
+SetupWizard の Registration Service が追加する SubAccount は既定で `visibility = standard`。「未分類」など内部用途を持つものは `system_purpose = unclassified` を設定する。
+
+---
+
+# 既存実装のポイント
+
+## 消費税の状態は FiscalYear を正とする
+
+`GeneralBusinessInitializer::initialize()` は消費税状態を `FiscalYear.is_taxable` / `FiscalYear.is_tax_exclusive` に保存する。`BusinessUnit` には持たせない。税抜経理は現時点で未対応（`is_tax_exclusive = true` を受けたら例外）。
+
+## 銀行口座 Todo の責務分離
+
+`BankAccountTodoHandler::execute()` は次を 1 トランザクションで行う。
+
+- 銀行口座 SubAccount（「その他の預金」配下）の作成
+- 期首残高がある場合の期首仕訳への反映
+
+内部では `BankAccountRegistrationService` が SubAccount 作成と期首仕訳追記の両方を扱い、期首仕訳追記は `OpeningEntryRegistrar` / `TransactionRevisor` に委譲する。
 
 ## UI と会計処理の変換
 
@@ -381,9 +392,11 @@ CounterpartySetupService
 ```text
 この年のはじめに残っていた金額
   ↓
-Opening Setup
+Todo の入力（TodoCard）
   ↓
-OpeningEntryRegistrar（追加・修正 API）
+TodoHandler::execute()
   ↓
-期首仕訳
+Registration Service（BankAccount / CashOnHand / OpeningBalance）
+  ↓
+期首仕訳（1本を追加・修正）
 ```

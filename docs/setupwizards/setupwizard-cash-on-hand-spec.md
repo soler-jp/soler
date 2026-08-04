@@ -35,29 +35,22 @@
 ## 表示条件
 
 ```text
-answer(cash_on_hand) = yes  or  unknown
-cash_on_hand_setup_status != completed
+cash_on_hand_answer = yes で生成された wizard_cash_on_hand Todo が pending
 ```
 
 ### answer 別の見え方
 
 #### answer = yes
 
+`GeneralBusinessInitializer::registerRequestedTodos()` が `wizard_cash_on_hand` Todo を作り、次のカードとして並ぶ。
+
 ```text
 事業用の現金を登録しましょう
 ```
 
-#### answer = unknown
-
-```text
-事業用として分けている現金があるか確認しましょう
-```
-
-確認カード内で「はい／いいえ」を選び直せるようにする。挙動は銀行口座 SetupWizard と同じ。
-
 #### answer = no
 
-通常はカードを表示しない。決算前チェックでのみ再確認してもよい。
+Todo は作られず、Dashboard には表示されない。現行実装に `unknown` はない。
 
 ---
 
@@ -131,37 +124,34 @@ cash_on_hand_setup_status != completed
 
 理由: 手元の現金は数えれば確認できるため。
 
-ただし、画面全体に対して「あとで登録する」は許す（`status = skipped`）。
+Todo 全体を「あとで登録する」形で残すことは許すが、現行の Todo モデルに `skipped` は存在しない。後回しにする場合は `pending` のまま Dashboard に残る。
 
 ---
 
 ## 完了条件
 
-### status の遷移
+### Todo status の遷移
 
-| 状態 | 遷移条件 |
+| status | 遷移条件 |
 | --- | --- |
-| `not_needed` | `answer = no` になった時点 |
-| `pending` | `answer = yes` または `unknown` で、まだ「保存」していない |
-| `completed` | 「保存」を押し、少なくとも1つの現金と開始金額が登録された |
-| `skipped` | 「あとで登録する」を選んだ |
+| `pending` | `cash_on_hand_answer = yes` で Todo が発行されてから、まだ Handler の実行が成功していない |
+| `completed` | `CashOnHandTodoHandler::execute()` が成功し、`Todo::markCompleted()` が呼ばれた |
+| `dismissed` | 利用者が明示的にこの Todo を取りやめた |
+
+`answer = no` の場合は Todo 自体が発行されない。
 
 ### completed の判定条件
 
-- `answer(cash_on_hand) = yes`
-- 少なくとも1つの `SubAccount`（事業用現金）が登録されている
-- 登録された各現金に対して、当該 `FiscalYear` の開始金額が入力されている
-- 利用者が「保存」を押した
+`CashOnHandTodoHandler::execute()` は次を1トランザクションで行い、成功すると Todo を `completed` にする。
+
+- 「現金」勘定配下に、入力された事業用現金ごとに `SubAccount` を作成する
+- 開始残高が 0 を超える現金について、期首仕訳へ追記する
 
 ---
 
 ## answer 遷移
 
-銀行口座 SetupWizard と同じ。
-
-- `unknown → yes`: 「事業用の現金がある」を選択 → Step 1 へ
-- `unknown → no`: 「事業用の現金はない」を選択 → `status = not_needed`、カードを閉じる
-- `yes → no`: Dashboard のカード操作から変更（詳細は setupwizard-design.md）
+`cash_on_hand_answer` は初回 SetupWizard の Step 4 で確定させ、以降は `initial_setup_data` に固定される。銀行口座 SetupWizard と同じく、初回完了後に回答を変える UI は現時点で持たない。
 
 ---
 

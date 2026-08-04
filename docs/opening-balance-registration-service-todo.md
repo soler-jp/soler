@@ -7,11 +7,13 @@
 
 現時点では、次の責務を持つ。
 
-- 開始残高入力の正規化
-- 必要な custom account の作成
-- 資産/負債/元入金の journal entries 組み立て
-- 新規期首仕訳の登録
-- 既存期首仕訳の改訂
+- 開始残高入力の正規化（asset_accounts / custom_asset_accounts / liability_accounts / custom_liability_accounts）
+- 必要な custom account の作成（`BusinessUnit::addCustomAccount()`）
+- 資産/負債の journal entries 組み立てと、元入金の差額計算
+- 期首仕訳が未登録なら `OpeningEntryRegistrar::registerForRollover()` で新規登録
+- 期首仕訳が既にあれば `TransactionRevisor::revise()` を通じて、対象科目の行と元入金を差し替え
+
+`OpeningBalanceTodoHandler`（`todo_type = wizard_opening_balance`）が本サービスの現在唯一の呼び出し元。
 
 ## 将来的な統一方針
 
@@ -36,7 +38,8 @@
 
 - `OpeningEntryRegistrar`
   - 低レベルな期首仕訳の登録部品
-  - journal entries を受けた登録/改訂の内部 API
+  - 現状は `register()` / `registerForRollover()` の単発登録のみ
+  - 将来的には journal entries を受けた upsert（登録/改訂）の内部 API を持たせる
 
 ## なぜ今すぐ統一しないか
 
