@@ -107,6 +107,39 @@ class BusinessUnitTest extends TestCase
     }
 
     #[Test]
+    public function create_with_default_accountsはexampleとcautionを保存する()
+    {
+        $user = User::factory()->create();
+
+        $businessUnit = BusinessUnit::createWithDefaultAccounts([
+            'user_id' => $user->id,
+            'name' => 'NTAデータ検証',
+            'type' => BusinessUnit::TYPE_GENERAL,
+        ]);
+
+        // example のみ持つ科目
+        $travel = $businessUnit->getAccountByName('旅費交通費');
+        $this->assertSame('電車賃、バス代、タクシー代、宿泊代', $travel->example);
+        $this->assertNull($travel->caution);
+
+        // example と caution の両方を持つ科目
+        $tax = $businessUnit->getAccountByName('租税公課');
+        $this->assertStringContainsString('消費税及び地方消費税', $tax->example);
+        $this->assertStringContainsString('商工会議所', $tax->example);
+        $this->assertStringContainsString("\n", $tax->example);
+        $this->assertStringContainsString('所得税及び復興特別所得税', $tax->caution);
+
+        // NTA データに含まれない科目
+        $opening = $businessUnit->getAccountByName('期首商品（棚卸高）');
+        $this->assertNull($opening->example);
+        $this->assertNull($opening->caution);
+
+        $unclassified = $businessUnit->getAccountByName(BusinessUnit::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME);
+        $this->assertNull($unclassified->example);
+        $this->assertNull($unclassified->caution);
+    }
+
+    #[Test]
     public function 棚卸振替科目はexpenseとして初期作成される()
     {
         $user = User::factory()->create();
@@ -124,6 +157,47 @@ class BusinessUnitTest extends TestCase
         $this->assertNotNull($closingInventory);
         $this->assertSame(Account::TYPE_EXPENSE, $openingInventory->type);
         $this->assertSame(Account::TYPE_EXPENSE, $closingInventory->type);
+    }
+
+    #[Test]
+    public function example_caution_migrationは既存accountをbackfillする()
+    {
+        $user = User::factory()->create();
+
+        $businessUnit = BusinessUnit::factory()->create([
+            'user_id' => $user->id,
+        ]);
+
+        // migration より前に作られた「素の」account を用意する（example/caution は null）。
+        $taxAccount = $businessUnit->accounts()->create([
+            'name' => '租税公課',
+            'type' => Account::TYPE_EXPENSE,
+        ]);
+
+        $travelAccount = $businessUnit->accounts()->create([
+            'name' => '旅費交通費',
+            'type' => Account::TYPE_EXPENSE,
+        ]);
+
+        // 既にユーザーが独自の値を持っている account は上書きしない想定。
+        $customTaxAccount = $businessUnit->accounts()->create([
+            'name' => '租税公課',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => 'ユーザー独自メモ',
+        ]);
+
+        $migration = require base_path('database/migrations/2026_08_04_093521_add_example_and_caution_to_accounts_table.php');
+        $migration->up();
+
+        $this->assertStringContainsString('消費税及び地方消費税', $taxAccount->fresh()->example);
+        $this->assertStringContainsString('所得税及び復興特別所得税', $taxAccount->fresh()->caution);
+
+        $this->assertSame('電車賃、バス代、タクシー代、宿泊代', $travelAccount->fresh()->example);
+        $this->assertNull($travelAccount->fresh()->caution);
+
+        // 既存値は残す。
+        $this->assertSame('ユーザー独自メモ', $customTaxAccount->fresh()->example);
+        $this->assertNull($customTaxAccount->fresh()->caution);
     }
 
     #[Test]

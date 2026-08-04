@@ -153,11 +153,12 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         $depreciationService = app(DepreciationService::class);
 
         return $this->allFixedAssets()
-            ->filter(fn (FixedAsset $fixedAsset): bool => $depreciationService->isStillDepreciating($fixedAsset, $fiscalYear))
+            ->filter(fn(FixedAsset $fixedAsset): bool => $depreciationService->isStillDepreciating($fixedAsset, $fiscalYear))
             ->values();
     }
 
     // 初期勘定科目リスト
+    // example, caution は https://www.nta.go.jp/taxes/shiraberu/shinkoku/kojin_jigyo/kichou03.pdf より引用
     public static array $defaultAccounts = [
         // 資産（asset）
         ['name' => '現金', 'type' => Account::TYPE_ASSET],
@@ -195,28 +196,106 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         ['name' => '家事消費等', 'type' => Account::TYPE_REVENUE],
 
         // 費用（expense）
+        // 出典: 国税庁「帳簿の記帳のしかた（事業所得者用）」より、example / caution を付与。
         ['name' => '期首商品（棚卸高）', 'type' => Account::TYPE_EXPENSE],
         ['name' => '期末商品（棚卸高）', 'type' => Account::TYPE_EXPENSE],
         ['name' => '仕入金額', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '租税公課', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '荷造運賃', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '水道光熱費', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '旅費交通費', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '通信費', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '広告宣伝費', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '接待交際費', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '損害保険料', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '修繕費', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '消耗品費', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '減価償却費', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '福利厚生費', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '給料賃金', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '外注工賃', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '利子割引料', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '地代家賃', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '貸倒金', 'type' => Account::TYPE_EXPENSE],
+        [
+            'name' => '租税公課',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => "税込経理方式による消費税及び地方消費税の納付税額、事業税、固定資産税、自動車税、不動産取得税、登録免許税、印紙税などの税金\n商工会議所、商工会、協同組合、同業者組合、商店会、青色申告会などの会費や組合費",
+            'caution' => '所得税及び復興特別所得税、相続税、贈与税、住民税、国民健康保険税、国民年金の保険料、国税の延滞税・加算税・過怠税、地方税の延滞金・加算金、罰金、科料、過料、交通反則金などは必要経費になりません。',
+        ],
+        [
+            'name' => '荷造運賃',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '販売商品の包装材料費、荷造りのための費用、運賃',
+        ],
+        [
+            'name' => '水道光熱費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '水道料、電気代、ガス代、プロパンガスや灯油などの購入費',
+        ],
+        [
+            'name' => '旅費交通費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '電車賃、バス代、タクシー代、宿泊代',
+        ],
+        [
+            'name' => '通信費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '電話料、切手代、電報料、インターネット接続料',
+        ],
+        [
+            'name' => '広告宣伝費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => "新聞、雑誌、ラジオ、テレビなどの広告費用、チラシ、折込み広告の費用\n広告用名入りライター、カレンダー、手ぬぐいなどの費用\nショーウインドーの陳列装飾のための費用",
+        ],
+        [
+            'name' => '接待交際費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => "取引先などを接待する茶菓飲食代\n取引先などを旅行、観劇などに招待する費用\n取引先などに対する中元、歳暮の費用",
+        ],
+        [
+            'name' => '損害保険料',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '火災保険料、自動車の損害保険料',
+        ],
+        [
+            'name' => '修繕費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '店舗、自動車、機械、器具備品などの修理代',
+            'caution' => '資産の価額を増したり、使用可能期間を延長したりするような支出は、原則として、資本的支出として一の減価償却資産を取得したものとして、減価償却を行います。',
+        ],
+        [
+            'name' => '消耗品費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => "帳簿、文房具、用紙、包装紙、ガソリンなどの消耗品購入費\n使用可能期間が1年未満か取得価額が10万円未満の什器備品の購入費",
+            'caution' => '取得価額が10万円未満であるかどうかは、税込経理方式又は税抜経理方式に応じ、その適用している方式により算定した金額によります。',
+        ],
+        [
+            'name' => '減価償却費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '建物、機械、船舶、車両、器具備品などの償却費',
+            'caution' => '取得価額が10万円以上20万円未満の減価償却資産については、減価償却をしないでその使用した年以後3年間の各年分において、その減価償却資産の全部又は特定の一部を一括し、一括した減価償却資産の取得価額の合計額の3分の1の金額を必要経費にすることができます。',
+        ],
+        [
+            'name' => '福利厚生費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => "従業員の慰安、医療、衛生、保健などのために事業主が支出した費用\n事業主が負担すべき従業員の健康保険、厚生年金、雇用保険などの保険料や掛金",
+        ],
+        [
+            'name' => '給料賃金',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '給料、賃金、退職金、従業員の食事や被服などの現物給与',
+        ],
+        [
+            'name' => '外注工賃',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '修理加工などで外部に注文して支払った場合の加工費など',
+            'caution' => '建設業を営んでいる人などの外注費も含まれます。',
+        ],
+        [
+            'name' => '利子割引料',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '事業用資金の借入金の利子や受取手形の割引料など',
+        ],
+        [
+            'name' => '地代家賃',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '店舗、工場、倉庫等の敷地の地代や店舗、工場、倉庫等を借りている場合の家賃など',
+        ],
+        [
+            'name' => '貸倒金',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '売掛金、受取手形、貸付金などの貸倒損失',
+        ],
         ['name' => '専従者給与', 'type' => Account::TYPE_EXPENSE],
-        ['name' => '雑費', 'type' => Account::TYPE_EXPENSE],
+        [
+            'name' => '雑費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '事業上の費用で他の経費に当てはまらない経費',
+        ],
         ['name' => self::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME, 'type' => Account::TYPE_EXPENSE],
     ];
 
@@ -539,9 +618,9 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
 
             if (
                 $plan->transactions()
-                    ->whereDate('date', $date)
-                    ->where('is_planned', true)
-                    ->exists()
+                ->whereDate('date', $date)
+                ->where('is_planned', true)
+                ->exists()
             ) {
                 continue;
             }
@@ -568,7 +647,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
     public function subAccountExistsRule(): Exists
     {
         return Rule::exists('sub_accounts', 'id')
-            ->where(fn ($query) => $query->whereIn('account_id', $this->accounts()->select('id')));
+            ->where(fn($query) => $query->whereIn('account_id', $this->accounts()->select('id')));
     }
 
     public function currentFiscalYear(): BelongsTo
@@ -662,7 +741,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         }
 
         $explicitSubAccounts = $account->subAccounts
-            ->filter(fn (SubAccount $subAccount): bool => $subAccount->name !== $account->name);
+            ->filter(fn(SubAccount $subAccount): bool => $subAccount->name !== $account->name);
 
         $hasUsage = $this->hasAnyActiveJournalEntryForAccount($account);
 
@@ -675,8 +754,8 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             : $explicitSubAccounts;
 
         return $availableSubAccounts
-            ->map(fn (SubAccount $subAccount): array => $this->makeCreditSourceOption(
-                key: 'cash-sub-account:'.$subAccount->id,
+            ->map(fn(SubAccount $subAccount): array => $this->makeCreditSourceOption(
+                key: 'cash-sub-account:' . $subAccount->id,
                 category: self::CREDIT_SOURCE_CATEGORY_CASH,
                 label: $subAccount->name,
                 description: '手元の現金から支払う',
@@ -707,7 +786,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         }
 
         $explicitSubAccounts = $account->subAccounts
-            ->filter(fn (SubAccount $subAccount): bool => $subAccount->name !== 'その他の預金');
+            ->filter(fn(SubAccount $subAccount): bool => $subAccount->name !== 'その他の預金');
 
         $hasUsage = $this->hasAnyActiveJournalEntryForAccount($account);
 
@@ -716,8 +795,8 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         }
 
         return $explicitSubAccounts
-            ->map(fn (SubAccount $subAccount): array => $this->makeCreditSourceOption(
-                key: 'bank-sub-account:'.$subAccount->id,
+            ->map(fn(SubAccount $subAccount): array => $this->makeCreditSourceOption(
+                key: 'bank-sub-account:' . $subAccount->id,
                 category: self::CREDIT_SOURCE_CATEGORY_BANK,
                 label: $subAccount->name,
                 description: '事業用の銀行口座から支払う',
@@ -746,13 +825,13 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             ->where('ownership_type', CreditCard::OWNERSHIP_TYPE_BUSINESS)
             ->where('is_active', true)
             ->get()
-            ->filter(fn (CreditCard $creditCard): bool => $creditCard->liabilitySubAccount !== null)
+            ->filter(fn(CreditCard $creditCard): bool => $creditCard->liabilitySubAccount !== null)
             ->map(function (CreditCard $creditCard): array {
                 /** @var SubAccount $subAccount */
                 $subAccount = $creditCard->liabilitySubAccount;
 
                 return $this->makeCreditSourceOption(
-                    key: 'card:'.$creditCard->id,
+                    key: 'card:' . $creditCard->id,
                     category: self::CREDIT_SOURCE_CATEGORY_CARD,
                     label: $creditCard->display_label,
                     description: '事業用クレジットカードで支払う',
@@ -790,7 +869,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
                     : $subAccount->name;
 
                 return $this->makeCreditSourceOption(
-                    key: 'private-sub-account:'.$subAccount->id,
+                    key: 'private-sub-account:' . $subAccount->id,
                     category: self::CREDIT_SOURCE_CATEGORY_PRIVATE,
                     label: $label,
                     description: '個人のお金で立て替えて支払った場合',
@@ -836,7 +915,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
     private function hasAnyActiveJournalEntryForAccount(Account $account): bool
     {
         return $account->journalEntries()
-            ->whereHas('transaction', fn ($query) => $query->active())
+            ->whereHas('transaction', fn($query) => $query->active())
             ->exists();
     }
 }

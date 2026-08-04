@@ -36,6 +36,8 @@ class Account extends Model implements ResolvesBusinessUnit
         'business_unit_id',
         'name',
         'type',
+        'example',
+        'caution',
     ];
 
     protected static function booted(): void
