@@ -25,9 +25,7 @@
             @endif
 
             <div class="py-6 px-4 sm:px-6 lg:px-8">
-                @includeIsolated('dashboard.partials.management-summary', [
-                    'managementSummaryCards' => $managementSummaryCards,
-                ])
+                <livewire:dashboard.profit-summary :fiscal-year="$selectedBusinessUnit->currentFiscalYear" />
             </div>
 
             <div class="py-6 px-4 sm:px-6 lg:px-8">

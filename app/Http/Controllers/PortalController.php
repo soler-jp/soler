@@ -28,7 +28,7 @@ class PortalController extends Controller
         $fiscalYear = $unit->currentFiscalYear;
 
         return view('dashboard', [
-            'managementSummaryCards' => $fiscalYear->managementSummaryCards(),
+            'selectedBusinessUnit' => $unit,
             'pendingTodos' => $todoService->listPending($unit, $user, $fiscalYear),
         ]);
     }

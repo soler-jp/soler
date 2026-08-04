@@ -9,7 +9,7 @@
                 'accountNames' => $card['account_names'],
                 'excludedAccountNames' => $card['excluded_account_names'],
             ],
-            key('management-summary-'.$card['key'])
+            key('profit-summary-'.$card['key'])
         )
     @else
         @php
@@ -19,11 +19,17 @@
                     'title' => 'text-emerald-700',
                     'amount' => 'text-emerald-700',
                 ]
-                : [
-                    'panel' => 'border-green-200 bg-green-50/80',
-                    'title' => 'text-green-700',
-                    'amount' => 'text-green-600',
-                ];
+                : ($card['variant'] === 'purchase'
+                    ? [
+                        'panel' => 'border-accent-purchase-border bg-accent-purchase',
+                        'title' => 'text-accent-purchase-fg',
+                        'amount' => 'text-accent-purchase-fg',
+                    ]
+                    : [
+                        'panel' => 'border-green-200 bg-green-50/80',
+                        'title' => 'text-green-700',
+                        'amount' => 'text-green-600',
+                    ]);
         @endphp
 
         <div class="h-full w-full rounded-2xl border px-5 py-4 shadow-sm {{ $cardStyle['panel'] }}">

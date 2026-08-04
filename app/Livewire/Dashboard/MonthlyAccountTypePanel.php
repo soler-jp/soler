@@ -108,6 +108,17 @@ class MonthlyAccountTypePanel extends Component
     public function palette(): array
     {
         return match ($this->variant) {
+            'purchase' => [
+                'panel' => 'border-accent-purchase-border bg-accent-purchase',
+                'hover' => 'hover:border-accent-purchase-border hover:bg-surface-muted',
+                'title' => 'text-accent-purchase-fg',
+                'amount' => 'text-accent-purchase-fg',
+                'chip' => 'bg-surface text-accent-purchase-fg',
+                'monthDefault' => 'border-accent-purchase-border bg-surface text-accent-purchase-fg hover:bg-surface-muted',
+                'monthActive' => 'border-accent-purchase-border bg-action-primary text-action-primary-fg',
+                'tableWrap' => 'border-accent-purchase-border',
+                'tableHead' => 'bg-accent-purchase text-accent-purchase-fg',
+            ],
             Account::TYPE_EXPENSE => [
                 'panel' => 'border-red-200 bg-red-50/80',
                 'hover' => 'hover:border-red-300 hover:bg-red-100/70',

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Dashboard\ProfitSummary;
 use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
@@ -28,6 +29,7 @@ class DashboardManagementSummaryTest extends TestCase
         $this->actingAs($user)
             ->get(route('dashboard'))
             ->assertOk()
+            ->assertSeeLivewire(ProfitSummary::class)
             ->assertSee('売上')
             ->assertSee('経費')
             ->assertSee('利益')
@@ -50,12 +52,13 @@ class DashboardManagementSummaryTest extends TestCase
         $this->actingAs($user)
             ->get(route('dashboard'))
             ->assertOk()
+            ->assertSeeLivewire(ProfitSummary::class)
             ->assertSee('売上')
             ->assertSee('経費')
             ->assertSee('仕入れ')
             ->assertSee('今の差し引き')
             ->assertSee('10,000')
-            ->assertSee('md:w-[11rem] lg:w-[12rem] md:shrink-0', false)
+            ->assertSee('md:min-w-0 md:flex-1', false)
             ->assertSee('売上から、記録済みの経費と仕入(6,000円)を引いた金額です。')
             ->assertSee('年末に在庫を入力すると、最終的な利益は変わることがあります。')
             ->assertDontSee('>利益</h2>', false);

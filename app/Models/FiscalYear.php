@@ -166,6 +166,7 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
             '仕入れ',
             Account::TYPE_EXPENSE,
             accountNames: self::PURCHASE_ACCOUNT_NAMES,
+            variant: 'purchase',
         );
         $cards[] = [
             'key' => 'current_difference',
@@ -219,12 +220,13 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
         string $accountType,
         array $accountNames = [],
         array $excludedAccountNames = [],
+        ?string $variant = null,
     ): array {
         return [
             'key' => $key,
             'type' => 'account_type',
             'title' => $title,
-            'variant' => $accountType,
+            'variant' => $variant ?? $accountType,
             'account_type' => $accountType,
             'account_names' => $accountNames,
             'excluded_account_names' => $excludedAccountNames,
