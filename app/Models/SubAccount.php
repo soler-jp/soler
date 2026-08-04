@@ -38,6 +38,7 @@ class SubAccount extends Model implements ResolvesBusinessUnit
     protected $fillable = [
         'account_id',
         'name',
+        'ui_label',
         'system_purpose',
         'visibility',
         'sort_order',
@@ -76,5 +77,20 @@ class SubAccount extends Model implements ResolvesBusinessUnit
     public function journalEntries(): HasMany
     {
         return $this->hasMany(JournalEntry::class);
+    }
+
+    /**
+     * UI 表示名。ui_label があればそれ、無ければ SubAccount の name を返す。
+     * Account 名は含めない（Account か SubAccount かの区別は UI 側のコンテキストで示す）。
+     */
+    public function displayName(): string
+    {
+        $label = $this->ui_label;
+
+        if (is_string($label) && trim($label) !== '') {
+            return $label;
+        }
+
+        return (string) $this->name;
     }
 }

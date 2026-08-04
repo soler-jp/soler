@@ -89,7 +89,7 @@
                             'bg-surface text-content border-line hover:bg-surface-muted' =>
                                 $receipt_sub_account_id !== $subAccount->id,
                         ])>
-                        {{ $subAccount->name }}
+                        {{ $subAccount->displayName() }}
                     </button>
                 @endforeach
 
@@ -107,7 +107,7 @@
                                 'bg-surface text-content border-line hover:bg-surface-muted' =>
                                     $receipt_sub_account_id !== $subAccount->id,
                             ])>
-                            {{ $subAccount->name }}
+                            {{ $subAccount->displayName() }}
                         </button>
                     @endforeach
                 @endif
@@ -126,7 +126,7 @@
                                 'bg-surface text-content border-line hover:bg-surface-muted' =>
                                     $receipt_sub_account_id !== $subAccount->id,
                             ])>
-                            <span class="italic">{{ $subAccount->name }}</span>
+                            <span class="italic">{{ $subAccount->displayName() }}</span>
                         </button>
                     @endforeach
                 @endif

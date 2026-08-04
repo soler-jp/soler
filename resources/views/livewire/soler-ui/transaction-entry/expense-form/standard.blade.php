@@ -90,7 +90,7 @@
                             'bg-surface text-content border-line hover:bg-surface-muted' =>
                                 $debit_sub_account_id !== $subAccount->id,
                         ])>
-                        {{ $subAccount->account->name === $subAccount->name ? $subAccount->account->name : $subAccount->account->name . ' - ' . $subAccount->name }}
+                        {{ $subAccount->displayName() }}
                     </button>
                 @endforeach
 
@@ -105,7 +105,7 @@
                                 'bg-surface text-content border-line hover:bg-surface-muted' =>
                                     $debit_sub_account_id !== $subAccount->id,
                             ])>
-                            {{ $subAccount->account->name === $subAccount->name ? $subAccount->account->name : $subAccount->account->name . ' - ' . $subAccount->name }}
+                            {{ $subAccount->displayName() }}
                         </button>
                     @endforeach
                 @endif
@@ -124,7 +124,7 @@
                                 'bg-surface text-content border-line hover:bg-surface-muted' =>
                                     $debit_sub_account_id !== $subAccount->id,
                             ])>
-                            <span class="italic">{{ $subAccount->account->name === $subAccount->name ? $subAccount->account->name : $subAccount->account->name . ' - ' . $subAccount->name }}</span>
+                            <span class="italic">{{ $subAccount->displayName() }}</span>
                         </button>
                     @endforeach
                 @endif
@@ -161,7 +161,7 @@
                                 'bg-surface text-content border-line hover:bg-surface-muted' =>
                                     $credit_sub_account_id !== $subAccount->id,
                             ])>
-                            {{ $account->name === $subAccount->name ? $account->name : $account->name . ' - ' . $subAccount->name }}
+                            {{ $subAccount->displayName() }}
                         </button>
                     @endforeach
                 @endforeach

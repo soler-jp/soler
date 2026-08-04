@@ -88,7 +88,7 @@
                                 'bg-surface text-content border-line hover:bg-surface-muted' =>
                                     $credit_sub_account_id !== $subAccount->id,
                             ])>
-                            {{ $account->name === $subAccount->name ? $account->name : $account->name . ' - ' . $subAccount->name }}
+                            {{ $subAccount->displayName() }}
                         </button>
                     @endforeach
                 @endforeach

@@ -308,6 +308,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
                     self::resolveDefaultSubAccountVisibility($subAccountName),
                     self::resolveDefaultSubAccountSystemPurpose($account->name, $subAccountName),
                     self::resolveDefaultSubAccountSortOrder($subAccountName),
+                    self::resolveDefaultSubAccountUiLabel($account->name, $subAccountName),
                 );
             }
 
@@ -347,6 +348,32 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         return $index === false
             ? SubAccount::SORT_ORDER_DEFAULT
             : ($index + 1) * 10;
+    }
+
+    /**
+     * 既定シードで作られる SubAccount のうち、UI 上で口語ラベルに置き換えたいもの。
+     * {account_name => {sub_account_name => ui_label}}
+     *
+     * @var array<string, array<string, string>>
+     */
+    public static array $defaultSubAccountUiLabels = [
+        '売掛金' => ['売掛金' => '後日入金予定'],
+        '事業主貸' => ['事業主貸' => '個人の財布に入金'],
+        '事業主借' => ['事業主借' => '個人の財布・個人のクレジットカードで支払い'],
+        '買掛金' => ['買掛金' => '後日支払い予定'],
+    ];
+
+    public static function resolveDefaultSubAccountUiLabel(string $accountName, string $subAccountName): ?string
+    {
+        // 未分類は system_purpose を根拠にしたいので、名前ではなく account+sub のペアで捕まえる。
+        if (
+            $accountName === self::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME
+            && $subAccountName === self::UNCLASSIFIED_EXPENSE_SUB_ACCOUNT_NAME
+        ) {
+            return '後から決める';
+        }
+
+        return self::$defaultSubAccountUiLabels[$accountName][$subAccountName] ?? null;
     }
 
     public function addCustomAccount(

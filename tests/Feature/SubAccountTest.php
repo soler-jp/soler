@@ -259,6 +259,48 @@ class SubAccountTest extends TestCase
     }
 
     #[Test]
+    public function 既定シードでは特定の_sub_accountに_ui_labelが付与される(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'ui_label 既定シードテスト',
+        ]);
+
+        $expected = [
+            ['売掛金', '売掛金', '後日入金予定'],
+            ['事業主貸', '事業主貸', '個人の財布に入金'],
+            ['事業主借', '事業主借', '個人の財布・個人のクレジットカードで支払い'],
+            ['買掛金', '買掛金', '後日支払い予定'],
+            [
+                BusinessUnit::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME,
+                BusinessUnit::UNCLASSIFIED_EXPENSE_SUB_ACCOUNT_NAME,
+                '後から決める',
+            ],
+        ];
+
+        foreach ($expected as [$accountName, $subAccountName, $label]) {
+            $sub = $businessUnit->getSubAccountByName($accountName, $subAccountName);
+            $this->assertNotNull($sub, "$accountName / $subAccountName の SubAccount が見つかりません。");
+            $this->assertSame($label, $sub->ui_label, "$accountName / $subAccountName の ui_label 想定値: $label");
+        }
+    }
+
+    #[Test]
+    public function 既定シードで_ui_labelの付かない_sub_accountはnullのまま(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'ui_label 非対象テスト',
+        ]);
+
+        foreach (['現金', '通信費', '水道光熱費', '源泉徴収'] as $name) {
+            $sub = $businessUnit->subAccounts()->where('sub_accounts.name', $name)->first();
+            $this->assertNotNull($sub, "$name の SubAccount が見つかりません。");
+            $this->assertNull($sub->ui_label, "$name には ui_label が付かない想定です。");
+        }
+    }
+
+    #[Test]
     public function 未分類_sub_accountはunclassified_system_purposeが付く(): void
     {
         $user = User::factory()->create();
@@ -273,6 +315,52 @@ class SubAccountTest extends TestCase
 
         $this->assertNotNull($unclassified);
         $this->assertSame(SubAccount::PURPOSE_UNCLASSIFIED, $unclassified->system_purpose);
+    }
+
+    #[Test]
+    public function display_nameはui_labelが最優先される(): void
+    {
+        $account = Account::factory()->create(['name' => '売掛金']);
+        // AccountFactory は同名の SubAccount を自動生成するのでそれを使う。
+        $subAccount = $account->subAccounts()->where('name', '売掛金')->firstOrFail();
+        $subAccount->update(['ui_label' => '後日入金予定']);
+
+        $this->assertSame('後日入金予定', $subAccount->displayName());
+    }
+
+    #[Test]
+    public function display_nameはui_labelが未設定ならsub名を返す(): void
+    {
+        $account = Account::factory()->create(['name' => '普通預金']);
+        $subAccount = SubAccount::create([
+            'account_id' => $account->id,
+            'name' => 'A銀行',
+        ]);
+
+        $this->assertSame('A銀行', $subAccount->displayName());
+    }
+
+    #[Test]
+    public function display_nameはaccount名と同名でもsub名だけを返す(): void
+    {
+        // Account 名は含めない設計。Account か SubAccount かは UI 側の文脈で示す。
+        $account = Account::factory()->create(['name' => '現金']);
+        $subAccount = $account->subAccounts()->where('name', '現金')->firstOrFail();
+
+        $this->assertSame('現金', $subAccount->displayName());
+    }
+
+    #[Test]
+    public function display_nameはui_labelが空文字や空白だけならsub名にフォールバックする(): void
+    {
+        $account = Account::factory()->create(['name' => '普通預金']);
+        $subAccount = SubAccount::create([
+            'account_id' => $account->id,
+            'name' => 'A銀行',
+            'ui_label' => '   ',
+        ]);
+
+        $this->assertSame('A銀行', $subAccount->displayName());
     }
 
     #[Test]

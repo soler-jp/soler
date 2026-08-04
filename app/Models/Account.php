@@ -93,6 +93,7 @@ class Account extends Model implements ResolvesBusinessUnit
         ?string $visibility = null,
         ?string $systemPurpose = null,
         ?int $sortOrder = null,
+        ?string $uiLabel = null,
     ): SubAccount {
         $attributes = ['name' => $subAccountName];
 
@@ -106,6 +107,10 @@ class Account extends Model implements ResolvesBusinessUnit
 
         if ($sortOrder !== null) {
             $attributes['sort_order'] = $sortOrder;
+        }
+
+        if ($uiLabel !== null) {
+            $attributes['ui_label'] = $uiLabel;
         }
 
         return $this->createSubAccount($attributes, $actor);
