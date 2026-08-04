@@ -34,7 +34,7 @@
                 <label class="block text-sm font-semibold text-content mb-1">
                     {{ __('transactions.purchase_form.fields.amount') }}
                 </label>
-                <input type="text" wire:model.defer="amount" inputmode="numeric" pattern="\d*"
+                <input type="text" wire:model.live.debounce.150ms="amount" inputmode="numeric" pattern="\d*"
                     autocomplete="off"
                     class="block w-full px-3 py-2 text-base text-right tabular-nums bg-surface text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus">
             </div>
@@ -122,9 +122,10 @@
             @enderror
         </div>
 
-        <div class="pt-1">
-            <x-ui.button variant="confirm" type="button" wire:click="submit" class="w-full">
-                {{ __('transactions.purchase_form.actions.submit') }}
+        <div class="flex justify-end pt-1">
+            <x-ui.button variant="confirm" type="button" wire:click="submit"
+                :disabled="$this->amountInputInvalid()" class="block shrink-0 min-w-[11rem]">
+                <span class="{{ $this->amountDisplay() !== '' ? 'font-mono text-base tabular-nums' : '' }}">{{ $this->amountSubmitLabel() }}</span>
             </x-ui.button>
         </div>
         </div>

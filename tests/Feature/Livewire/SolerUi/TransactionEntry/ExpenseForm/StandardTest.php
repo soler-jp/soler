@@ -44,6 +44,33 @@ class StandardTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSeeLivewire(Standard::class);
+        $this->assertSame(4, substr_count($response->getContent(), 'wire:model.live.debounce.150ms="amount"'));
+    }
+
+    #[Test]
+    public function 金額の日本語表記を表示できる(): void
+    {
+        $user = User::factory()->create();
+        $this->initializeUnit($user);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('amount', '123456')
+            ->assertSee('12万 3,456円')
+            ->assertSee('を登録する');
+    }
+
+    #[Test]
+    public function 金額が不正なら登録不可の文言を表示する(): void
+    {
+        $user = User::factory()->create();
+        $this->initializeUnit($user);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('amount', '12a34')
+            ->assertSee('金額が不正なので登録できません')
+            ->assertDontSee('を登録する');
     }
 
     #[Test]

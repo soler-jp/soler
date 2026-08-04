@@ -98,6 +98,32 @@ class StandardTest extends TestCase
     }
 
     #[Test]
+    public function 金額の日本語表記を文字列入力でも表示できる(): void
+    {
+        $user = User::factory()->create();
+        $this->initializeUnit($user);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('amount', '123456')
+            ->assertSee('12万 3,456円')
+            ->assertSee('を登録する');
+    }
+
+    #[Test]
+    public function 金額が不正なら登録不可の文言を表示する(): void
+    {
+        $user = User::factory()->create();
+        $this->initializeUnit($user);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('amount', '12a34')
+            ->assertSee('金額が不正なので登録できません')
+            ->assertDontSee('を登録する');
+    }
+
+    #[Test]
     public function 源泉徴収ありの売上が即時入金で登録できる()
     {
         $user = User::factory()->create();

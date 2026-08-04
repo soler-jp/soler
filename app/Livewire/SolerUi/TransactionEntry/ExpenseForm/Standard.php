@@ -2,6 +2,7 @@
 
 namespace App\Livewire\SolerUi\TransactionEntry\ExpenseForm;
 
+use App\Livewire\SolerUi\TransactionEntry\Concerns\FormatsJapaneseAmount;
 use App\Models\Account;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
@@ -12,6 +13,10 @@ use Livewire\Component;
 
 class Standard extends Component
 {
+    use FormatsJapaneseAmount;
+
+    private const MAX_AMOUNT = 1000000;
+
     public const TAX_OPTION_10 = '10';
 
     public const TAX_OPTION_8 = '8';
@@ -30,7 +35,7 @@ class Standard extends Component
 
     public string $counterparty_name = '';
 
-    public ?int $amount = null;
+    public $amount = null;
 
     public string $tax_option = self::TAX_OPTION_10;
 
@@ -101,6 +106,31 @@ class Standard extends Component
         $this->showExpanded = ! $this->showExpanded;
     }
 
+    public function amountDisplay(): string
+    {
+        return $this->formatJapaneseAmount($this->amount);
+    }
+
+    public function amountSubmitLabel(): string
+    {
+        if ($this->amountInputInvalid()) {
+            return __('transactions.shared.invalid_amount_submit');
+        }
+
+        $display = $this->amountDisplay();
+
+        if ($display !== '') {
+            return $display.' '.__('transactions.shared.submit_suffix');
+        }
+
+        return __('transactions.expense_form.actions.submit');
+    }
+
+    public function amountInputInvalid(): bool
+    {
+        return $this->hasInvalidAmountInput($this->amount, max: self::MAX_AMOUNT);
+    }
+
     public function submit(): void
     {
         $user = auth()->user();
@@ -109,7 +139,7 @@ class Standard extends Component
 
         $this->validate([
             'date_input' => ['required', 'string', 'regex:/^\d{3,4}$/'],
-            'amount' => ['required', 'integer', 'min:1', 'max:1000000'],
+            'amount' => ['required', 'integer', 'min:1', 'max:'.self::MAX_AMOUNT],
             'tax_option' => ['required', 'in:'.implode(',', self::TAX_OPTIONS)],
             'debit_sub_account_id' => ['required', $unit->subAccountExistsRule()],
             'credit_sub_account_id' => ['required', $unit->subAccountExistsRule()],

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\SolerUi\TransactionEntry\TransferForm;
 
+use App\Livewire\SolerUi\TransactionEntry\Concerns\FormatsJapaneseAmount;
 use App\Models\JournalEntry;
 use App\Models\SubAccount;
 use App\Services\TransactionRegistrar;
@@ -11,9 +12,13 @@ use Livewire\Component;
 
 class Standard extends Component
 {
+    use FormatsJapaneseAmount;
+
+    private const MAX_AMOUNT = 10000000;
+
     public string $date_input = '';
 
-    public ?int $amount = null;
+    public $amount = null;
 
     public string $note = '';
 
@@ -40,7 +45,7 @@ class Standard extends Component
 
         $this->validate([
             'date_input' => ['required', 'string', 'regex:/^\d{3,4}$/'],
-            'amount' => ['required', 'integer', 'min:1', 'max:10000000'],
+            'amount' => ['required', 'integer', 'min:1', 'max:'.self::MAX_AMOUNT],
             'from_sub_account_id' => ['required', $unit->subAccountExistsRule()],
             'to_sub_account_id' => ['required', $unit->subAccountExistsRule()],
             'note' => ['nullable', 'string', 'max:255'],
@@ -116,6 +121,31 @@ class Standard extends Component
     public function render()
     {
         return view('livewire.soler-ui.transaction-entry.transfer-form.standard');
+    }
+
+    public function amountDisplay(): string
+    {
+        return $this->formatJapaneseAmount($this->amount);
+    }
+
+    public function amountSubmitLabel(): string
+    {
+        if ($this->amountInputInvalid()) {
+            return __('transactions.shared.invalid_amount_submit');
+        }
+
+        $display = $this->amountDisplay();
+
+        if ($display !== '') {
+            return $display.' '.__('transactions.shared.submit_suffix');
+        }
+
+        return __('transactions.transfer_form.actions.submit');
+    }
+
+    public function amountInputInvalid(): bool
+    {
+        return $this->hasInvalidAmountInput($this->amount, max: self::MAX_AMOUNT);
     }
 
     /**

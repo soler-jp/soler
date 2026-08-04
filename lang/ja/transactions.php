@@ -1,6 +1,11 @@
 <?php
 
 return [
+    'shared' => [
+        'submit_suffix' => 'を登録する',
+        'invalid_amount_submit' => '金額が不正なので登録できません',
+    ],
+
     'revenue_form' => [
         'title' => '売上の入力',
         'sections' => [

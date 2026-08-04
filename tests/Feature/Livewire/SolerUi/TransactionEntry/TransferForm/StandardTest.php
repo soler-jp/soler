@@ -87,6 +87,18 @@ class StandardTest extends TestCase
     }
 
     #[Test]
+    public function 金額が不正なら登録不可の文言を表示する(): void
+    {
+        $user = User::factory()->create();
+        $this->initializeUnit($user);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('amount', '12a34')
+            ->assertSee('金額が不正なので登録できません');
+    }
+
+    #[Test]
     public function メモが空なら移動元と移動先から摘要を自動生成する(): void
     {
         $user = User::factory()->create();
