@@ -152,6 +152,40 @@ class StandardTest extends TestCase
     }
 
     #[Test]
+    public function 買掛金を支払方法にして仕入を登録できる(): void
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $purchaseSub = $unit->getAccountByName('仕入金額')->subAccounts()->firstOrFail();
+        $accountsPayableSub = $unit->getAccountByName('買掛金')->subAccounts()->firstOrFail();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0515')
+            ->set('amount', 2200)
+            ->set('note', '雑貨の仕入れ')
+            ->set('credit_sub_account_id', $accountsPayableSub->id)
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $purchaseSub->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => 2000,
+            'tax_amount' => 200,
+            'tax_type' => JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $accountsPayableSub->id,
+            'type' => JournalEntry::TYPE_CREDIT,
+            'net_amount' => 2200,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+        ]);
+    }
+
+    #[Test]
     public function 摘要が空ならdescriptionは仕入になる(): void
     {
         $user = User::factory()->create();
@@ -312,7 +346,7 @@ class StandardTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertSame(['現金', '事業主借'], $creditAccountNames);
+        $this->assertSame(['現金', '事業主借', '買掛金'], $creditAccountNames);
     }
 
     #[Test]
