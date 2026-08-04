@@ -29,6 +29,8 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
 
     private const PURCHASE_ACCOUNT_NAMES = ['仕入金額'];
 
+    private const CASH_BALANCE_ACCOUNT_NAMES = ['現金', '当座預金', '定期預金', 'その他の預金', '普通預金'];
+
     protected $fillable = [
         'business_unit_id',
         'year',
@@ -123,7 +125,8 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
      *     account_names?: array<int, string>,
      *     excluded_account_names?: array<int, string>,
      *     amount?: int,
-     *     note_lines?: array<int, string>
+     *     note_lines?: array<int, string>,
+     *     breakdowns?: array<int, array{label: string, amount: int}>
      * }>
      */
     public function managementSummaryCards(): array
@@ -137,6 +140,7 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
             Account::TYPE_EXPENSE,
             excludedAccountNames: self::PURCHASE_ACCOUNT_NAMES,
         )['total_amount'];
+        $cashBalanceAmount = $this->cashBalanceAmount();
 
         $cards = [
             $this->managementAccountTypeCard('revenue', '売上', Account::TYPE_REVENUE),
@@ -157,6 +161,13 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
                 'amount' => $revenueAmount - $expenseAmount,
                 'note_lines' => [],
             ];
+            $cards[] = $this->managementAmountCard(
+                'cash_balance',
+                '現金・預金',
+                $cashBalanceAmount,
+                'cash_balance',
+                breakdowns: $this->cashBalanceBreakdowns(),
+            );
 
             return $cards;
         }
@@ -179,6 +190,13 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
                 '年末に在庫を入力すると、最終的な利益は変わることがあります。',
             ],
         ];
+        $cards[] = $this->managementAmountCard(
+            'cash_balance',
+            '現金・預金',
+            $cashBalanceAmount,
+            'cash_balance',
+            breakdowns: $this->cashBalanceBreakdowns(),
+        );
 
         return $cards;
     }
@@ -231,6 +249,64 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
             'account_names' => $accountNames,
             'excluded_account_names' => $excludedAccountNames,
         ];
+    }
+
+    /**
+     * @param  array<int, string>  $noteLines
+     * @return array{
+     *     key: string,
+     *     type: 'amount',
+     *     title: string,
+     *     variant: string,
+     *     amount: int,
+     *     note_lines: array<int, string>,
+     *     breakdowns: array<int, array{label: string, amount: int}>
+     * }
+     */
+    private function managementAmountCard(
+        string $key,
+        string $title,
+        int $amount,
+        string $variant,
+        array $noteLines = [],
+        array $breakdowns = [],
+    ): array {
+        return [
+            'key' => $key,
+            'type' => 'amount',
+            'title' => $title,
+            'variant' => $variant,
+            'amount' => $amount,
+            'note_lines' => $noteLines,
+            'breakdowns' => $breakdowns,
+        ];
+    }
+
+    private function cashBalanceAmount(): int
+    {
+        return (int) collect($this->cashBalanceBreakdowns())->sum('amount');
+    }
+
+    /**
+     * @return array<int, array{label: string, amount: int}>
+     */
+    private function cashBalanceBreakdowns(): array
+    {
+        $assetAccounts = app(FiscalYearBalanceCalculator::class)->calculate($this)[Account::TYPE_ASSET]['accounts'];
+
+        return collect($assetAccounts)
+            ->filter(fn (array $account): bool => in_array($account['account_name'], self::CASH_BALANCE_ACCOUNT_NAMES, true))
+            ->flatMap(function (array $account): array {
+                return collect($account['sub_accounts'])
+                    ->map(fn (array $subAccount): array => [
+                        'label' => $subAccount['sub_account_name'],
+                        'amount' => $subAccount['balance'],
+                    ])
+                    ->all();
+            })
+            ->filter(fn (array $breakdown): bool => $breakdown['amount'] !== 0)
+            ->values()
+            ->all();
     }
 
     /**

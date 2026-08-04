@@ -25,6 +25,7 @@ class DashboardManagementSummaryTest extends TestCase
 
         $this->registerRevenue($unit, $fiscalYear, 10000);
         $this->registerExpense($unit, $fiscalYear, 3000);
+        $this->registerRevenue($unit, $fiscalYear, 5000, '預金売上', 'その他の預金');
 
         $this->actingAs($user)
             ->get(route('dashboard'))
@@ -33,8 +34,13 @@ class DashboardManagementSummaryTest extends TestCase
             ->assertSee('売上')
             ->assertSee('経費')
             ->assertSee('利益')
-            ->assertSee('7,000')
-            ->assertSee('md:min-w-0 md:flex-1', false)
+            ->assertSee('現金・預金')
+            ->assertSee('現金')
+            ->assertSee('その他の預金')
+            ->assertSee('12,000')
+            ->assertSee('15,000')
+            ->assertSee('space-y-4', false)
+            ->assertSee('grid gap-4 md:grid-cols-2 xl:grid-cols-4', false)
             ->assertDontSee('>仕入れ</h2>', false)
             ->assertDontSee('>今の差し引き</h2>', false);
     }
@@ -57,8 +63,10 @@ class DashboardManagementSummaryTest extends TestCase
             ->assertSee('経費')
             ->assertSee('仕入れ')
             ->assertSee('今の差し引き')
+            ->assertSee('現金・預金')
+            ->assertSee('現金')
             ->assertSee('10,000')
-            ->assertSee('md:min-w-0 md:flex-1', false)
+            ->assertSee('grid gap-4 md:grid-cols-2 xl:grid-cols-4', false)
             ->assertSee('売上から、記録済みの経費と仕入(6,000円)を引いた金額です。')
             ->assertSee('年末に在庫を入力すると、最終的な利益は変わることがあります。')
             ->assertDontSee('>利益</h2>', false);
@@ -77,14 +85,19 @@ class DashboardManagementSummaryTest extends TestCase
         return [$user, $unit];
     }
 
-    private function registerRevenue(BusinessUnit $unit, FiscalYear $fiscalYear, int $amount): Transaction
-    {
+    private function registerRevenue(
+        BusinessUnit $unit,
+        FiscalYear $fiscalYear,
+        int $amount,
+        string $description = '売上',
+        string $receiptAccountName = '現金',
+    ): Transaction {
         return (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-01-10',
-            'description' => '売上',
+            'description' => $description,
         ], [
             [
-                'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
+                'sub_account_id' => $unit->getAccountByName($receiptAccountName)->subAccounts()->firstOrFail()->id,
                 'type' => JournalEntry::TYPE_DEBIT,
                 'net_amount' => $amount,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
@@ -103,6 +116,7 @@ class DashboardManagementSummaryTest extends TestCase
         FiscalYear $fiscalYear,
         int $amount,
         string $accountName = '消耗品費',
+        string $paymentAccountName = '現金',
     ): Transaction {
         return (new TransactionRegistrar)->register($fiscalYear, [
             'date' => '2025-01-11',
@@ -115,7 +129,7 @@ class DashboardManagementSummaryTest extends TestCase
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
             [
-                'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
+                'sub_account_id' => $unit->getAccountByName($paymentAccountName)->subAccounts()->firstOrFail()->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => $amount,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
