@@ -153,7 +153,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         $depreciationService = app(DepreciationService::class);
 
         return $this->allFixedAssets()
-            ->filter(fn (FixedAsset $fixedAsset): bool => $depreciationService->isStillDepreciating($fixedAsset, $fiscalYear))
+            ->filter(fn(FixedAsset $fixedAsset): bool => $depreciationService->isStillDepreciating($fixedAsset, $fiscalYear))
             ->values();
     }
 
@@ -242,6 +242,22 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
     ];
 
     /**
+     * 既定シードのうち、UI で優先的に上位に表示する SubAccount 名の一覧。この配列の先頭ほど上に並ぶ。
+     * ここに含まれない SubAccount は SubAccount::SORT_ORDER_DEFAULT（＝ id 順）で末尾に並ぶ。
+     *
+     * @var array<int, string>
+     */
+    public static array $prioritizedDefaultSubAccounts = [
+        '消耗品費',
+        '旅費交通費',
+        '接待交際費',
+        '荷造運賃',
+        '雑費',
+        '広告宣伝費',
+        '修繕費',
+    ];
+
+    /**
      * BusinessUnitを作成し、標準勘定科目も同時に登録する
      */
     public static function createWithDefaultAccounts(array $attributes): self
@@ -277,6 +293,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
                     $user,
                     self::resolveDefaultSubAccountVisibility($subAccountName),
                     self::resolveDefaultSubAccountSystemPurpose($account->name, $subAccountName),
+                    self::resolveDefaultSubAccountSortOrder($subAccountName),
                 );
             }
 
@@ -301,6 +318,15 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         }
 
         return null;
+    }
+
+    public static function resolveDefaultSubAccountSortOrder(string $subAccountName): int
+    {
+        $index = array_search($subAccountName, self::$prioritizedDefaultSubAccounts, true);
+
+        return $index === false
+            ? SubAccount::SORT_ORDER_DEFAULT
+            : ($index + 1) * 10;
     }
 
     public function addCustomAccount(
@@ -462,9 +488,9 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
 
             if (
                 $plan->transactions()
-                    ->whereDate('date', $date)
-                    ->where('is_planned', true)
-                    ->exists()
+                ->whereDate('date', $date)
+                ->where('is_planned', true)
+                ->exists()
             ) {
                 continue;
             }
@@ -491,7 +517,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
     public function subAccountExistsRule(): Exists
     {
         return Rule::exists('sub_accounts', 'id')
-            ->where(fn ($query) => $query->whereIn('account_id', $this->accounts()->select('id')));
+            ->where(fn($query) => $query->whereIn('account_id', $this->accounts()->select('id')));
     }
 
     public function currentFiscalYear(): BelongsTo
@@ -585,7 +611,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         }
 
         $explicitSubAccounts = $account->subAccounts
-            ->filter(fn (SubAccount $subAccount): bool => $subAccount->name !== $account->name);
+            ->filter(fn(SubAccount $subAccount): bool => $subAccount->name !== $account->name);
 
         $hasUsage = $this->hasAnyActiveJournalEntryForAccount($account);
 
@@ -598,8 +624,8 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             : $explicitSubAccounts;
 
         return $availableSubAccounts
-            ->map(fn (SubAccount $subAccount): array => $this->makeCreditSourceOption(
-                key: 'cash-sub-account:'.$subAccount->id,
+            ->map(fn(SubAccount $subAccount): array => $this->makeCreditSourceOption(
+                key: 'cash-sub-account:' . $subAccount->id,
                 category: self::CREDIT_SOURCE_CATEGORY_CASH,
                 label: $subAccount->name,
                 description: '手元の現金から支払う',
@@ -630,7 +656,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         }
 
         $explicitSubAccounts = $account->subAccounts
-            ->filter(fn (SubAccount $subAccount): bool => $subAccount->name !== 'その他の預金');
+            ->filter(fn(SubAccount $subAccount): bool => $subAccount->name !== 'その他の預金');
 
         $hasUsage = $this->hasAnyActiveJournalEntryForAccount($account);
 
@@ -639,8 +665,8 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         }
 
         return $explicitSubAccounts
-            ->map(fn (SubAccount $subAccount): array => $this->makeCreditSourceOption(
-                key: 'bank-sub-account:'.$subAccount->id,
+            ->map(fn(SubAccount $subAccount): array => $this->makeCreditSourceOption(
+                key: 'bank-sub-account:' . $subAccount->id,
                 category: self::CREDIT_SOURCE_CATEGORY_BANK,
                 label: $subAccount->name,
                 description: '事業用の銀行口座から支払う',
@@ -669,13 +695,13 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             ->where('ownership_type', CreditCard::OWNERSHIP_TYPE_BUSINESS)
             ->where('is_active', true)
             ->get()
-            ->filter(fn (CreditCard $creditCard): bool => $creditCard->liabilitySubAccount !== null)
+            ->filter(fn(CreditCard $creditCard): bool => $creditCard->liabilitySubAccount !== null)
             ->map(function (CreditCard $creditCard): array {
                 /** @var SubAccount $subAccount */
                 $subAccount = $creditCard->liabilitySubAccount;
 
                 return $this->makeCreditSourceOption(
-                    key: 'card:'.$creditCard->id,
+                    key: 'card:' . $creditCard->id,
                     category: self::CREDIT_SOURCE_CATEGORY_CARD,
                     label: $creditCard->display_label,
                     description: '事業用クレジットカードで支払う',
@@ -713,7 +739,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
                     : $subAccount->name;
 
                 return $this->makeCreditSourceOption(
-                    key: 'private-sub-account:'.$subAccount->id,
+                    key: 'private-sub-account:' . $subAccount->id,
                     category: self::CREDIT_SOURCE_CATEGORY_PRIVATE,
                     label: $label,
                     description: '個人のお金で立て替えて支払った場合',
@@ -759,7 +785,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
     private function hasAnyActiveJournalEntryForAccount(Account $account): bool
     {
         return $account->journalEntries()
-            ->whereHas('transaction', fn ($query) => $query->active())
+            ->whereHas('transaction', fn($query) => $query->active())
             ->exists();
     }
 }

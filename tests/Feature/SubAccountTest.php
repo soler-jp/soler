@@ -192,6 +192,54 @@ class SubAccountTest extends TestCase
     }
 
     #[Test]
+    public function add_custom_sub_accountは既定で_sort_orderがdefault値になる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'sort_order 既定テスト',
+        ]);
+        $account = $businessUnit->accounts()->create([
+            'name' => 'テスト費用sort',
+            'type' => Account::TYPE_EXPENSE,
+        ]);
+
+        $subAccount = $account->addCustomSubAccount('社内勉強会', $user);
+
+        $this->assertSame(SubAccount::SORT_ORDER_DEFAULT, $subAccount->sort_order);
+    }
+
+    #[Test]
+    public function 既定シードでは優先リストの_sub_accountに順序値が付く(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'sort_order 優先リストテスト',
+        ]);
+
+        foreach (BusinessUnit::$prioritizedDefaultSubAccounts as $index => $name) {
+            $expected = ($index + 1) * 10;
+            $sub = $businessUnit->subAccounts()->where('sub_accounts.name', $name)->first();
+            $this->assertNotNull($sub, "$name の SubAccount が見つかりません。");
+            $this->assertSame($expected, $sub->sort_order, "$name の sort_order 想定値 $expected");
+        }
+    }
+
+    #[Test]
+    public function 既定シードでは優先リスト外の_sub_accountはdefault値になる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'sort_order 非優先テスト',
+        ]);
+
+        foreach (['現金', '通信費', '水道光熱費'] as $name) {
+            $sub = $businessUnit->subAccounts()->where('sub_accounts.name', $name)->first();
+            $this->assertNotNull($sub);
+            $this->assertSame(SubAccount::SORT_ORDER_DEFAULT, $sub->sort_order);
+        }
+    }
+
+    #[Test]
     public function 未分類_sub_accountはunclassified_system_purposeが付く(): void
     {
         $user = User::factory()->create();

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Livewire\SolerUi\TransactionEntry\ExpenseForm;
 
 use App\Livewire\SolerUi\TransactionEntry\ExpenseForm\Standard;
+use App\Models\BusinessUnit;
 use App\Models\JournalEntry;
 use App\Models\User;
 use App\Setup\Initializers\GeneralBusinessInitializer;
@@ -202,17 +203,46 @@ class StandardTest extends TestCase
         $component = Livewire::actingAs($user)
             ->test(Standard::class);
 
-        $standardNames = collect($component->instance()->expenseAccountsStandard)
-            ->flatMap(fn ($account) => $account->subAccounts->pluck('name'))
+        $standardNames = collect($component->instance()->expenseSubAccountsStandard)
+            ->pluck('name')
             ->all();
 
-        $expandedNames = collect($component->instance()->expenseAccountsExpanded)
-            ->flatMap(fn ($account) => $account->subAccounts->pluck('name'))
+        $expandedNames = collect($component->instance()->expenseSubAccountsExpanded)
+            ->pluck('name')
             ->all();
 
         // 事業体初期化直後は「消耗品費」等が standard、それ以外の既定補助科目は expanded に降格
         $this->assertContains('消耗品費', $standardNames);
         $this->assertNotContains('消耗品費', $expandedNames);
+    }
+
+    #[Test]
+    public function standardな補助科目は_prioritized_default_sub_accountsの順で並ぶ()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $component = Livewire::actingAs($user)
+            ->test(Standard::class);
+
+        $names = collect($component->instance()->expenseSubAccountsStandard)
+            ->pluck('name')
+            ->values()
+            ->all();
+
+        // $prioritizedDefaultSubAccounts に含まれかつ standard な補助科目は、
+        // 優先リストの順で並ぶ想定。
+        $priorityFiltered = array_values(array_filter(
+            BusinessUnit::$prioritizedDefaultSubAccounts,
+            fn (string $n) => in_array($n, $names, true),
+        ));
+
+        $namesFiltered = array_values(array_filter(
+            $names,
+            fn (string $n) => in_array($n, BusinessUnit::$prioritizedDefaultSubAccounts, true),
+        ));
+
+        $this->assertSame($priorityFiltered, $namesFiltered);
     }
 
     #[Test]
@@ -224,12 +254,12 @@ class StandardTest extends TestCase
         $component = Livewire::actingAs($user)
             ->test(Standard::class);
 
-        $unclassifiedNames = collect($component->instance()->expenseAccountsUnclassified)
-            ->flatMap(fn ($account) => $account->subAccounts->pluck('name'))
+        $unclassifiedNames = collect($component->instance()->expenseSubAccountsUnclassified)
+            ->pluck('name')
             ->all();
 
-        $standardNames = collect($component->instance()->expenseAccountsStandard)
-            ->flatMap(fn ($account) => $account->subAccounts->pluck('name'))
+        $standardNames = collect($component->instance()->expenseSubAccountsStandard)
+            ->pluck('name')
             ->all();
 
         $this->assertContains('未分類', $unclassifiedNames);

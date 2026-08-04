@@ -44,11 +44,11 @@ class Standard extends Component
 
     public bool $isTaxable = false;
 
-    public Collection $expenseAccountsStandard;
+    public Collection $expenseSubAccountsStandard;
 
-    public Collection $expenseAccountsUnclassified;
+    public Collection $expenseSubAccountsUnclassified;
 
-    public Collection $expenseAccountsExpanded;
+    public Collection $expenseSubAccountsExpanded;
 
     public Collection $creditAccounts;
 
@@ -65,28 +65,28 @@ class Standard extends Component
 
         $this->date_input = now()->format('md');
 
-        $expenseAccounts = $unit->accounts()
-            ->with(['subAccounts' => fn ($q) => $q->orderBy('id')])
-            ->where('type', Account::TYPE_EXPENSE)
-            ->orderBy('name')
+        $expenseSubAccounts = SubAccount::query()
+            ->with('account')
+            ->whereHas('account', fn ($q) => $q
+                ->where('business_unit_id', $unit->id)
+                ->where('type', Account::TYPE_EXPENSE))
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->get();
 
-        $this->expenseAccountsStandard = $this->pluckAccountsWithFilteredSubAccounts(
-            $expenseAccounts,
-            fn (SubAccount $sub) => $sub->visibility === SubAccount::VISIBILITY_STANDARD
-                && $sub->system_purpose === null,
-        );
+        $this->expenseSubAccountsStandard = $expenseSubAccounts
+            ->filter(fn (SubAccount $sub) => $sub->visibility === SubAccount::VISIBILITY_STANDARD
+                && $sub->system_purpose === null)
+            ->values();
 
-        $this->expenseAccountsUnclassified = $this->pluckAccountsWithFilteredSubAccounts(
-            $expenseAccounts,
-            fn (SubAccount $sub) => $sub->system_purpose === SubAccount::PURPOSE_UNCLASSIFIED,
-        );
+        $this->expenseSubAccountsUnclassified = $expenseSubAccounts
+            ->filter(fn (SubAccount $sub) => $sub->system_purpose === SubAccount::PURPOSE_UNCLASSIFIED)
+            ->values();
 
-        $this->expenseAccountsExpanded = $this->pluckAccountsWithFilteredSubAccounts(
-            $expenseAccounts,
-            fn (SubAccount $sub) => $sub->visibility === SubAccount::VISIBILITY_EXPANDED
-                && $sub->system_purpose === null,
-        );
+        $this->expenseSubAccountsExpanded = $expenseSubAccounts
+            ->filter(fn (SubAccount $sub) => $sub->visibility === SubAccount::VISIBILITY_EXPANDED
+                && $sub->system_purpose === null)
+            ->values();
 
         $this->creditAccounts = $unit->accounts()
             ->with('subAccounts')
@@ -193,24 +193,6 @@ class Standard extends Component
         $day = (int) substr($normalized, 2, 2);
 
         return [$month, $day];
-    }
-
-    protected function pluckAccountsWithFilteredSubAccounts(Collection $accounts, callable $filter): Collection
-    {
-        return $accounts
-            ->map(function (Account $account) use ($filter) {
-                $filtered = $account->subAccounts->filter($filter)->values();
-
-                if ($filtered->isEmpty()) {
-                    return null;
-                }
-
-                $account->setRelation('subAccounts', $filtered);
-
-                return $account;
-            })
-            ->filter()
-            ->values();
     }
 
     protected function resolveDescription(): string

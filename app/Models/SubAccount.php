@@ -30,15 +30,19 @@ class SubAccount extends Model implements ResolvesBusinessUnit
         self::VISIBILITY_EXPANDED,
     ];
 
+    public const SORT_ORDER_DEFAULT = 1000;
+
     protected $fillable = [
         'account_id',
         'name',
         'system_purpose',
         'visibility',
+        'sort_order',
     ];
 
     protected $attributes = [
         'visibility' => self::VISIBILITY_STANDARD,
+        'sort_order' => self::SORT_ORDER_DEFAULT,
     ];
 
     protected static function booted(): void

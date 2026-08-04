@@ -224,6 +224,36 @@ class BusinessUnitTest extends TestCase
     }
 
     #[Test]
+    public function sub_account_sort_order_migrationは既存データにも順序値を正しく埋める()
+    {
+        $user = User::factory()->create();
+
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'sub_accounts sort_order 後埋めテスト',
+        ]);
+
+        $subAccountIds = $businessUnit->subAccounts()->pluck('sub_accounts.id');
+
+        DB::table('sub_accounts')
+            ->whereIn('id', $subAccountIds)
+            ->update(['sort_order' => SubAccount::SORT_ORDER_DEFAULT]);
+
+        $migration = require base_path('database/migrations/2026_08_04_100001_add_sort_order_to_sub_accounts_table.php');
+        $migration->up();
+
+        foreach (BusinessUnit::$prioritizedDefaultSubAccounts as $index => $name) {
+            $expected = ($index + 1) * 10;
+            $sub = $businessUnit->subAccounts()->where('sub_accounts.name', $name)->first();
+            $this->assertSame($expected, $sub->sort_order, "$name は $expected 想定");
+        }
+
+        foreach (['現金', '通信費'] as $name) {
+            $sub = $businessUnit->subAccounts()->where('sub_accounts.name', $name)->first();
+            $this->assertSame(SubAccount::SORT_ORDER_DEFAULT, $sub->sort_order);
+        }
+    }
+
+    #[Test]
     public function sub_account_system_purpose_visibility_migrationは既存データにも予約用途と可視性を正しく埋める()
     {
         $user = User::factory()->create();

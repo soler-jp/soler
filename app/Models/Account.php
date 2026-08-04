@@ -60,6 +60,7 @@ class Account extends Model implements ResolvesBusinessUnit
     public function subAccounts()
     {
         return $this->hasMany(SubAccount::class)
+            ->orderBy('sort_order')
             ->orderBy('id');
     }
 
@@ -91,6 +92,7 @@ class Account extends Model implements ResolvesBusinessUnit
         User $actor,
         ?string $visibility = null,
         ?string $systemPurpose = null,
+        ?int $sortOrder = null,
     ): SubAccount {
         $attributes = ['name' => $subAccountName];
 
@@ -100,6 +102,10 @@ class Account extends Model implements ResolvesBusinessUnit
 
         if ($systemPurpose !== null) {
             $attributes['system_purpose'] = $systemPurpose;
+        }
+
+        if ($sortOrder !== null) {
+            $attributes['sort_order'] = $sortOrder;
         }
 
         return $this->createSubAccount($attributes, $actor);

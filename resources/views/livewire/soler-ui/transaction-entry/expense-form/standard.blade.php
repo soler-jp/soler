@@ -80,8 +80,22 @@
             </label>
 
             <div class="flex flex-wrap items-center gap-2">
-                @foreach ($expenseAccountsStandard as $account)
-                    @foreach ($account->subAccounts as $subAccount)
+                @foreach ($expenseSubAccountsStandard as $subAccount)
+                    <button type="button"
+                        wire:click="$set('debit_sub_account_id', {{ $subAccount->id }})"
+                        @class([
+                            'px-3 py-1.5 text-sm font-medium rounded-control border transition',
+                            'bg-action-primary text-action-primary-fg border-transparent font-semibold' =>
+                                $debit_sub_account_id === $subAccount->id,
+                            'bg-surface text-content border-line hover:bg-surface-muted' =>
+                                $debit_sub_account_id !== $subAccount->id,
+                        ])>
+                        {{ $subAccount->account->name === $subAccount->name ? $subAccount->account->name : $subAccount->account->name . ' - ' . $subAccount->name }}
+                    </button>
+                @endforeach
+
+                @if ($showExpanded)
+                    @foreach ($expenseSubAccountsExpanded as $subAccount)
                         <button type="button"
                             wire:click="$set('debit_sub_account_id', {{ $subAccount->id }})"
                             @class([
@@ -91,51 +105,31 @@
                                 'bg-surface text-content border-line hover:bg-surface-muted' =>
                                     $debit_sub_account_id !== $subAccount->id,
                             ])>
-                            {{ $account->name === $subAccount->name ? $account->name : $account->name . ' - ' . $subAccount->name }}
+                            {{ $subAccount->account->name === $subAccount->name ? $subAccount->account->name : $subAccount->account->name . ' - ' . $subAccount->name }}
                         </button>
                     @endforeach
-                @endforeach
-
-                @if ($showExpanded)
-                    @foreach ($expenseAccountsExpanded as $account)
-                        @foreach ($account->subAccounts as $subAccount)
-                            <button type="button"
-                                wire:click="$set('debit_sub_account_id', {{ $subAccount->id }})"
-                                @class([
-                                    'px-3 py-1.5 text-sm font-medium rounded-control border transition',
-                                    'bg-action-primary text-action-primary-fg border-transparent font-semibold' =>
-                                        $debit_sub_account_id === $subAccount->id,
-                                    'bg-surface text-content border-line hover:bg-surface-muted' =>
-                                        $debit_sub_account_id !== $subAccount->id,
-                                ])>
-                                {{ $account->name === $subAccount->name ? $account->name : $account->name . ' - ' . $subAccount->name }}
-                            </button>
-                        @endforeach
-                    @endforeach
                 @endif
 
-                @if ($expenseAccountsUnclassified->isNotEmpty())
+                @if ($expenseSubAccountsUnclassified->isNotEmpty())
                     <span class="text-content-muted text-base select-none px-1" aria-hidden="true">|</span>
 
-                    @foreach ($expenseAccountsUnclassified as $account)
-                        @foreach ($account->subAccounts as $subAccount)
-                            <button type="button"
-                                wire:click="$set('debit_sub_account_id', {{ $subAccount->id }})"
-                                title="種類が決まっていない支出。あとから正しい科目へ振り替えるのがおすすめです。"
-                                @class([
-                                    'px-3 py-1.5 text-sm font-medium rounded-control border transition',
-                                    'bg-action-primary text-action-primary-fg border-transparent font-semibold' =>
-                                        $debit_sub_account_id === $subAccount->id,
-                                    'bg-surface text-content border-line hover:bg-surface-muted' =>
-                                        $debit_sub_account_id !== $subAccount->id,
-                                ])>
-                                <span class="italic">{{ $account->name === $subAccount->name ? $account->name : $account->name . ' - ' . $subAccount->name }}</span>
-                            </button>
-                        @endforeach
+                    @foreach ($expenseSubAccountsUnclassified as $subAccount)
+                        <button type="button"
+                            wire:click="$set('debit_sub_account_id', {{ $subAccount->id }})"
+                            title="種類が決まっていない支出。あとから正しい科目へ振り替えるのがおすすめです。"
+                            @class([
+                                'px-3 py-1.5 text-sm font-medium rounded-control border transition',
+                                'bg-action-primary text-action-primary-fg border-transparent font-semibold' =>
+                                    $debit_sub_account_id === $subAccount->id,
+                                'bg-surface text-content border-line hover:bg-surface-muted' =>
+                                    $debit_sub_account_id !== $subAccount->id,
+                            ])>
+                            <span class="italic">{{ $subAccount->account->name === $subAccount->name ? $subAccount->account->name : $subAccount->account->name . ' - ' . $subAccount->name }}</span>
+                        </button>
                     @endforeach
                 @endif
 
-                @if ($expenseAccountsExpanded->isNotEmpty())
+                @if ($expenseSubAccountsExpanded->isNotEmpty())
                     <button type="button" wire:click="toggleExpanded"
                         class="ml-1 text-sm text-link hover:underline">
                         {{ $showExpanded
