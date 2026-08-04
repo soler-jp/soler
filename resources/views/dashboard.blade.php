@@ -31,7 +31,9 @@
             </div>
 
             <div class="py-6 px-4 sm:px-6 lg:px-8">
-                <livewire:soler-ui.transaction-entry.expense-form.standard />
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                    <livewire:soler-ui.transaction-entry.expense-form.standard />
+                </div>
             </div>
 
             <div class="py-6 px-4 sm:px-6 lg:px-8">

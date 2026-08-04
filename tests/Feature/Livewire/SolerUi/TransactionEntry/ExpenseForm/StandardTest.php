@@ -3,6 +3,7 @@
 namespace Tests\Feature\Livewire\SolerUi\TransactionEntry\ExpenseForm;
 
 use App\Livewire\SolerUi\TransactionEntry\ExpenseForm\Standard;
+use App\Models\JournalEntry;
 use App\Models\User;
 use App\Setup\Initializers\GeneralBusinessInitializer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,22 +16,26 @@ class StandardTest extends TestCase
 {
     use RefreshDatabase;
 
-    #[Test]
-    public function 経費入力フォームがダッシュボードに表示される()
+    protected function initializeUnit(User $user, string $name = 'テスト事業体', bool $isTaxable = false)
     {
-        $user = User::factory()->create();
-        $initializer = new GeneralBusinessInitializer;
-        $initializer->initialize($user, [
-            'name' => 'テスト事業体',
+        return (new GeneralBusinessInitializer)->initialize($user, [
+            'name' => $name,
             'type' => 'general',
             'year' => 2025,
-            'is_taxable' => false,
+            'is_taxable' => $isTaxable,
             'is_tax_exclusive' => false,
             'cash_balance' => null,
             'bank_accounts' => [],
             'fixed_assets' => [],
             'recurring_templates' => [],
         ]);
+    }
+
+    #[Test]
+    public function 経費入力フォームがダッシュボードに表示される()
+    {
+        $user = User::factory()->create();
+        $this->initializeUnit($user);
 
         $this->actingAs($user);
 
@@ -44,19 +49,7 @@ class StandardTest extends TestCase
     public function 経費を正しく入力すると仕訳が登録される()
     {
         $user = User::factory()->create();
-
-        $initializer = new GeneralBusinessInitializer;
-        $unit = $initializer->initialize($user, [
-            'name' => 'テスト事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
+        $unit = $this->initializeUnit($user);
 
         $debit = $unit->getAccountByName('消耗品費')->subAccounts()->first();
         $credit = $unit->getAccountByName('現金')->subAccounts()->first();
@@ -65,9 +58,53 @@ class StandardTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Standard::class)
-            ->set('date', '2025-05-10')
-            ->set('description', '文房具購入')
-            ->set('amount', 1500)
+            ->set('date_input', '0510')
+            ->set('note', '文房具購入')
+            ->set('amount', 1100)
+            ->set('tax_option', Standard::TAX_OPTION_10)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        // 免税事業者・10%税込1100 → net=1000, tax=100
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $debit->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => 1000,
+            'tax_amount' => 100,
+            'tax_type' => JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $credit->id,
+            'type' => JournalEntry::TYPE_CREDIT,
+            'net_amount' => 1100,
+        ]);
+
+        $this->assertDatabaseHas('transactions', [
+            'date' => '2025-05-10 00:00:00',
+            'description' => '文房具購入',
+        ]);
+    }
+
+    #[Test]
+    public function 非課税を選ぶと税額が計上されず税区分がexemptになる()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $debit = $unit->getAccountByName('消耗品費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        $this->actingAs($user);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0510')
+            ->set('note', '印紙')
+            ->set('amount', 1000)
+            ->set('tax_option', Standard::TAX_OPTION_EXEMPT)
             ->set('debit_sub_account_id', $debit->id)
             ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
@@ -75,15 +112,66 @@ class StandardTest extends TestCase
 
         $this->assertDatabaseHas('journal_entries', [
             'sub_account_id' => $debit->id,
-            'type' => 'debit',
-            'net_amount' => 1500,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => 1000,
+            'tax_amount' => 0,
+            'tax_type' => JournalEntry::TAX_TYPE_EXEMPT,
         ]);
+    }
 
-        $this->assertDatabaseHas('journal_entries', [
-            'sub_account_id' => $credit->id,
-            'type' => 'credit',
-            'net_amount' => 1500,
+    #[Test]
+    public function 支払い先を入力すると_counterpartyが作成され取引に紐づく()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $debit = $unit->getAccountByName('消耗品費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        $this->actingAs($user);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0510')
+            ->set('note', 'ノート')
+            ->set('amount', 550)
+            ->set('tax_option', Standard::TAX_OPTION_10)
+            ->set('counterparty_name', 'ロフト')
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        $counterparty = $unit->counterparties()->where('name', 'ロフト')->firstOrFail();
+
+        $this->assertDatabaseHas('transactions', [
+            'counterparty_id' => $counterparty->id,
+            'date' => '2025-05-10 00:00:00',
         ]);
+    }
+
+    #[Test]
+    public function 支払い先未入力なら_counterpartyは作成されない()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $debit = $unit->getAccountByName('消耗品費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        $this->actingAs($user);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0510')
+            ->set('note', 'ノート')
+            ->set('amount', 550)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        $this->assertSame(0, $unit->counterparties()->count());
     }
 
     #[Test]
@@ -91,19 +179,7 @@ class StandardTest extends TestCase
     public function 貸方勘定科目が想定順で表示される()
     {
         $user = User::factory()->create();
-
-        $initializer = new GeneralBusinessInitializer;
-        $initializer->initialize($user, [
-            'name' => 'テスト事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
+        $this->initializeUnit($user);
 
         $creditAccountNames = Livewire::actingAs($user)
             ->test(Standard::class)
@@ -117,42 +193,79 @@ class StandardTest extends TestCase
     }
 
     #[Test]
+    public function standardな補助科目のみがexpandedを開かなくても表示される()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $component = Livewire::actingAs($user)
+            ->test(Standard::class);
+
+        $standardNames = collect($component->instance()->expenseAccountsStandard)
+            ->flatMap(fn ($account) => $account->subAccounts->pluck('name'))
+            ->all();
+
+        $expandedNames = collect($component->instance()->expenseAccountsExpanded)
+            ->flatMap(fn ($account) => $account->subAccounts->pluck('name'))
+            ->all();
+
+        // 事業体初期化直後は「消耗品費」等が standard、それ以外の既定補助科目は expanded に降格
+        $this->assertContains('消耗品費', $standardNames);
+        $this->assertNotContains('消耗品費', $expandedNames);
+    }
+
+    #[Test]
+    public function 未分類の補助科目は専用セクションに分けて表示される()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $component = Livewire::actingAs($user)
+            ->test(Standard::class);
+
+        $unclassifiedNames = collect($component->instance()->expenseAccountsUnclassified)
+            ->flatMap(fn ($account) => $account->subAccounts->pluck('name'))
+            ->all();
+
+        $standardNames = collect($component->instance()->expenseAccountsStandard)
+            ->flatMap(fn ($account) => $account->subAccounts->pluck('name'))
+            ->all();
+
+        $this->assertContains('未分類', $unclassifiedNames);
+        $this->assertNotContains('未分類', $standardNames);
+    }
+
+    #[Test]
+    public function toggle_expandedで折りたたみ状態が切り替わる()
+    {
+        $user = User::factory()->create();
+        $this->initializeUnit($user);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->assertSet('showExpanded', false)
+            ->call('toggleExpanded')
+            ->assertSet('showExpanded', true)
+            ->call('toggleExpanded')
+            ->assertSet('showExpanded', false);
+    }
+
+    #[Test]
     public function 他ユーザー事業体の補助科目は経費登録に使えない()
     {
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
 
-        $initializer = new GeneralBusinessInitializer;
-        $unit = $initializer->initialize($user, [
-            'name' => '自分の事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
-        $otherUnit = $initializer->initialize($otherUser, [
-            'name' => '他人の事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
+        $unit = $this->initializeUnit($user, '自分の事業体');
+        $otherUnit = $this->initializeUnit($otherUser, '他人の事業体');
 
         $ownCredit = $unit->getAccountByName('現金')->subAccounts()->first();
         $foreignDebit = $otherUnit->getAccountByName('消耗品費')->subAccounts()->first();
 
         Livewire::actingAs($user)
             ->test(Standard::class)
-            ->set('date', '2025-05-10')
-            ->set('description', '不正な経費登録')
+            ->set('date_input', '0510')
+            ->set('note', '不正な経費登録')
             ->set('amount', 1500)
             ->set('debit_sub_account_id', $foreignDebit->id)
             ->set('credit_sub_account_id', $ownCredit->id)
@@ -161,8 +274,7 @@ class StandardTest extends TestCase
 
         $this->assertDatabaseMissing('journal_entries', [
             'sub_account_id' => $foreignDebit->id,
-            'type' => 'debit',
-            'net_amount' => 1500,
+            'type' => JournalEntry::TYPE_DEBIT,
         ]);
     }
 
@@ -170,19 +282,7 @@ class StandardTest extends TestCase
     public function 日付が未入力だとバリデーションエラーになる()
     {
         $user = User::factory()->create();
-
-        $initializer = new GeneralBusinessInitializer;
-        $unit = $initializer->initialize($user, [
-            'name' => 'テスト事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
+        $unit = $this->initializeUnit($user);
 
         $this->actingAs($user);
 
@@ -191,32 +291,20 @@ class StandardTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Standard::class)
-            ->set('date', '')
-            ->set('description', '交通費')
+            ->set('date_input', '')
+            ->set('note', '交通費')
             ->set('amount', 1000)
             ->set('debit_sub_account_id', $debit->id)
             ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
-            ->assertHasErrors(['date' => 'required']);
+            ->assertHasErrors(['date_input' => 'required']);
     }
 
     #[Test]
-    public function 摘要が未入力だとバリデーションエラーになる()
+    public function 日付が不正な形式だとバリデーションエラーになる()
     {
         $user = User::factory()->create();
-
-        $initializer = new GeneralBusinessInitializer;
-        $unit = $initializer->initialize($user, [
-            'name' => 'テスト事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
+        $unit = $this->initializeUnit($user);
 
         $this->actingAs($user);
 
@@ -225,32 +313,96 @@ class StandardTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Standard::class)
-            ->set('date', '2025-05-10')
-            ->set('description', '')
+            ->set('date_input', '12345')
             ->set('amount', 1000)
             ->set('debit_sub_account_id', $debit->id)
             ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
-            ->assertHasErrors(['description' => 'required']);
+            ->assertHasErrors(['date_input' => 'regex']);
+    }
+
+    #[Test]
+    public function 日付が存在しない日だとバリデーションエラーになる()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $this->actingAs($user);
+
+        $debit = $unit->getAccountByName('旅費交通費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0231')
+            ->set('amount', 1000)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
+            ->call('submit')
+            ->assertHasErrors(['date_input']);
+    }
+
+    #[Test]
+    public function 日付が3桁でも登録できる()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $this->actingAs($user);
+
+        $debit = $unit->getAccountByName('旅費交通費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '313')
+            ->set('note', '交通費')
+            ->set('amount', 1000)
+            ->set('tax_option', Standard::TAX_OPTION_EXEMPT)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('transactions', [
+            'date' => '2025-03-13 00:00:00',
+        ]);
+    }
+
+    #[Test]
+    public function メモが未入力でも登録できる()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $this->actingAs($user);
+
+        $debit = $unit->getAccountByName('旅費交通費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0510')
+            ->set('note', '')
+            ->set('amount', 1000)
+            ->set('tax_option', Standard::TAX_OPTION_EXEMPT)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        // メモ空白時は補助科目名(または勘定科目 - 補助科目)を description に採用
+        $this->assertDatabaseHas('transactions', [
+            'date' => '2025-05-10 00:00:00',
+            'description' => '旅費交通費',
+        ]);
     }
 
     #[Test]
     public function 金額が未入力だとバリデーションエラーになる()
     {
         $user = User::factory()->create();
-
-        $initializer = new GeneralBusinessInitializer;
-        $unit = $initializer->initialize($user, [
-            'name' => 'テスト事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
+        $unit = $this->initializeUnit($user);
 
         $this->actingAs($user);
 
@@ -259,8 +411,8 @@ class StandardTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Standard::class)
-            ->set('date', '2025-05-10')
-            ->set('description', '通信費')
+            ->set('date_input', '0510')
+            ->set('note', '通信費')
             ->set('amount', null)
             ->set('debit_sub_account_id', $debit->id)
             ->set('credit_sub_account_id', $credit->id)
@@ -269,22 +421,31 @@ class StandardTest extends TestCase
     }
 
     #[Test]
-    public function debit_account_idが未選択だとバリデーションエラーになる()
+    public function 金額が100万円を超えるとバリデーションエラーになる()
     {
         $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
 
-        $initializer = new GeneralBusinessInitializer;
-        $unit = $initializer->initialize($user, [
-            'name' => 'テスト事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
+        $this->actingAs($user);
+
+        $debit = $unit->getAccountByName('旅費交通費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0510')
+            ->set('amount', 1000001)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
+            ->call('submit')
+            ->assertHasErrors(['amount' => 'max']);
+    }
+
+    #[Test]
+    public function debit_sub_account_idが未選択だとバリデーションエラーになる()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
 
         $this->actingAs($user);
 
@@ -292,8 +453,8 @@ class StandardTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Standard::class)
-            ->set('date', '2025-05-10')
-            ->set('description', '水道光熱費')
+            ->set('date_input', '0510')
+            ->set('note', '水道光熱費')
             ->set('amount', 3000)
             ->set('debit_sub_account_id', null)
             ->set('credit_sub_account_id', $credit->id)
@@ -302,22 +463,10 @@ class StandardTest extends TestCase
     }
 
     #[Test]
-    public function credit_account_idが未選択だとバリデーションエラーになる()
+    public function credit_sub_account_idが未選択だとバリデーションエラーになる()
     {
         $user = User::factory()->create();
-
-        $initializer = new GeneralBusinessInitializer;
-        $unit = $initializer->initialize($user, [
-            'name' => 'テスト事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
+        $unit = $this->initializeUnit($user);
 
         $this->actingAs($user);
 
@@ -325,8 +474,8 @@ class StandardTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Standard::class)
-            ->set('date', '2025-05-10')
-            ->set('description', '備品購入')
+            ->set('date_input', '0510')
+            ->set('note', '備品購入')
             ->set('amount', 2000)
             ->set('debit_sub_account_id', $expenseSubAccount->id)
             ->set('credit_sub_account_id', null)
@@ -338,17 +487,7 @@ class StandardTest extends TestCase
     public function 金額が負の値だとバリデーションエラーになる()
     {
         $user = User::factory()->create();
-        $unit = (new GeneralBusinessInitializer)->initialize($user, [
-            'name' => 'テスト事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
+        $unit = $this->initializeUnit($user);
 
         $this->actingAs($user);
 
@@ -357,8 +496,8 @@ class StandardTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Standard::class)
-            ->set('date', '2025-05-10')
-            ->set('description', '交通費')
+            ->set('date_input', '0510')
+            ->set('note', '交通費')
             ->set('amount', -100)
             ->set('debit_sub_account_id', $debit->id)
             ->set('credit_sub_account_id', $credit->id)
@@ -370,24 +509,14 @@ class StandardTest extends TestCase
     public function 存在しない勘定科目を指定するとバリデーションエラーになる()
     {
         $user = User::factory()->create();
-        $unit = (new GeneralBusinessInitializer)->initialize($user, [
-            'name' => 'テスト事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
+        $this->initializeUnit($user);
 
         $this->actingAs($user);
 
         Livewire::actingAs($user)
             ->test(Standard::class)
-            ->set('date', '2025-05-10')
-            ->set('description', '通信費')
+            ->set('date_input', '0510')
+            ->set('note', '通信費')
             ->set('amount', 1000)
             ->set('debit_sub_account_id', 999999)
             ->set('credit_sub_account_id', 999998)
@@ -402,17 +531,7 @@ class StandardTest extends TestCase
     public function 登録後にフォームが初期化される()
     {
         $user = User::factory()->create();
-        $unit = (new GeneralBusinessInitializer)->initialize($user, [
-            'name' => 'テスト事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
+        $unit = $this->initializeUnit($user);
 
         $this->actingAs($user);
 
@@ -421,33 +540,27 @@ class StandardTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Standard::class)
-            ->set('date', '2025-05-10')
-            ->set('description', '備品購入')
+            ->set('date_input', '0510')
+            ->set('note', '備品購入')
+            ->set('counterparty_name', '無印良品')
             ->set('amount', 500)
+            ->set('tax_option', Standard::TAX_OPTION_8)
             ->set('debit_sub_account_id', $expense->id)
             ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
-            ->assertSet('description', '')
+            ->assertSet('note', '')
+            ->assertSet('counterparty_name', '')
             ->assertSet('amount', null)
             ->assertSet('debit_sub_account_id', null)
-            ->assertSet('credit_sub_account_id', null);
+            ->assertSet('credit_sub_account_id', null)
+            ->assertSet('tax_option', Standard::TAX_OPTION_10);
     }
 
     #[Test]
     public function 登録後に確認メッセージが表示される()
     {
         $user = User::factory()->create();
-        $unit = (new GeneralBusinessInitializer)->initialize($user, [
-            'name' => 'テスト事業体',
-            'type' => 'general',
-            'year' => 2025,
-            'is_taxable' => false,
-            'is_tax_exclusive' => false,
-            'cash_balance' => null,
-            'bank_accounts' => [],
-            'fixed_assets' => [],
-            'recurring_templates' => [],
-        ]);
+        $unit = $this->initializeUnit($user);
 
         $this->actingAs($user);
 
@@ -456,13 +569,13 @@ class StandardTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(Standard::class)
-            ->set('date', '2025-05-10')
-            ->set('description', '消耗品購入')
+            ->set('date_input', '0510')
+            ->set('note', '消耗品購入')
             ->set('amount', 800)
             ->set('debit_sub_account_id', $expense->id)
             ->set('credit_sub_account_id', $credit->id)
             ->call('submit')
-            ->assertSee('経費を登録しました');
+            ->assertSee(__('transactions.expense_form.messages.registered'));
     }
 
     #[Test]

@@ -3,37 +3,83 @@
 namespace App\Livewire\SolerUi\TransactionEntry\ExpenseForm;
 
 use App\Models\Account;
+use App\Models\FiscalYear;
+use App\Models\JournalEntry;
+use App\Models\SubAccount;
 use App\Services\TransactionRegistrar;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Standard extends Component
 {
-    public string $date;
+    public const TAX_OPTION_10 = '10';
 
-    public string $description = '';
+    public const TAX_OPTION_8 = '8';
+
+    public const TAX_OPTION_EXEMPT = 'exempt';
+
+    public const TAX_OPTIONS = [
+        self::TAX_OPTION_10,
+        self::TAX_OPTION_8,
+        self::TAX_OPTION_EXEMPT,
+    ];
+
+    public string $date_input = '';
+
+    public string $note = '';
+
+    public string $counterparty_name = '';
 
     public ?int $amount = null;
+
+    public string $tax_option = self::TAX_OPTION_10;
 
     public ?int $debit_sub_account_id = null;
 
     public ?int $credit_sub_account_id = null;
 
-    public Collection $expenseAccounts; // type = 'expense'
+    public bool $showExpanded = false;
 
-    public Collection $creditAccounts; // name in ['現金', '普通預金', '事業主借']
+    public int $fiscalYearYear = 0;
+
+    public Collection $expenseAccountsStandard;
+
+    public Collection $expenseAccountsUnclassified;
+
+    public Collection $expenseAccountsExpanded;
+
+    public Collection $creditAccounts;
 
     public function mount(): void
     {
-        $this->date = now()->toDateString();
-
         $unit = auth()->user()->selectedBusinessUnitOrFail();
+        $fiscalYear = $unit->currentFiscalYear;
+        $this->fiscalYearYear = (int) $fiscalYear->year;
 
-        $this->expenseAccounts = $unit->accounts()
-            ->with('subAccounts')
+        $this->date_input = now()->format('md');
+
+        $expenseAccounts = $unit->accounts()
+            ->with(['subAccounts' => fn ($q) => $q->orderBy('id')])
             ->where('type', Account::TYPE_EXPENSE)
             ->orderBy('name')
             ->get();
+
+        $this->expenseAccountsStandard = $this->pluckAccountsWithFilteredSubAccounts(
+            $expenseAccounts,
+            fn (SubAccount $sub) => $sub->visibility === SubAccount::VISIBILITY_STANDARD
+                && $sub->system_purpose === null,
+        );
+
+        $this->expenseAccountsUnclassified = $this->pluckAccountsWithFilteredSubAccounts(
+            $expenseAccounts,
+            fn (SubAccount $sub) => $sub->system_purpose === SubAccount::PURPOSE_UNCLASSIFIED,
+        );
+
+        $this->expenseAccountsExpanded = $this->pluckAccountsWithFilteredSubAccounts(
+            $expenseAccounts,
+            fn (SubAccount $sub) => $sub->visibility === SubAccount::VISIBILITY_EXPANDED
+                && $sub->system_purpose === null,
+        );
 
         $this->creditAccounts = $unit->accounts()
             ->with('subAccounts')
@@ -42,54 +88,150 @@ class Standard extends Component
             ->get();
     }
 
+    public function toggleExpanded(): void
+    {
+        $this->showExpanded = ! $this->showExpanded;
+    }
+
     public function submit(): void
     {
         $user = auth()->user();
         $unit = $user->selectedBusinessUnitOrFail();
+        $fiscalYear = $unit->currentFiscalYear;
 
         $this->validate([
-            'date' => ['required', 'date'],
-            'description' => ['required', 'string', 'max:255'],
-            'amount' => ['required', 'integer', 'min:1'],
+            'date_input' => ['required', 'string', 'regex:/^\d{3,4}$/'],
+            'amount' => ['required', 'integer', 'min:1', 'max:1000000'],
+            'tax_option' => ['required', 'in:'.implode(',', self::TAX_OPTIONS)],
             'debit_sub_account_id' => ['required', $unit->subAccountExistsRule()],
             'credit_sub_account_id' => ['required', $unit->subAccountExistsRule()],
+            'note' => ['nullable', 'string', 'max:255'],
+            'counterparty_name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $fiscalYear = $unit->currentFiscalYear;
+        [$month, $day] = $this->parseDateInput($this->date_input);
+
+        if (! checkdate($month, $day, $this->fiscalYearYear)) {
+            $this->addError('date_input', __('transactions.expense_form.errors.invalid_date'));
+
+            return;
+        }
+
+        $date = sprintf('%04d-%02d-%02d', $this->fiscalYearYear, $month, $day);
+        $description = $this->resolveDescription();
+        $debitTaxType = $this->mapDebitTaxType($fiscalYear, $this->tax_option);
+
+        $transactionData = [
+            'date' => $date,
+            'description' => $description,
+        ];
+
+        $counterpartyName = trim($this->counterparty_name);
+        if ($counterpartyName !== '') {
+            $transactionData['counterparty_name'] = $counterpartyName;
+        }
 
         try {
             app(TransactionRegistrar::class)->register(
                 $fiscalYear,
-                [
-                    'date' => $this->date,
-                    'description' => $this->description,
-                ],
+                $transactionData,
                 [
                     [
                         'sub_account_id' => $this->debit_sub_account_id,
-                        'type' => 'debit',
-                        'net_amount' => $this->amount,
+                        'type' => JournalEntry::TYPE_DEBIT,
+                        'gross_amount' => (int) $this->amount,
+                        'tax_type' => $debitTaxType,
                     ],
                     [
                         'sub_account_id' => $this->credit_sub_account_id,
-                        'type' => 'credit',
-                        'net_amount' => $this->amount,
+                        'type' => JournalEntry::TYPE_CREDIT,
+                        'net_amount' => (int) $this->amount,
                     ],
                 ],
                 $user,
             );
 
             $this->dispatch('dashboard-transaction-created');
-            // 初期化 & 確認メッセージ
-            $this->reset(['description', 'amount', 'debit_sub_account_id', 'credit_sub_account_id']);
-            session()->flash('message', '経費を登録しました');
+            $this->reset([
+                'note',
+                'amount',
+                'debit_sub_account_id',
+                'credit_sub_account_id',
+                'counterparty_name',
+            ]);
+            $this->tax_option = self::TAX_OPTION_10;
+            session()->flash('message', __('transactions.expense_form.messages.registered'));
         } catch (\Exception $e) {
-            session()->flash('error', '経費の登録に失敗しました: '.$e->getMessage());
+            session()->flash('error', __('transactions.expense_form.errors.registration_failed').': '.$e->getMessage());
         }
     }
 
     public function render()
     {
         return view('livewire.soler-ui.transaction-entry.expense-form.standard');
+    }
+
+    /**
+     * @return array{0:int,1:int}
+     */
+    protected function parseDateInput(string $input): array
+    {
+        $normalized = str_pad(trim($input), 4, '0', STR_PAD_LEFT);
+        $month = (int) substr($normalized, 0, 2);
+        $day = (int) substr($normalized, 2, 2);
+
+        return [$month, $day];
+    }
+
+    protected function pluckAccountsWithFilteredSubAccounts(Collection $accounts, callable $filter): Collection
+    {
+        return $accounts
+            ->map(function (Account $account) use ($filter) {
+                $filtered = $account->subAccounts->filter($filter)->values();
+
+                if ($filtered->isEmpty()) {
+                    return null;
+                }
+
+                $account->setRelation('subAccounts', $filtered);
+
+                return $account;
+            })
+            ->filter()
+            ->values();
+    }
+
+    protected function resolveDescription(): string
+    {
+        $note = trim($this->note);
+        if ($note !== '') {
+            return $note;
+        }
+
+        $subAccount = $this->debit_sub_account_id !== null
+            ? SubAccount::with('account')->find($this->debit_sub_account_id)
+            : null;
+
+        if ($subAccount === null) {
+            return '経費';
+        }
+
+        $accountName = $subAccount->account?->name ?? '';
+        $subName = $subAccount->name;
+
+        return $accountName === '' || $accountName === $subName
+            ? $subName
+            : $accountName.' - '.$subName;
+    }
+
+    protected function mapDebitTaxType(FiscalYear $fiscalYear, string $option): string
+    {
+        return match ($option) {
+            self::TAX_OPTION_10 => $fiscalYear->is_taxable
+                ? JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10
+                : JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10,
+            self::TAX_OPTION_8 => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8,
+            self::TAX_OPTION_EXEMPT => JournalEntry::TAX_TYPE_EXEMPT,
+        };
     }
 }
