@@ -74,6 +74,22 @@ export default {
                     fg:      withAlpha('--color-status-info-fg'),
                     border:  withAlpha('--color-status-info-border'),
                 },
+
+                'accent-revenue': {
+                    DEFAULT: withAlpha('--color-accent-revenue-bg'),
+                    fg:      withAlpha('--color-accent-revenue-fg'),
+                    border:  withAlpha('--color-accent-revenue-border'),
+                },
+                'accent-expense': {
+                    DEFAULT: withAlpha('--color-accent-expense-bg'),
+                    fg:      withAlpha('--color-accent-expense-fg'),
+                    border:  withAlpha('--color-accent-expense-border'),
+                },
+                'accent-purchase': {
+                    DEFAULT: withAlpha('--color-accent-purchase-bg'),
+                    fg:      withAlpha('--color-accent-purchase-fg'),
+                    border:  withAlpha('--color-accent-purchase-border'),
+                },
             },
             borderRadius: {
                 control: 'var(--radius-control)',

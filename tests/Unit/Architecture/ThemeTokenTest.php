@@ -32,6 +32,9 @@ class ThemeTokenTest extends TestCase
         'status-warning', 'status-warning-fg', 'status-warning-border',
         'status-success', 'status-success-fg', 'status-success-border',
         'status-info', 'status-info-fg', 'status-info-border',
+        'accent-revenue', 'accent-revenue-fg', 'accent-revenue-border',
+        'accent-expense', 'accent-expense-fg', 'accent-expense-border',
+        'accent-purchase', 'accent-purchase-fg', 'accent-purchase-border',
         'transparent', 'current', 'inherit',
     ];
 
@@ -76,6 +79,9 @@ class ThemeTokenTest extends TestCase
         'color-status-warning-bg', 'color-status-warning-fg', 'color-status-warning-border',
         'color-status-success-bg', 'color-status-success-fg', 'color-status-success-border',
         'color-status-info-bg', 'color-status-info-fg', 'color-status-info-border',
+        'color-accent-revenue-bg', 'color-accent-revenue-fg', 'color-accent-revenue-border',
+        'color-accent-expense-bg', 'color-accent-expense-fg', 'color-accent-expense-border',
+        'color-accent-purchase-bg', 'color-accent-purchase-fg', 'color-accent-purchase-border',
     ];
 
     private const EXPECTED_RADIUS_TOKENS = [

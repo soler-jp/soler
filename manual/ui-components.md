@@ -100,7 +100,7 @@ Soler の UI は、テーマ契約に基づいた共通コンポーネントを 
 
 `name` で SVG アイコンを描画します。ボタン外でも使えます。色は `currentColor` を継承するので、親の `text-*` で色付けします。
 
-現在使えるアイコン: `plus` / `pencil` / `x-mark` / `arrow-right` / `arrow-left` / `arrow-down-tray` / `trash` / `check`
+現在使えるアイコン: `plus` / `pencil` / `x-mark` / `arrow-right` / `arrow-left` / `arrow-down-tray` / `trash` / `check` / `chevron-down`
 
 ```blade
 <x-ui.icon name="plus" />
@@ -132,6 +132,55 @@ Soler の UI は、テーマ契約に基づいた共通コンポーネントを 
     <x-ui.card-body>...</x-ui.card-body>
 </x-ui.card>
 ```
+
+#### `variant` — 取引区分アクセント
+
+`variant` に取引区分を指定すると、カード全体が淡背景＋アクセント色の罫線に切り替わります。取引フォーム（売上・経費・仕入）の識別に使います。
+
+| variant | 意味 | 契約トークン |
+| --- | --- | --- |
+| `default`（省略時） | 通常の面 | `bg-surface` / `border-line` |
+| `revenue` | 売上・収入 | `bg-accent-revenue` / `border-accent-revenue-border` |
+| `expense` | 経費・支出 | `bg-accent-expense` / `border-accent-expense-border` |
+| `purchase` | 仕入 | `bg-accent-purchase` / `border-accent-purchase-border` |
+
+`<x-ui.card-header>` にも同じ `variant` を渡すと、ヘッダー下の罫線がアクセント色に揃います。
+
+```blade
+<x-ui.card variant="revenue">
+    <x-ui.card-header variant="revenue">売上を登録</x-ui.card-header>
+    <x-ui.card-body>...</x-ui.card-body>
+</x-ui.card>
+```
+
+`status-*`（成功／警告／情報／エラーの通知）と `accent-*`（取引区分の識別）は意味カテゴリが独立です。revenue カードの中で status-success の flash を出す、といった組み合わせは前提として設計しています。
+
+#### `collapsible` — ヘッダーだけ残して本体を畳む
+
+`<x-ui.card>` に `collapsible` を付けると、カード全体が Alpine.js の `x-data="{ open: true }"` を持ちます。あわせて `<x-ui.card-header>` に `toggle` を付けるとヘッダー全体がトグルボタンになり、右端に chevron が出ます。本体側は自分で `x-show="open"` を貼ります（`x-cloak` を併用すると初期描画のちらつきを防げます）。
+
+初期状態を畳んだ状態にしたい場合は `:collapsed="true"` を渡します。
+
+```blade
+<x-ui.card variant="expense" collapsible>
+    <x-ui.card-header toggle variant="expense">経費を登録</x-ui.card-header>
+    <div x-show="open" x-cloak class="p-4 space-y-4">
+        {{-- 本体 --}}
+    </div>
+</x-ui.card>
+
+{{-- 初期は畳んで表示 --}}
+<x-ui.card collapsible :collapsed="true">
+    <x-ui.card-header toggle>詳細設定</x-ui.card-header>
+    <div x-show="open" x-cloak class="p-4">...</div>
+</x-ui.card>
+```
+
+`toggle` を付けなくても `<x-ui.card-header>` は使えます。その場合は普通の見出しとしてだけ表示されます。
+
+#### ヘッダーの見た目
+
+`<x-ui.card-header>` は `text-base` + `font-bold` で表示されます。`variant` を渡すと下罫線が対応するアクセント色になります。トグル時はヘッダー全体にホバー背景（`hover:bg-surface-muted`）が乗ります。
 
 ### `<x-ui.input>`
 
@@ -172,6 +221,7 @@ Blade から使えるユーティリティのうち、色・アール・影は�
 - アクション: `bg-action-primary` `text-action-primary-fg` `hover:bg-action-primary-hover`（`action-confirm` / `action-danger` も同形）
 - chrome (navmenu 等): `bg-chrome` `text-chrome-fg` `text-chrome-muted` `hover:bg-chrome-hover`
 - ステータス: `bg-status-danger` `text-status-danger-fg` `border-status-danger-border`（`warning` / `success` / `info` も同形）
+- 取引区分アクセント: `bg-accent-revenue` `text-accent-revenue-fg` `border-accent-revenue-border`（`expense` / `purchase` も同形。取引フォームの識別に使う）
 
 ### アール
 

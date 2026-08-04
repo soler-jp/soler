@@ -121,6 +121,16 @@ chrome は「本文エリア (canvas/surface) とは対照的な、常時濃色�
 - `--color-status-success-bg` / `--color-status-success-fg` / `--color-status-success-border`
 - `--color-status-info-bg`    / `--color-status-info-fg`    / `--color-status-info-border`
 
+### 取引区分アクセント（bg / fg / border の三点セット）
+
+取引区分（売上・経費・仕入）を淡背景で識別するためのカテゴリ。`status-*` が「イベント通知（成功／失敗／警告／情報）」を表すのに対し、`accent-*` は「業務ドメインの意味」を表す。同じ淡背景でも意味カテゴリが異なるため、混在してもよい（例: revenue カードの中に status-success の flash が出る）。
+
+- `--color-accent-revenue-bg`  / `--color-accent-revenue-fg`  / `--color-accent-revenue-border`
+- `--color-accent-expense-bg`  / `--color-accent-expense-fg`  / `--color-accent-expense-border`
+- `--color-accent-purchase-bg` / `--color-accent-purchase-fg` / `--color-accent-purchase-border`
+
+このカテゴリはドメイン上固定される取引区分に対してだけ設ける。動的に増える識別（クライアント別・案件別のアクセント色等）はスコープ外に置き、必要になった時点で別カテゴリを検討する。
+
 ### 形（アール）
 
 - `--radius-control` … 入力・ボタン等の操作系

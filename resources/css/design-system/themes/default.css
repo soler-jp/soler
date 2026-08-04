@@ -32,6 +32,9 @@
   --theme-emerald-950:  2 44 34;
   --theme-teal-700:     15 118 110;
   --theme-teal-800:     17 94 89;
+  --theme-orange-50:    255 247 237;
+  --theme-orange-200:   254 215 170;
+  --theme-orange-700:   194 65 12;
 
   /* ── 契約: 表層 ── */
   --color-canvas:         var(--theme-slate-50);
@@ -79,6 +82,17 @@
   --color-status-info-bg:        var(--theme-blue-50);
   --color-status-info-fg:        var(--theme-blue-800);
   --color-status-info-border:    var(--theme-blue-200);
+
+  /* ── 契約: 取引区分アクセント（淡背景の三点セット） ── */
+  --color-accent-revenue-bg:      var(--theme-blue-50);
+  --color-accent-revenue-fg:      var(--theme-blue-800);
+  --color-accent-revenue-border:  var(--theme-blue-200);
+  --color-accent-expense-bg:      var(--theme-red-50);
+  --color-accent-expense-fg:      var(--theme-red-700);
+  --color-accent-expense-border:  var(--theme-red-200);
+  --color-accent-purchase-bg:     var(--theme-orange-50);
+  --color-accent-purchase-fg:     var(--theme-orange-700);
+  --color-accent-purchase-border: var(--theme-orange-200);
 
   /* ── 契約: 形 ── */
   --radius-control: 0.5rem;

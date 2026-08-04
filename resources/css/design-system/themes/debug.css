@@ -40,6 +40,16 @@
   --color-status-info-fg:        30 58 138;
   --color-status-info-border:    96 165 250;
 
+  --color-accent-revenue-bg:      220 252 231;
+  --color-accent-revenue-fg:      22 101 52;
+  --color-accent-revenue-border:  134 239 172;
+  --color-accent-expense-bg:      255 228 230;
+  --color-accent-expense-fg:      159 18 57;
+  --color-accent-expense-border:  253 164 175;
+  --color-accent-purchase-bg:     221 214 254;
+  --color-accent-purchase-fg:     67 56 202;
+  --color-accent-purchase-border: 165 180 252;
+
   --radius-control: 9999px;
   --radius-card:    1.5rem;
   --radius-badge:   9999px;
