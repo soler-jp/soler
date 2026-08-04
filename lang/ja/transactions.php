@@ -127,4 +127,31 @@ return [
             'invalid_date' => '日付が正しくありません。MMDD形式で入力してください。',
         ],
     ],
+
+    'transfer_form' => [
+        'title' => 'お金の移動',
+        'fields' => [
+            'date' => '日付',
+            'amount' => '金額',
+            'from_account' => 'どこから出したか',
+            'to_account' => 'どこへ入れたか',
+            'note' => 'メモ',
+        ],
+        'placeholders' => [
+            'date' => 'MMDD',
+            'note' => 'レジ用の現金補充 / 個人口座へ移動 など',
+        ],
+        'actions' => [
+            'submit' => '登録する',
+        ],
+        'messages' => [
+            'registered' => 'お金の移動を登録しました',
+        ],
+        'errors' => [
+            'registration_failed' => 'お金の移動の登録に失敗しました',
+            'invalid_date' => '日付が正しくありません。MMDD形式で入力してください。',
+            'same_account' => '移動元と移動先には別の口座を選んでください。',
+            'invalid_transfer_account' => '選択できない勘定科目です。',
+        ],
+    ],
 ];
