@@ -119,6 +119,10 @@ class StandardTest extends TestCase
             ->set('receipt_sub_account_id', $cashSub->id)
             ->call('submit')
             ->assertHasNoErrors()
+            ->assertSet('confirming', true)
+            ->call('confirm')
+            ->assertHasNoErrors()
+            ->assertSet('confirming', false)
             ->assertSee(__('transactions.revenue_form.messages.registered'));
 
         $this->assertDatabaseHas('journal_entries', [
@@ -138,6 +142,190 @@ class StandardTest extends TestCase
             'type' => JournalEntry::TYPE_DEBIT,
             'net_amount' => 1021,
         ]);
+    }
+
+    #[Test]
+    public function 源泉徴収ありのsubmitでは即時登録されずconfirm画面に遷移する()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, isTaxable: true);
+
+        $revenueSub = $unit->getAccountByName('売上高')->subAccounts()->first();
+        $cashSub = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0401')
+            ->set('amount', 11000)
+            ->set('tax_option', Standard::TAX_OPTION_10)
+            ->set('withholding', true)
+            ->set('withholding_amount', 1021)
+            ->set('revenue_sub_account_id', $revenueSub->id)
+            ->set('receipt_sub_account_id', $cashSub->id)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('confirming', true)
+            ->assertDontSee(__('transactions.revenue_form.messages.registered'));
+
+        $this->assertDatabaseMissing('journal_entries', [
+            'sub_account_id' => $revenueSub->id,
+            'type' => JournalEntry::TYPE_CREDIT,
+        ]);
+    }
+
+    #[Test]
+    public function confirm画面に売上金額と消費税と源泉徴収と差引金額が表示される()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, isTaxable: true);
+
+        $revenueSub = $unit->getAccountByName('売上高')->subAccounts()->first();
+        $cashSub = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0401')
+            ->set('amount', 11000)
+            ->set('tax_option', Standard::TAX_OPTION_10)
+            ->set('withholding', true)
+            ->set('withholding_amount', 1021)
+            ->set('revenue_sub_account_id', $revenueSub->id)
+            ->set('receipt_sub_account_id', $cashSub->id)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('confirming', true)
+            ->assertSee(__('transactions.revenue_form.confirm.title'))
+            ->assertSee(__('transactions.revenue_form.confirm.amount_net_taxable'))
+            ->assertSee('10,000') // 税抜
+            ->assertSee(__('transactions.revenue_form.confirm.tax_10'))
+            ->assertSee('1,000') // 消費税
+            ->assertSee(__('transactions.revenue_form.confirm.withholding'))
+            ->assertSee('1,021') // 源泉徴収
+            ->assertSee('9,979') // 差引 (11000 - 1021)
+            ->assertSee('4/1 に') // 日付
+            ->assertSee('入金された'); // 現金 → 入金された
+    }
+
+    #[Test]
+    public function confirm画面で銀行入金の場合は振込と表示される()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, isTaxable: true);
+
+        $revenueSub = $unit->getAccountByName('売上高')->subAccounts()->first();
+        $bankAccount = $unit->getAccountByName('その他の預金');
+        $bankSub = $bankAccount->createSubAccount(['name' => 'テスト銀行'], $user);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0401')
+            ->set('amount', 10000)
+            ->set('tax_option', Standard::TAX_OPTION_EXEMPT)
+            ->set('withholding', true)
+            ->set('withholding_amount', 1000)
+            ->set('revenue_sub_account_id', $revenueSub->id)
+            ->set('receipt_sub_account_id', $bankSub->id)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('confirming', true)
+            ->assertSee('振り込まれた');
+    }
+
+    #[Test]
+    public function confirm画面で事業主貸入金は個人の財布に入れた文言になる()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, isTaxable: true);
+
+        $revenueSub = $unit->getAccountByName('売上高')->subAccounts()->first();
+        $ownerDrawSub = $unit->getSubAccountByName('事業主貸', '事業主貸');
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0401')
+            ->set('amount', 10000)
+            ->set('tax_option', Standard::TAX_OPTION_EXEMPT)
+            ->set('withholding', true)
+            ->set('withholding_amount', 1000)
+            ->set('revenue_sub_account_id', $revenueSub->id)
+            ->set('receipt_sub_account_id', $ownerDrawSub->id)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('confirming', true)
+            ->assertSee('受け取って、個人の財布に入れた');
+    }
+
+    #[Test]
+    public function confirm画面で売掛金入金は後日入金予定で計上する文言になる()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, isTaxable: true);
+
+        $revenueSub = $unit->getAccountByName('売上高')->subAccounts()->first();
+        $accountsReceivableSub = $unit->getAccountByName('売掛金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0401')
+            ->set('amount', 10000)
+            ->set('tax_option', Standard::TAX_OPTION_EXEMPT)
+            ->set('withholding', true)
+            ->set('withholding_amount', 1000)
+            ->set('revenue_sub_account_id', $revenueSub->id)
+            ->set('receipt_sub_account_id', $accountsReceivableSub->id)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('confirming', true)
+            ->assertSee('後日入金予定で計上する');
+    }
+
+    #[Test]
+    public function confirm画面からbackで入力画面に戻れる()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, isTaxable: true);
+
+        $revenueSub = $unit->getAccountByName('売上高')->subAccounts()->first();
+        $cashSub = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0401')
+            ->set('amount', 10000)
+            ->set('tax_option', Standard::TAX_OPTION_EXEMPT)
+            ->set('withholding', true)
+            ->set('withholding_amount', 1000)
+            ->set('revenue_sub_account_id', $revenueSub->id)
+            ->set('receipt_sub_account_id', $cashSub->id)
+            ->call('submit')
+            ->assertSet('confirming', true)
+            ->call('back')
+            ->assertSet('confirming', false)
+            ->assertSet('amount', 10000)
+            ->assertSet('withholding', true)
+            ->assertSet('withholding_amount', 1000);
+    }
+
+    #[Test]
+    public function 源泉徴収なしはconfirmを経由せず即登録される()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $revenueSub = $unit->getAccountByName('売上高')->subAccounts()->first();
+        $cashSub = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0401')
+            ->set('amount', 11000)
+            ->set('tax_option', Standard::TAX_OPTION_10)
+            ->set('revenue_sub_account_id', $revenueSub->id)
+            ->set('receipt_sub_account_id', $cashSub->id)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('confirming', false)
+            ->assertSee(__('transactions.revenue_form.messages.registered'));
     }
 
     #[Test]

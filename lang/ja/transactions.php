@@ -22,11 +22,29 @@ return [
         ],
         'actions' => [
             'submit' => '登録する',
+            'confirm' => '登録する',
+            'back' => '修正する',
         ],
         'tax_options' => [
             '10' => '10%',
             '8' => '8%',
             'exempt' => '非課税',
+        ],
+        'confirm' => [
+            'title' => '内容を確認してください',
+            'amount_net_taxable' => '売上金額（税抜）',
+            'amount_net_exempt' => '売上金額',
+            'tax_10' => '消費税（10%）',
+            'tax_8' => '消費税（8%）',
+            'withholding' => '源泉徴収',
+            'connector' => 'なので、',
+            'settlements' => [
+                'cash' => '差し引き :amount 円が :date に :receipt に入金された。',
+                'bank' => '差し引き :amount 円が :date に :receipt に振り込まれた。',
+                'owner_draw' => '差し引き :amount 円を :date に受け取って、個人の財布に入れた。',
+                'accounts_receivable' => '差し引き :amount 円を、後日入金予定で計上する。',
+                'default' => '差し引き :amount 円が :date に :receipt に入金された。',
+            ],
         ],
         'messages' => [
             'registered' => '売上を登録しました',

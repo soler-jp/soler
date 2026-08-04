@@ -6,6 +6,8 @@
 
         <div x-show="open" x-cloak class="p-4 space-y-4">
 
+        @if (! $confirming)
+
         @if (session()->has('message'))
             <div
                 class="p-2 rounded-control bg-status-success text-status-success-fg border border-status-success-border text-sm">
@@ -188,6 +190,76 @@
                 {{ __('transactions.revenue_form.actions.submit') }}
             </x-ui.button>
         </div>
+
+        @else
+            {{-- 源泉徴収あり: 確認画面 --}}
+            <div class="space-y-4">
+                <div class="text-sm font-semibold text-content">
+                    {{ __('transactions.revenue_form.confirm.title') }}
+                </div>
+
+                <dl class="space-y-1 text-sm">
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-content-muted">
+                            @if ($this->confirmTaxRate > 0)
+                                {{ __('transactions.revenue_form.confirm.amount_net_taxable') }}
+                            @else
+                                {{ __('transactions.revenue_form.confirm.amount_net_exempt') }}
+                            @endif
+                        </dt>
+                        <dd class="tabular-nums text-content">
+                            {{ number_format($this->confirmNetAmount) }} 円
+                        </dd>
+                    </div>
+
+                    @if ($this->confirmTaxRate === 10)
+                        <div class="flex justify-between gap-4">
+                            <dt class="text-content-muted">
+                                {{ __('transactions.revenue_form.confirm.tax_10') }}
+                            </dt>
+                            <dd class="tabular-nums text-content">
+                                {{ number_format($this->confirmTaxAmount) }} 円
+                            </dd>
+                        </div>
+                    @elseif ($this->confirmTaxRate === 8)
+                        <div class="flex justify-between gap-4">
+                            <dt class="text-content-muted">
+                                {{ __('transactions.revenue_form.confirm.tax_8') }}
+                            </dt>
+                            <dd class="tabular-nums text-content">
+                                {{ number_format($this->confirmTaxAmount) }} 円
+                            </dd>
+                        </div>
+                    @endif
+
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-content-muted">
+                            {{ __('transactions.revenue_form.confirm.withholding') }}
+                        </dt>
+                        <dd class="tabular-nums text-content">
+                            {{ number_format($this->confirmWithholdingAmount) }} 円
+                        </dd>
+                    </div>
+                </dl>
+
+                <div class="text-sm text-content-muted">
+                    {{ __('transactions.revenue_form.confirm.connector') }}
+                </div>
+
+                <div class="text-base text-content">
+                    {{ $this->confirmSettlementMessage }}
+                </div>
+
+                <div class="flex gap-2 pt-1">
+                    <x-ui.button variant="secondary" type="button" wire:click="back" class="flex-1">
+                        {{ __('transactions.revenue_form.actions.back') }}
+                    </x-ui.button>
+                    <x-ui.button variant="confirm" type="button" wire:click="confirm" class="flex-1">
+                        {{ __('transactions.revenue_form.actions.confirm') }}
+                    </x-ui.button>
+                </div>
+            </div>
+        @endif
         </div>
     </x-ui.card>
 </div>

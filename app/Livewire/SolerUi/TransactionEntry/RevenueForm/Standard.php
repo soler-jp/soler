@@ -7,6 +7,7 @@ use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\SubAccount;
 use App\Services\TransactionRegistrar;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class Standard extends Component
@@ -42,6 +43,8 @@ class Standard extends Component
     public bool $withholding = false;
 
     public ?int $withholding_amount = null;
+
+    public bool $confirming = false;
 
     public int $fiscalYearYear = 0;
 
@@ -102,9 +105,43 @@ class Standard extends Component
 
     public function submit(): void
     {
+        if (! $this->runValidation()) {
+            return;
+        }
+
+        if ($this->withholding) {
+            $this->confirming = true;
+
+            return;
+        }
+
+        $this->finalize();
+    }
+
+    public function confirm(): void
+    {
+        if (! $this->confirming) {
+            return;
+        }
+
+        if (! $this->runValidation()) {
+            $this->confirming = false;
+
+            return;
+        }
+
+        $this->finalize();
+    }
+
+    public function back(): void
+    {
+        $this->confirming = false;
+    }
+
+    protected function runValidation(): bool
+    {
         $user = auth()->user();
         $unit = $user->selectedBusinessUnitOrFail();
-        $fiscalYear = $unit->currentFiscalYear;
 
         $this->validate([
             'date_input' => ['required', 'string', 'regex:/^\d{3,4}$/'],
@@ -123,21 +160,31 @@ class Standard extends Component
         if (! checkdate($month, $day, $this->fiscalYearYear)) {
             $this->addError('date_input', __('transactions.revenue_form.errors.invalid_date'));
 
-            return;
+            return false;
         }
 
         if ($this->withholding && (int) $this->withholding_amount <= 0) {
             $this->addError('withholding_amount', '源泉徴収額を入力してください。');
 
-            return;
+            return false;
         }
 
         if ($this->withholding && (int) $this->withholding_amount >= (int) $this->amount) {
             $this->addError('withholding_amount', '源泉徴収額は売上金額より小さい必要があります。');
 
-            return;
+            return false;
         }
 
+        return true;
+    }
+
+    protected function finalize(): void
+    {
+        $user = auth()->user();
+        $unit = $user->selectedBusinessUnitOrFail();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        [$month, $day] = $this->parseDateInput($this->date_input);
         $date = sprintf('%04d-%02d-%02d', $this->fiscalYearYear, $month, $day);
         $description = $this->resolveDescription();
 
@@ -206,11 +253,109 @@ class Standard extends Component
                 'receipt_sub_account_id',
                 'withholding',
                 'withholding_amount',
+                'confirming',
             ]);
             session()->flash('message', __('transactions.revenue_form.messages.registered'));
         } catch (\Exception $e) {
+            $this->confirming = false;
             session()->flash('error', __('transactions.revenue_form.errors.registration_failed').': '.$e->getMessage());
         }
+    }
+
+    #[Computed]
+    public function confirmTaxRate(): int
+    {
+        if (! $this->isTaxable) {
+            return 0;
+        }
+
+        return match ($this->tax_option) {
+            self::TAX_OPTION_10 => 10,
+            self::TAX_OPTION_8 => 8,
+            default => 0,
+        };
+    }
+
+    #[Computed]
+    public function confirmNetAmount(): int
+    {
+        $rate = $this->confirmTaxRate();
+        $amount = (int) $this->amount;
+
+        if ($rate === 0) {
+            return $amount;
+        }
+
+        return intdiv($amount * 100, 100 + $rate);
+    }
+
+    #[Computed]
+    public function confirmTaxAmount(): int
+    {
+        return (int) $this->amount - $this->confirmNetAmount();
+    }
+
+    #[Computed]
+    public function confirmWithholdingAmount(): int
+    {
+        return (int) $this->withholding_amount;
+    }
+
+    #[Computed]
+    public function confirmSettlementAmount(): int
+    {
+        return (int) $this->amount - $this->confirmWithholdingAmount();
+    }
+
+    #[Computed]
+    public function confirmReceiptSubAccount(): ?SubAccount
+    {
+        if ($this->receipt_sub_account_id === null) {
+            return null;
+        }
+
+        return SubAccount::with('account')->find($this->receipt_sub_account_id);
+    }
+
+    #[Computed]
+    public function confirmReceiptLabel(): string
+    {
+        $sub = $this->confirmReceiptSubAccount();
+
+        return $sub?->displayName() ?? '';
+    }
+
+    #[Computed]
+    public function confirmDateLabel(): string
+    {
+        [$month, $day] = $this->parseDateInput($this->date_input);
+
+        if (! checkdate($month, $day, $this->fiscalYearYear)) {
+            return '';
+        }
+
+        return $month.'/'.$day;
+    }
+
+    #[Computed]
+    public function confirmSettlementMessage(): string
+    {
+        $sub = $this->confirmReceiptSubAccount();
+        $accountName = $sub?->account?->name;
+
+        $key = match ($accountName) {
+            '現金' => 'cash',
+            'その他の預金', '普通預金' => 'bank',
+            '事業主貸' => 'owner_draw',
+            '売掛金' => 'accounts_receivable',
+            default => 'default',
+        };
+
+        return __('transactions.revenue_form.confirm.settlements.'.$key, [
+            'amount' => number_format($this->confirmSettlementAmount()),
+            'date' => $this->confirmDateLabel(),
+            'receipt' => $this->confirmReceiptLabel(),
+        ]);
     }
 
     public function render()
