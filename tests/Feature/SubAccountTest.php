@@ -177,8 +177,8 @@ class SubAccountTest extends TestCase
             'name' => '既定シード expanded テスト',
         ]);
 
-        // 標準リストに含まれない既定 SubAccount のサンプル
-        $expandedSamples = ['現金', '水道光熱費', '通信費', '源泉徴収'];
+        // 標準リストにも hidden リストにも含まれない既定 SubAccount のサンプル
+        $expandedSamples = ['水道光熱費', '通信費', '売上高', '源泉徴収'];
 
         foreach ($expandedSamples as $name) {
             $sub = $businessUnit->subAccounts()->where('sub_accounts.name', $name)->first();

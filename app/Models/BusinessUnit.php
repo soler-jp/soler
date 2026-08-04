@@ -259,12 +259,16 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
 
     /**
      * 既定シードのうち、UI では最初から表示しない（hidden）SubAccount 名の一覧。
-     * 内部処理では使うが、ユーザーが直接選ぶことが少ない科目をここに置く。
+     * 内部処理専用の科目に加え、「場所/口座が具体化するまで使わない」初期プレースホルダもここに置く。
      * ユーザーが「表示する」に切り替えたい場合は visibility を standard / expanded に更新する。
      *
      * @var array<int, string>
      */
     public static array $hiddenDefaultSubAccounts = [
+        '現金',
+        '当座預金',
+        '定期預金',
+        'その他の預金',
         '仕入金額',
         '期首商品（棚卸高）',
         '期末商品（棚卸高）',
