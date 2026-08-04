@@ -75,4 +75,38 @@ return [
             'invalid_date' => '日付が正しくありません。MMDD形式で入力してください。',
         ],
     ],
+
+    'purchase_form' => [
+        'title' => '仕入の入力',
+        'sections' => [
+            'payment_method' => '支払方法',
+        ],
+        'fields' => [
+            'date' => '日付',
+            'amount' => '金額（税込）',
+            'tax_option' => '消費税',
+            'note' => '何を購入したか',
+            'counterparty_name' => '支払い先',
+        ],
+        'placeholders' => [
+            'date' => 'MMDD',
+            'note' => '食材の仕入れ / 商品△△の購入 など',
+            'counterparty_name' => '株式会社△△ / ◯◯市場',
+        ],
+        'actions' => [
+            'submit' => '登録する',
+        ],
+        'tax_options' => [
+            '10' => '10%',
+            '8' => '8%',
+            'exempt' => '非課税',
+        ],
+        'messages' => [
+            'registered' => '仕入を登録しました',
+        ],
+        'errors' => [
+            'registration_failed' => '仕入の登録に失敗しました',
+            'invalid_date' => '日付が正しくありません。MMDD形式で入力してください。',
+        ],
+    ],
 ];
