@@ -80,7 +80,8 @@ class Standard extends Component
             ->values();
 
         $this->expenseSubAccountsUnclassified = $expenseSubAccounts
-            ->filter(fn (SubAccount $sub) => $sub->system_purpose === SubAccount::PURPOSE_UNCLASSIFIED)
+            ->filter(fn (SubAccount $sub) => $sub->system_purpose === SubAccount::PURPOSE_UNCLASSIFIED
+                && $sub->visibility !== SubAccount::VISIBILITY_HIDDEN)
             ->values();
 
         $this->expenseSubAccountsExpanded = $expenseSubAccounts
@@ -89,7 +90,7 @@ class Standard extends Component
             ->values();
 
         $this->creditAccounts = $unit->accounts()
-            ->with('subAccounts')
+            ->with(['subAccounts' => fn ($q) => $q->where('visibility', '!=', SubAccount::VISIBILITY_HIDDEN)])
             ->whereIn('name', ['現金', '普通預金', '事業主借'])
             ->orderByRaw("CASE name WHEN '現金' THEN 0 WHEN '普通預金' THEN 1 WHEN '事業主借' THEN 2 ELSE 3 END")
             ->get();

@@ -25,9 +25,12 @@ class SubAccount extends Model implements ResolvesBusinessUnit
 
     public const VISIBILITY_EXPANDED = 'expanded';
 
+    public const VISIBILITY_HIDDEN = 'hidden';
+
     public const VISIBILITIES = [
         self::VISIBILITY_STANDARD,
         self::VISIBILITY_EXPANDED,
+        self::VISIBILITY_HIDDEN,
     ];
 
     public const SORT_ORDER_DEFAULT = 1000;

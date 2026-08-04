@@ -246,6 +246,28 @@ class StandardTest extends TestCase
     }
 
     #[Test]
+    public function hidden指定の補助科目はstandardにもexpandedにも出ない()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $component = Livewire::actingAs($user)
+            ->test(Standard::class);
+
+        $standardNames = collect($component->instance()->expenseSubAccountsStandard)
+            ->pluck('name')
+            ->all();
+        $expandedNames = collect($component->instance()->expenseSubAccountsExpanded)
+            ->pluck('name')
+            ->all();
+
+        foreach (BusinessUnit::$hiddenDefaultSubAccounts as $hiddenName) {
+            $this->assertNotContains($hiddenName, $standardNames, "$hiddenName は standard に出ない想定");
+            $this->assertNotContains($hiddenName, $expandedNames, "$hiddenName は expanded に出ない想定");
+        }
+    }
+
+    #[Test]
     public function 未分類の補助科目は専用セクションに分けて表示される()
     {
         $user = User::factory()->create();

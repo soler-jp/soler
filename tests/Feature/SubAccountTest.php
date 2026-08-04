@@ -240,6 +240,25 @@ class SubAccountTest extends TestCase
     }
 
     #[Test]
+    public function 既定シードでは非表示リストの_sub_accountはhiddenになる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'hidden 既定シードテスト',
+        ]);
+
+        foreach (BusinessUnit::$hiddenDefaultSubAccounts as $name) {
+            $sub = $businessUnit->subAccounts()->where('sub_accounts.name', $name)->first();
+            $this->assertNotNull($sub, "$name の SubAccount が見つかりません。");
+            $this->assertSame(
+                SubAccount::VISIBILITY_HIDDEN,
+                $sub->visibility,
+                "$name は hidden で登録される想定です。",
+            );
+        }
+    }
+
+    #[Test]
     public function 未分類_sub_accountはunclassified_system_purposeが付く(): void
     {
         $user = User::factory()->create();

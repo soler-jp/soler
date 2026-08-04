@@ -4,6 +4,7 @@ namespace App\Livewire\SolerUi\TransactionEntry\PurchaseForm;
 
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
+use App\Models\SubAccount;
 use App\Services\TransactionRegistrar;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -54,7 +55,7 @@ class Standard extends Component
         $this->purchase_sub_account_id = $unit->getAccountByName('仕入金額')->subAccounts()->first()?->id;
 
         $this->creditAccounts = $unit->accounts()
-            ->with('subAccounts')
+            ->with(['subAccounts' => fn ($q) => $q->where('visibility', '!=', SubAccount::VISIBILITY_HIDDEN)])
             ->whereIn('name', ['現金', '普通預金', '事業主借', '買掛金'])
             ->orderByRaw("CASE name WHEN '現金' THEN 0 WHEN '普通預金' THEN 1 WHEN '事業主借' THEN 2 WHEN '買掛金' THEN 3 ELSE 4 END")
             ->get();
