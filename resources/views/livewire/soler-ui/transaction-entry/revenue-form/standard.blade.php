@@ -1,143 +1,187 @@
-<div class="bg-white shadow rounded-2xl p-6">
-    <h2 class="text-lg font-bold text-gray-800 mb-4">売上の入力</h2>
+<div>
+    <x-ui.card class="p-4 space-y-4">
 
-    {{-- フラッシュメッセージ --}}
-    @if (session()->has('message'))
-        <div class="mb-4 p-2 rounded bg-green-100 text-green-800 text-sm">
-            {{ session('message') }}
-        </div>
-    @endif
+        <h2 class="text-base font-semibold text-content">
+            {{ __('transactions.revenue_form.title') }}
+        </h2>
 
-    {{-- エラーメッセージ --}}
-    @if (session()->has('error'))
-        <div class="mb-4 p-2 rounded bg-red-100 text-red-800 text-sm">
-            {{ session('error') }}
-        </div>
-    @endif
-
-    {{-- 入力フォーム --}}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-        {{-- 左ブロック：入金先ボタン --}}
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">入金先</label>
-
-            <div class="space-y-4">
-                @foreach (['cash' => '現金', 'bank' => '銀行', 'other' => 'その他'] as $key => $label)
-                    <div>
-                        <h3 class="text-sm font-bold text-gray-600 mb-2">{{ $label }}</h3>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                            @foreach ($receiptGroups[$key] as $item)
-                                @php
-                                    $subAccountId =
-                                        $item instanceof \App\Models\Account
-                                            ? optional($item->subAccounts->first())->id
-                                            : $item->id;
-                                @endphp
-
-                                @if ($subAccountId)
-                                    <button type="button" wire:click="$set('receiptSubAccountId', {{ $subAccountId }})"
-                                        class="w-full px-3 py-2 text-sm rounded-md shadow-sm text-center
-                                        @if ($receiptSubAccountId === $subAccountId) bg-indigo-600 text-white
-                                        @else bg-gray-100 text-gray-800 @endif">
-                                        {{ $item->name }}
-                                    </button>
-                                @endif
-                            @endforeach
-                        </div>
-                    </div>
-                @endforeach
+        @if (session()->has('message'))
+            <div
+                class="p-2 rounded-control bg-status-success text-status-success-fg border border-status-success-border text-sm">
+                {{ session('message') }}
             </div>
+        @endif
 
-            @error('receiptSubAccountId')
-                <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
-            @enderror
-        </div>
-
-        {{-- 右ブロック：日付・金額・摘要・源泉徴収 --}}
-        <div class="space-y-4">
-
-            {{-- 日付・金額 --}}
-            <div class="flex gap-4">
-                <div class="flex-1">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">日付</label>
-                    <input type="date" wire:model.defer="date"
-                        class="w-full border-gray-300 rounded-md shadow-sm text-sm" />
-                    @error('date')
-                        <div class="text-xs text-red-600">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                <div class="flex-1">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">売上金額（源泉徴収前）</label>
-                    <input type="number" wire:model.defer="gross_amount"
-                        class="w-full border-gray-300 rounded-md shadow-sm text-sm" />
-                    @error('gross_amount')
-                        <div class="text-xs text-red-600">{{ $message }}</div>
-                    @enderror
-
-                </div>
+        @if (session()->has('error'))
+            <div
+                class="p-2 rounded-control bg-status-danger text-status-danger-fg border border-status-danger-border text-sm">
+                {{ session('error') }}
             </div>
+        @endif
 
-            {{-- 売上の補助科目（credit側）の選択 --}}
+        {{-- 日付 / 金額 / 消費税 --}}
+        <div class="flex flex-wrap items-end gap-3">
+            <div class="w-20">
+                <label class="block text-sm font-semibold text-content mb-1">
+                    {{ __('transactions.revenue_form.fields.date') }}
+                </label>
+                <input type="text" wire:model.defer="date_input" maxlength="4" size="4"
+                    inputmode="numeric" pattern="\d{3,4}" autocomplete="off"
+                    placeholder="{{ __('transactions.revenue_form.placeholders.date') }}"
+                    class="block w-full px-2 py-2 text-base text-center tabular-nums bg-surface-muted text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus focus:bg-surface">
+            </div>
+            <div class="flex-1 min-w-[8rem]">
+                <label class="block text-sm font-semibold text-content mb-1">
+                    {{ __('transactions.revenue_form.fields.amount') }}
+                </label>
+                <input type="text" wire:model.defer="amount" inputmode="numeric" pattern="\d*"
+                    autocomplete="off"
+                    class="block w-full px-3 py-2 text-base text-right tabular-nums bg-surface-muted text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus focus:bg-surface">
+            </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">売上（収益）</label>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                    @foreach ($receiptGroups['revenue'] ?? [] as $item)
-                        <button type="button" wire:click="$set('revenueSubAccountId', {{ $item->id }})"
-                            class="w-full px-3 py-2 text-sm rounded-md shadow-sm text-center
-                @if ($revenueSubAccountId === $item->id) bg-indigo-600 text-white
-                @else bg-gray-100 text-gray-800 @endif">
-                            {{ $item->name }}
+                <label class="block text-sm font-semibold text-content mb-1">
+                    {{ __('transactions.revenue_form.fields.tax_option') }}
+                </label>
+                <div
+                    class="inline-flex rounded-control border border-line overflow-hidden bg-surface shadow-sm">
+                    @foreach (\App\Livewire\SolerUi\TransactionEntry\RevenueForm\Standard::TAX_OPTIONS as $option)
+                        <button type="button" wire:click="$set('tax_option', '{{ $option }}')"
+                            @class([
+                                'px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-focus focus:z-10',
+                                'bg-action-primary text-action-primary-fg font-semibold' => $tax_option === $option,
+                                'text-content hover:bg-surface-muted' => $tax_option !== $option,
+                                'border-l border-line' => ! $loop->first,
+                            ])>
+                            {{ __('transactions.revenue_form.tax_options.' . $option) }}
                         </button>
                     @endforeach
                 </div>
-
-                @error('revenueSubAccountId')
-                    <div class="text-xs text-red-600 mt-1">{{ $message }}</div>
-                @enderror
-            </div>
-
-            {{-- 摘要 --}}
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">摘要</label>
-                <textarea wire:model.defer="description" rows="2"
-                    class="w-full border-gray-300 rounded-md shadow-sm text-sm resize-none"></textarea>
-                @error('description')
-                    <div class="text-xs text-red-600">{{ $message }}</div>
-                @enderror
-            </div>
-
-            {{-- 源泉徴収チェックと金額 --}}
-            <div x-data>
-                {{-- チェックボックス --}}
-                <label class="inline-flex items-center">
-                    <input type="checkbox" wire:model="withholding" class="mr-2">
-                    <span class="text-sm text-gray-700">源泉徴収あり</span>
-                </label>
-
-                {{-- 源泉徴収額入力欄（JS側で切り替える） --}}
-                <div x-show="$wire.withholding" x-cloak>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">源泉徴収額</label>
-                    <input type="number" wire:model.defer="holding_amount"
-                        class="w-full border-gray-300 rounded-md shadow-sm text-sm" />
-                    @error('holding_amount')
-                        <div class="text-xs text-red-600">{{ $message }}</div>
-                    @enderror
-                </div>
-            </div>
-
-
-            {{-- 入金先 --}}
-            {{-- 登録ボタン --}}
-            <div class="text-right pt-2">
-                <button type="button" wire:click="save"
-                    class="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-md shadow hover:bg-indigo-700">
-                    登録する
-                </button>
             </div>
         </div>
-    </div>
+        @error('date_input')
+            <div class="text-xs text-status-danger-fg -mt-2">{{ $message }}</div>
+        @enderror
+        @error('amount')
+            <div class="text-xs text-status-danger-fg -mt-2">{{ $message }}</div>
+        @enderror
+        @error('tax_option')
+            <div class="text-xs text-status-danger-fg -mt-2">{{ $message }}</div>
+        @enderror
+
+        {{-- 入金先 --}}
+        <div class="space-y-2">
+            <label class="block text-sm font-semibold text-content">
+                {{ __('transactions.revenue_form.sections.receipt_method') }}
+            </label>
+            <div class="flex flex-wrap items-center gap-2">
+                @foreach ($receiptStandardSubAccounts as $subAccount)
+                    <button type="button"
+                        wire:click="$set('receipt_sub_account_id', {{ $subAccount->id }})"
+                        @class([
+                            'px-3 py-1.5 text-sm font-medium rounded-control border transition',
+                            'bg-action-primary text-action-primary-fg border-transparent font-semibold' =>
+                                $receipt_sub_account_id === $subAccount->id,
+                            'bg-surface text-content border-line hover:bg-surface-muted' =>
+                                $receipt_sub_account_id !== $subAccount->id,
+                        ])>
+                        {{ $subAccount->name }}
+                    </button>
+                @endforeach
+
+                @if (! empty($receiptOwnerDrawSubAccounts))
+                    <span class="text-content-muted text-base select-none px-1" aria-hidden="true">|</span>
+
+                    @foreach ($receiptOwnerDrawSubAccounts as $subAccount)
+                        <button type="button"
+                            wire:click="$set('receipt_sub_account_id', {{ $subAccount->id }})"
+                            title="事業用の口座を経由せず個人資金で受け取った場合に使います。"
+                            @class([
+                                'px-3 py-1.5 text-sm font-medium rounded-control border transition',
+                                'bg-action-primary text-action-primary-fg border-transparent font-semibold' =>
+                                    $receipt_sub_account_id === $subAccount->id,
+                                'bg-surface text-content border-line hover:bg-surface-muted' =>
+                                    $receipt_sub_account_id !== $subAccount->id,
+                            ])>
+                            {{ $subAccount->name }}
+                        </button>
+                    @endforeach
+                @endif
+
+                @if (! empty($receiptSpecialSubAccounts))
+                    <span class="text-content-muted text-base select-none px-1" aria-hidden="true">|</span>
+
+                    @foreach ($receiptSpecialSubAccounts as $subAccount)
+                        <button type="button"
+                            wire:click="$set('receipt_sub_account_id', {{ $subAccount->id }})"
+                            title="現金化は後日。入金時に別途、売掛金からの振替を登録してください。"
+                            @class([
+                                'px-3 py-1.5 text-sm font-medium rounded-control border transition',
+                                'bg-action-primary text-action-primary-fg border-transparent font-semibold' =>
+                                    $receipt_sub_account_id === $subAccount->id,
+                                'bg-surface text-content border-line hover:bg-surface-muted' =>
+                                    $receipt_sub_account_id !== $subAccount->id,
+                            ])>
+                            <span class="italic">{{ $subAccount->name }}</span>
+                        </button>
+                    @endforeach
+                @endif
+            </div>
+            @error('receipt_sub_account_id')
+                <div class="text-xs text-status-danger-fg">{{ $message }}</div>
+            @enderror
+        </div>
+
+        {{-- 何の売上か --}}
+        <div>
+            <label class="block text-sm font-semibold text-content mb-1">
+                {{ __('transactions.revenue_form.fields.note') }}
+            </label>
+            <input type="text" wire:model.defer="note"
+                placeholder="{{ __('transactions.revenue_form.placeholders.note') }}"
+                class="block w-full px-3 py-2 text-sm bg-surface-muted text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus focus:bg-surface">
+            @error('note')
+                <div class="text-xs text-status-danger-fg mt-1">{{ $message }}</div>
+            @enderror
+        </div>
+
+        {{-- 取引先 --}}
+        <div>
+            <label class="block text-sm font-semibold text-content mb-1">
+                {{ __('transactions.revenue_form.fields.counterparty_name') }}
+            </label>
+            <input type="text" wire:model.defer="counterparty_name"
+                placeholder="{{ __('transactions.revenue_form.placeholders.counterparty_name') }}"
+                class="block w-full px-3 py-2 text-sm bg-surface-muted text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus focus:bg-surface">
+            @error('counterparty_name')
+                <div class="text-xs text-status-danger-fg mt-1">{{ $message }}</div>
+            @enderror
+        </div>
+
+        {{-- 源泉徴収 --}}
+        <div class="space-y-2" x-data>
+            <label class="inline-flex items-center gap-2 text-sm font-semibold text-content">
+                <input type="checkbox" wire:model.live="withholding"
+                    class="rounded border-line text-action-primary focus:ring-focus">
+                {{ __('transactions.revenue_form.fields.withholding') }}
+            </label>
+
+            <div x-show="$wire.withholding" x-cloak>
+                <label class="block text-sm font-semibold text-content mb-1">
+                    {{ __('transactions.revenue_form.fields.withholding_amount') }}
+                </label>
+                <input type="text" wire:model.defer="withholding_amount" inputmode="numeric" pattern="\d*"
+                    autocomplete="off"
+                    class="block w-40 px-3 py-2 text-base text-right tabular-nums bg-surface-muted text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus focus:bg-surface">
+                @error('withholding_amount')
+                    <div class="text-xs text-status-danger-fg mt-1">{{ $message }}</div>
+                @enderror
+            </div>
+        </div>
+
+        <div class="pt-1">
+            <x-ui.button variant="confirm" type="button" wire:click="submit" class="w-full">
+                {{ __('transactions.revenue_form.actions.submit') }}
+            </x-ui.button>
+        </div>
+    </x-ui.card>
 </div>
