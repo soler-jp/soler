@@ -7,6 +7,7 @@ use App\Models\Counterparty;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\RecurringTransactionPlan;
+use App\Models\SubAccount;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
@@ -1172,6 +1173,7 @@ class TransactionRegistrarTest extends TestCase
         $this->assertSame($businessEntry->allocation_group_id, $householdEntry->allocation_group_id);
         $this->assertSame($householdSubAccount->id, $householdEntry->sub_account_id);
         $this->assertNull($householdEntry->business_ratio);
+        $this->assertSame(SubAccount::PURPOSE_HOUSEHOLD_ALLOCATION, $householdSubAccount->system_purpose);
     }
 
     #[Test]

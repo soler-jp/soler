@@ -86,10 +86,22 @@ class Account extends Model implements ResolvesBusinessUnit
         return $this->subAccounts()->create($attributes);
     }
 
-    public function addCustomSubAccount(string $subAccountName, User $actor): SubAccount
-    {
-        return $this->createSubAccount([
-            'name' => $subAccountName,
-        ], $actor);
+    public function addCustomSubAccount(
+        string $subAccountName,
+        User $actor,
+        ?string $visibility = null,
+        ?string $systemPurpose = null,
+    ): SubAccount {
+        $attributes = ['name' => $subAccountName];
+
+        if ($visibility !== null) {
+            $attributes['visibility'] = $visibility;
+        }
+
+        if ($systemPurpose !== null) {
+            $attributes['system_purpose'] = $systemPurpose;
+        }
+
+        return $this->createSubAccount($attributes, $actor);
     }
 }

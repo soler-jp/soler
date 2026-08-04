@@ -12,10 +12,47 @@ class SubAccount extends Model implements ResolvesBusinessUnit
 {
     use HasFactory;
 
+    public const PURPOSE_UNCLASSIFIED = 'unclassified';
+
+    public const PURPOSE_HOUSEHOLD_ALLOCATION = 'household_allocation';
+
+    public const PURPOSES = [
+        self::PURPOSE_UNCLASSIFIED,
+        self::PURPOSE_HOUSEHOLD_ALLOCATION,
+    ];
+
+    public const VISIBILITY_STANDARD = 'standard';
+
+    public const VISIBILITY_EXPANDED = 'expanded';
+
+    public const VISIBILITIES = [
+        self::VISIBILITY_STANDARD,
+        self::VISIBILITY_EXPANDED,
+    ];
+
     protected $fillable = [
         'account_id',
         'name',
+        'system_purpose',
+        'visibility',
     ];
+
+    protected $attributes = [
+        'visibility' => self::VISIBILITY_STANDARD,
+    ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (SubAccount $subAccount): void {
+            if ($subAccount->system_purpose !== null && ! in_array($subAccount->system_purpose, self::PURPOSES, true)) {
+                throw new \InvalidArgumentException("SubAccount::system_purpose の値が不正です: {$subAccount->system_purpose}");
+            }
+
+            if (! in_array($subAccount->visibility, self::VISIBILITIES, true)) {
+                throw new \InvalidArgumentException("SubAccount::visibility の値が不正です: {$subAccount->visibility}");
+            }
+        });
+    }
 
     public function account(): BelongsTo
     {

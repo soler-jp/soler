@@ -584,8 +584,9 @@ class TransactionRegistrar
             ->where('name', '事業主貸')
             ->firstOrFail();
 
-        return $ownerDrawAccount->subAccounts()->firstOrCreate([
-            'name' => BusinessUnit::HOUSEHOLD_ALLOCATION_SUB_ACCOUNT_NAME,
-        ]);
+        return $ownerDrawAccount->subAccounts()->firstOrCreate(
+            ['name' => BusinessUnit::HOUSEHOLD_ALLOCATION_SUB_ACCOUNT_NAME],
+            ['system_purpose' => SubAccount::PURPOSE_HOUSEHOLD_ALLOCATION],
+        );
     }
 }

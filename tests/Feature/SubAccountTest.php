@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\BusinessUnit;
 use App\Models\SubAccount;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -108,5 +109,138 @@ class SubAccountTest extends TestCase
         $this->expectException(AuthorizationException::class);
 
         $account->addCustomSubAccount('役員会議', $otherUser);
+    }
+
+    #[Test]
+    public function add_custom_sub_accountは既定でstandard_visibilityになる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'visibility 既定テスト',
+        ]);
+        $account = $businessUnit->accounts()->create([
+            'name' => 'テスト費用',
+            'type' => Account::TYPE_EXPENSE,
+        ]);
+
+        $subAccount = $account->addCustomSubAccount('社内勉強会', $user);
+
+        $this->assertSame(SubAccount::VISIBILITY_STANDARD, $subAccount->visibility);
+        $this->assertNull($subAccount->system_purpose);
+    }
+
+    #[Test]
+    public function add_custom_sub_accountはvisibilityと_system_purposeを明示指定できる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'visibility 指定テスト',
+        ]);
+        $account = $businessUnit->accounts()->create([
+            'name' => 'テスト費用2',
+            'type' => Account::TYPE_EXPENSE,
+        ]);
+
+        $subAccount = $account->addCustomSubAccount(
+            '内部利用',
+            $user,
+            SubAccount::VISIBILITY_EXPANDED,
+        );
+
+        $this->assertSame(SubAccount::VISIBILITY_EXPANDED, $subAccount->visibility);
+    }
+
+    #[Test]
+    public function 既定シードでは標準リストに含まれる_sub_accountはstandardになる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '既定シード standard テスト',
+        ]);
+
+        foreach (BusinessUnit::$standardDefaultSubAccounts as $name) {
+            $sub = $businessUnit->subAccounts()->where('sub_accounts.name', $name)->first();
+            $this->assertNotNull($sub, "$name の SubAccount が見つかりません。");
+            $this->assertSame(
+                SubAccount::VISIBILITY_STANDARD,
+                $sub->visibility,
+                "$name は standard で登録される想定です。",
+            );
+        }
+    }
+
+    #[Test]
+    public function 既定シードでは標準リストに含まれない_sub_accountはexpandedになる(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => '既定シード expanded テスト',
+        ]);
+
+        // 標準リストに含まれない既定 SubAccount のサンプル
+        $expandedSamples = ['現金', '水道光熱費', '通信費', '源泉徴収'];
+
+        foreach ($expandedSamples as $name) {
+            $sub = $businessUnit->subAccounts()->where('sub_accounts.name', $name)->first();
+            $this->assertNotNull($sub, "$name の SubAccount が見つかりません。");
+            $this->assertSame(
+                SubAccount::VISIBILITY_EXPANDED,
+                $sub->visibility,
+                "$name は expanded で登録される想定です。",
+            );
+        }
+    }
+
+    #[Test]
+    public function 未分類_sub_accountはunclassified_system_purposeが付く(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'unclassified system_purpose テスト',
+        ]);
+
+        $unclassified = $businessUnit->getSubAccountByName(
+            BusinessUnit::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME,
+            BusinessUnit::UNCLASSIFIED_EXPENSE_SUB_ACCOUNT_NAME,
+        );
+
+        $this->assertNotNull($unclassified);
+        $this->assertSame(SubAccount::PURPOSE_UNCLASSIFIED, $unclassified->system_purpose);
+    }
+
+    #[Test]
+    public function 不正な_visibility値は保存時に拒否される(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'visibility 不正値テスト',
+        ]);
+        $account = $businessUnit->accounts()->create([
+            'name' => '不正値テスト費用',
+            'type' => Account::TYPE_EXPENSE,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('SubAccount::visibility の値が不正です');
+
+        $account->addCustomSubAccount('X', $user, 'bogus');
+    }
+
+    #[Test]
+    public function 不正な_system_purpose値は保存時に拒否される(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'system_purpose 不正値テスト',
+        ]);
+        $account = $businessUnit->accounts()->create([
+            'name' => '不正値テスト費用2',
+            'type' => Account::TYPE_EXPENSE,
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('SubAccount::system_purpose の値が不正です');
+
+        $account->addCustomSubAccount('Y', $user, SubAccount::VISIBILITY_STANDARD, 'bogus');
     }
 }

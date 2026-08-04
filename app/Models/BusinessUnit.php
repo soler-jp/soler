@@ -226,6 +226,22 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
     ];
 
     /**
+     * 既定シードのうち、UI で最初から表示する（standard）SubAccount 名の一覧。
+     * ここに含まれない既定 SubAccount は expanded に降格し、ユーザーが自分で追加した SubAccount は既定で standard。
+     *
+     * @var array<int, string>
+     */
+    public static array $standardDefaultSubAccounts = [
+        '事業主借',
+        '荷造運賃',
+        '旅費交通費',
+        '接待交際費',
+        '修繕費',
+        '消耗品費',
+        '雑費',
+    ];
+
+    /**
      * BusinessUnitを作成し、標準勘定科目も同時に登録する
      */
     public static function createWithDefaultAccounts(array $attributes): self
@@ -253,16 +269,38 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         return \DB::transaction(function () use ($attributes, $user) {
             $account = $this->accounts()->create($attributes);
 
-            if (isset(self::$defaultSubAccounts[$account->name])) {
-                foreach (self::$defaultSubAccounts[$account->name] as $subAccountName) {
-                    $account->addCustomSubAccount($subAccountName, $user);
-                }
-            } else {
-                $account->addCustomSubAccount($account->name, $user);
+            $subAccountNames = self::$defaultSubAccounts[$account->name] ?? [$account->name];
+
+            foreach ($subAccountNames as $subAccountName) {
+                $account->addCustomSubAccount(
+                    $subAccountName,
+                    $user,
+                    self::resolveDefaultSubAccountVisibility($subAccountName),
+                    self::resolveDefaultSubAccountSystemPurpose($account->name, $subAccountName),
+                );
             }
 
             return $account;
         });
+    }
+
+    public static function resolveDefaultSubAccountVisibility(string $subAccountName): string
+    {
+        return in_array($subAccountName, self::$standardDefaultSubAccounts, true)
+            ? SubAccount::VISIBILITY_STANDARD
+            : SubAccount::VISIBILITY_EXPANDED;
+    }
+
+    public static function resolveDefaultSubAccountSystemPurpose(string $accountName, string $subAccountName): ?string
+    {
+        if (
+            $accountName === self::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME
+            && $subAccountName === self::UNCLASSIFIED_EXPENSE_SUB_ACCOUNT_NAME
+        ) {
+            return SubAccount::PURPOSE_UNCLASSIFIED;
+        }
+
+        return null;
     }
 
     public function addCustomAccount(

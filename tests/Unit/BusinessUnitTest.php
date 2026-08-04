@@ -6,11 +6,13 @@ use App\Models\Account;
 use App\Models\BusinessUnit;
 use App\Models\CreditCard;
 use App\Models\FixedAsset;
+use App\Models\SubAccount;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
@@ -219,6 +221,48 @@ class BusinessUnitTest extends TestCase
 
         $this->assertSame($originalAccountId, $unclassifiedAccount->id);
         $this->assertCount(1, $unclassifiedAccount->subAccounts);
+    }
+
+    #[Test]
+    public function sub_account_system_purpose_visibility_migrationは既存データにも予約用途と可視性を正しく埋める()
+    {
+        $user = User::factory()->create();
+
+        $businessUnit = $user->createBusinessUnitWithDefaults([
+            'name' => 'sub_accounts system_purpose/visibility 後埋めテスト',
+        ]);
+
+        // 予約 SubAccount まで含めて migration 未適用の状態に巻き戻す。
+        $subAccountIds = $businessUnit->subAccounts()->pluck('sub_accounts.id');
+
+        DB::table('sub_accounts')
+            ->whereIn('id', $subAccountIds)
+            ->update([
+                'system_purpose' => null,
+                'visibility' => SubAccount::VISIBILITY_STANDARD,
+            ]);
+
+        $migration = require base_path('database/migrations/2026_08_04_100000_add_system_purpose_and_visibility_to_sub_accounts_table.php');
+        $migration->up();
+
+        // 未分類 SubAccount は system_purpose=unclassified になる。
+        $unclassified = $businessUnit->getSubAccountByName(
+            BusinessUnit::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME,
+            BusinessUnit::UNCLASSIFIED_EXPENSE_SUB_ACCOUNT_NAME,
+        );
+        $this->assertSame(SubAccount::PURPOSE_UNCLASSIFIED, $unclassified->system_purpose);
+
+        // 標準リストの SubAccount は standard のまま残る。
+        foreach (BusinessUnit::$standardDefaultSubAccounts as $name) {
+            $sub = $businessUnit->subAccounts()->where('sub_accounts.name', $name)->first();
+            $this->assertSame(SubAccount::VISIBILITY_STANDARD, $sub->visibility, "$name は standard 想定");
+        }
+
+        // 標準リストに含まれない既定 SubAccount は expanded に降格する。
+        foreach (['現金', '通信費', '源泉徴収'] as $name) {
+            $sub = $businessUnit->subAccounts()->where('sub_accounts.name', $name)->first();
+            $this->assertSame(SubAccount::VISIBILITY_EXPANDED, $sub->visibility, "$name は expanded 想定");
+        }
     }
 
     #[Test]
