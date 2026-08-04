@@ -1,9 +1,10 @@
 <div>
-    <x-ui.card class="p-4 space-y-4">
-
-        <h2 class="text-base font-semibold text-content">
+    <x-ui.card variant="purchase" collapsible>
+        <x-ui.card-header toggle variant="purchase">
             {{ __('transactions.purchase_form.title') }}
-        </h2>
+        </x-ui.card-header>
+
+        <div x-show="open" x-cloak class="p-4 space-y-4">
 
         @if (session()->has('message'))
             <div
@@ -27,7 +28,7 @@
                 <input type="text" wire:model.defer="date_input" maxlength="4" size="4"
                     inputmode="numeric" pattern="\d{3,4}" autocomplete="off"
                     placeholder="{{ __('transactions.purchase_form.placeholders.date') }}"
-                    class="block w-full px-2 py-2 text-base text-center tabular-nums bg-surface-muted text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus focus:bg-surface">
+                    class="block w-full px-2 py-2 text-base text-center tabular-nums bg-surface text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus">
             </div>
             <div class="flex-1 min-w-[8rem]">
                 <label class="block text-sm font-semibold text-content mb-1">
@@ -35,7 +36,7 @@
                 </label>
                 <input type="text" wire:model.defer="amount" inputmode="numeric" pattern="\d*"
                     autocomplete="off"
-                    class="block w-full px-3 py-2 text-base text-right tabular-nums bg-surface-muted text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus focus:bg-surface">
+                    class="block w-full px-3 py-2 text-base text-right tabular-nums bg-surface text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus">
             </div>
             @if ($isTaxable)
                 <div>
@@ -103,7 +104,7 @@
             </label>
             <input type="text" wire:model.defer="note"
                 placeholder="{{ __('transactions.purchase_form.placeholders.note') }}"
-                class="block w-full px-3 py-2 text-sm bg-surface-muted text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus focus:bg-surface">
+                class="block w-full px-3 py-2 text-sm bg-surface text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus">
             @error('note')
                 <div class="text-xs text-status-danger-fg mt-1">{{ $message }}</div>
             @enderror
@@ -115,7 +116,7 @@
             </label>
             <input type="text" wire:model.defer="counterparty_name"
                 placeholder="{{ __('transactions.purchase_form.placeholders.counterparty_name') }}"
-                class="block w-full px-3 py-2 text-sm bg-surface-muted text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus focus:bg-surface">
+                class="block w-full px-3 py-2 text-sm bg-surface text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus">
             @error('counterparty_name')
                 <div class="text-xs text-status-danger-fg mt-1">{{ $message }}</div>
             @enderror
@@ -125,6 +126,7 @@
             <x-ui.button variant="confirm" type="button" wire:click="submit" class="w-full">
                 {{ __('transactions.purchase_form.actions.submit') }}
             </x-ui.button>
+        </div>
         </div>
     </x-ui.card>
 </div>
