@@ -90,6 +90,19 @@ return [
             '8' => '8%',
             'exempt' => '非課税',
         ],
+        'picker' => [
+            'help_aria' => '経費の種類の説明を見る',
+            'title' => '経費の種類を選ぶ',
+            'lead' => '具体例や注意事項を確認しながら選べます。',
+            'columns' => [
+                'name' => '勘定科目',
+                'example' => '具体例',
+            ],
+            'no_description' => '（説明なし）',
+            'caution_label' => '注意',
+            'source' => '出典: 国税庁「帳簿の記帳のしかた（事業所得者用）」',
+            'close' => '閉じる',
+        ],
         'messages' => [
             'registered' => '経費を登録しました',
         ],

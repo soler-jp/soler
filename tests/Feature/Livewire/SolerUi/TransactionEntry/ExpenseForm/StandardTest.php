@@ -336,10 +336,13 @@ class StandardTest extends TestCase
         $user = User::factory()->create();
         $this->initializeUnit($user, isTaxable: false);
 
+        // '非課税' は tax_options の選択肢文言にのみ出現するため、
+        // フォーム側で税率選択 UI が出ないことの識別に使える。
+        // （ラベル '消費税' は 租税公課 の example 文にも含まれるため使えない。）
         Livewire::actingAs($user)
             ->test(Standard::class)
             ->assertSet('isTaxable', false)
-            ->assertDontSee(__('transactions.expense_form.fields.tax_option'));
+            ->assertDontSee(__('transactions.expense_form.tax_options.exempt'));
     }
 
     #[Test]
@@ -709,5 +712,75 @@ class StandardTest extends TestCase
         Livewire::actingAs($user)
             ->test(Standard::class)
             ->assertForbidden();
+    }
+
+    #[Test]
+    public function 経費ピッカーは_account_の_example_と_caution_を含む(): void
+    {
+        $user = User::factory()->create();
+        $this->initializeUnit($user);
+
+        $component = Livewire::actingAs($user)->test(Standard::class);
+
+        $rows = collect($component->get('expenseAccountPickerRows'));
+
+        $tax = $rows->firstWhere('account_name', '租税公課');
+        $this->assertNotNull($tax, '租税公課 行がピッカーに存在する');
+        $this->assertStringContainsString('消費税及び地方消費税', $tax['example']);
+        $this->assertStringContainsString('所得税及び復興特別所得税', $tax['caution']);
+
+        $travel = $rows->firstWhere('account_name', '旅費交通費');
+        $this->assertNotNull($travel);
+        $this->assertSame('電車賃、バス代、タクシー代、宿泊代', $travel['example']);
+        $this->assertNull($travel['caution']);
+
+        $component->assertSee('租税公課')
+            ->assertSee('消費税及び地方消費税')
+            ->assertSee('所得税及び復興特別所得税');
+    }
+
+    #[Test]
+    public function 経費ピッカーで選ぶと_debit_sub_account_id_がセットされる(): void
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $consumables = $unit->getAccountByName('消耗品費')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->assertSet('debit_sub_account_id', null)
+            ->set('debit_sub_account_id', $consumables->id)
+            ->assertSet('debit_sub_account_id', $consumables->id);
+    }
+
+    #[Test]
+    public function 経費ピッカーは_未分類費用_のような_system_purpose_付き科目を除外する(): void
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $component = Livewire::actingAs($user)->test(Standard::class);
+        $names = collect($component->get('expenseAccountPickerRows'))->pluck('account_name')->all();
+
+        $this->assertNotContains(BusinessUnit::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME, $names);
+        // example が無い通常の勘定科目（専従者給与）は残す
+        $this->assertContains('専従者給与', $names);
+    }
+
+    #[Test]
+    public function 経費ピッカーの行は_sort_order_順に並ぶ(): void
+    {
+        $user = User::factory()->create();
+        $this->initializeUnit($user);
+
+        $component = Livewire::actingAs($user)->test(Standard::class);
+        $rows = collect($component->get('expenseAccountPickerRows'));
+
+        $sortOrders = $rows->pluck('sort_order')->all();
+        $expected = $sortOrders;
+        sort($expected);
+
+        $this->assertSame($expected, $sortOrders, 'ピッカー行は sort_order の昇順に並ぶ');
     }
 }

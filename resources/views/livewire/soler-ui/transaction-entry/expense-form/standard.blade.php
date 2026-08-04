@@ -74,10 +74,93 @@
         @endif
 
         {{-- 経費の種類 --}}
-        <div class="space-y-2">
-            <label class="block text-sm font-semibold text-content">
-                {{ __('transactions.expense_form.sections.expense_type') }}
-            </label>
+        <div class="space-y-2" x-data="{ pickerOpen: false }">
+            <div class="flex items-center gap-1.5">
+                <label class="block text-sm font-semibold text-content">
+                    {{ __('transactions.expense_form.sections.expense_type') }}
+                </label>
+                <button type="button" @click="pickerOpen = true"
+                    aria-label="{{ __('transactions.expense_form.picker.help_aria') }}"
+                    class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-surface border border-line text-content shadow-sm hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-focus">
+                    <span class="text-xs font-bold leading-none" aria-hidden="true">?</span>
+                </button>
+            </div>
+
+            {{-- 説明つき勘定科目ピッカー --}}
+            <div x-show="pickerOpen" x-cloak
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+                @keydown.escape.window="pickerOpen = false"
+                @click.self="pickerOpen = false">
+                <div class="bg-surface text-content rounded-card shadow-card border border-line w-full max-w-3xl max-h-[85vh] flex flex-col">
+                    <div class="flex items-start justify-between p-4 border-b border-line">
+                        <div>
+                            <h2 class="text-base font-semibold">
+                                {{ __('transactions.expense_form.picker.title') }}
+                            </h2>
+                            <p class="text-xs text-content-muted mt-1">
+                                {{ __('transactions.expense_form.picker.lead') }}
+                            </p>
+                        </div>
+                        <button type="button" @click="pickerOpen = false"
+                            aria-label="{{ __('transactions.expense_form.picker.close') }}"
+                            class="text-content-muted hover:text-content focus:outline-none focus:ring-2 focus:ring-focus rounded-control p-1">
+                            <x-ui.icon name="x-mark" class="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    <div class="overflow-y-auto flex-1">
+                        <table class="w-full text-sm">
+                            <thead class="sticky top-0 bg-surface border-b border-line">
+                                <tr>
+                                    <th class="text-left font-semibold px-3 py-2 w-32 whitespace-nowrap">
+                                        {{ __('transactions.expense_form.picker.columns.name') }}
+                                    </th>
+                                    <th class="text-left font-semibold px-3 py-2">
+                                        {{ __('transactions.expense_form.picker.columns.example') }}
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($expenseAccountPickerRows as $row)
+                                    <tr
+                                        wire:key="picker-row-{{ $row['sub_account_id'] }}"
+                                        wire:click="$set('debit_sub_account_id', {{ $row['sub_account_id'] }})"
+                                        @click="pickerOpen = false"
+                                        @class([
+                                            'cursor-pointer border-b border-line transition',
+                                            'bg-action-primary/10' => $debit_sub_account_id === $row['sub_account_id'],
+                                            'hover:bg-surface-muted' => $debit_sub_account_id !== $row['sub_account_id'],
+                                        ])>
+                                        <td class="align-middle px-3 py-2 font-semibold whitespace-nowrap">
+                                            {{ $row['sub_account_display_name'] }}
+                                        </td>
+                                        <td class="align-top px-3 py-2">
+                                            @if (! empty($row['example']))
+                                                <div class="whitespace-pre-line text-content">{{ $row['example'] }}</div>
+                                            @else
+                                                <div class="text-content-muted italic">{{ __('transactions.expense_form.picker.no_description') }}</div>
+                                            @endif
+
+                                            @if (! empty($row['caution']))
+                                                <div class="mt-1 text-xs text-status-warning-fg"><span class="font-semibold">⚠ {{ __('transactions.expense_form.picker.caution_label') }}:</span> {{ $row['caution'] }}</div>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="px-4 py-2 border-t border-line text-xs text-content-muted">
+                        {{ __('transactions.expense_form.picker.source') }}
+                        <a href="https://www.nta.go.jp/taxes/shiraberu/shinkoku/kojin_jigyo/kichou03.pdf"
+                            target="_blank" rel="noopener noreferrer"
+                            class="text-link hover:underline break-all">
+                            https://www.nta.go.jp/taxes/shiraberu/shinkoku/kojin_jigyo/kichou03.pdf
+                        </a>
+                    </div>
+                </div>
+            </div>
 
             <div class="flex flex-wrap items-center gap-2">
                 @foreach ($expenseSubAccountsStandard as $subAccount)

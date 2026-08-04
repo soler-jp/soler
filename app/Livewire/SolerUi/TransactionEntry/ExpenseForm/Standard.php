@@ -57,6 +57,15 @@ class Standard extends Component
 
     public Collection $creditAccounts;
 
+    /**
+     * 「勘定科目が分からない人」向けのピッカー一覧。
+     * 1 Account = 1 row。行クリック時に、その Account 配下で非 hidden かつ
+     * sort_order 最小の SubAccount を debit_sub_account_id にセットする。
+     *
+     * @var Collection<int, array{account_id:int, account_name:string, sub_account_id:int, sub_account_display_name:string, example:?string, caution:?string, sort_order:int}>
+     */
+    public Collection $expenseAccountPickerRows;
+
     public function mount(): void
     {
         $unit = auth()->user()->selectedBusinessUnitOrFail();
@@ -99,6 +108,30 @@ class Standard extends Component
             ->whereIn('name', ['現金', '普通預金', '事業主借'])
             ->orderByRaw("CASE name WHEN '現金' THEN 0 WHEN '普通預金' THEN 1 WHEN '事業主借' THEN 2 ELSE 3 END")
             ->get();
+
+        $this->expenseAccountPickerRows = $unit->accounts()
+            ->with(['subAccounts' => fn ($q) => $q
+                ->where('visibility', '!=', SubAccount::VISIBILITY_HIDDEN)
+                ->whereNull('system_purpose')])
+            ->where('type', Account::TYPE_EXPENSE)
+            ->get()
+            ->filter(fn (Account $account) => $account->subAccounts->isNotEmpty())
+            ->map(function (Account $account): array {
+                /** @var SubAccount $primary */
+                $primary = $account->subAccounts->first();
+
+                return [
+                    'account_id' => $account->id,
+                    'account_name' => $account->name,
+                    'sub_account_id' => $primary->id,
+                    'sub_account_display_name' => $primary->displayName(),
+                    'example' => $account->example,
+                    'caution' => $account->caution,
+                    'sort_order' => (int) $primary->sort_order,
+                ];
+            })
+            ->sortBy(fn (array $row) => [$row['sort_order'], $row['sub_account_id']])
+            ->values();
     }
 
     public function toggleExpanded(): void
