@@ -3,7 +3,7 @@
 @php($customAssetAccounts = $inputs['custom_asset_accounts'] ?? [])
 @php($customLiabilityAccounts = $inputs['custom_liability_accounts'] ?? [])
 @php($numberInputClass = '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none')
-@php($imagePath = \Illuminate\Support\Facades\Vite::asset('resources/images/setup/opening-entry-masked.png'))
+@php($imagePath = asset('images/setup/opening-entry-masked.png'))
 
 <x-ui.card class="xl:col-span-2">
     <x-ui.card-body class="p-6">
