@@ -45,6 +45,8 @@ class Standard extends Component
 
     public int $fiscalYearYear = 0;
 
+    public bool $isTaxable = false;
+
     /**
      * @var list<SubAccount>
      */
@@ -65,6 +67,11 @@ class Standard extends Component
         $unit = auth()->user()->selectedBusinessUnitOrFail();
         $fiscalYear = $unit->currentFiscalYear;
         $this->fiscalYearYear = (int) $fiscalYear->year;
+        $this->isTaxable = (bool) $fiscalYear->is_taxable;
+
+        if (! $fiscalYear->is_taxable) {
+            $this->tax_option = self::TAX_OPTION_10;
+        }
 
         $this->date_input = now()->format('md');
 
@@ -133,6 +140,11 @@ class Standard extends Component
 
         $date = sprintf('%04d-%02d-%02d', $this->fiscalYearYear, $month, $day);
         $description = $this->resolveDescription();
+
+        if (! $fiscalYear->is_taxable) {
+            $this->tax_option = self::TAX_OPTION_10;
+        }
+
         $creditTaxType = $this->mapCreditTaxType($fiscalYear, $this->tax_option);
 
         $transactionData = [
@@ -160,18 +172,21 @@ class Standard extends Component
             $journalEntries[] = [
                 'sub_account_id' => $this->receipt_sub_account_id,
                 'type' => JournalEntry::TYPE_DEBIT,
-                'net_amount' => (int) $this->amount - $withheldTaxAmount,
+                'gross_amount' => (int) $this->amount - $withheldTaxAmount,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ];
             $journalEntries[] = [
                 'sub_account_id' => $this->withheld_tax_sub_account_id,
                 'type' => JournalEntry::TYPE_DEBIT,
-                'net_amount' => $withheldTaxAmount,
+                'gross_amount' => $withheldTaxAmount,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ];
         } else {
             $journalEntries[] = [
                 'sub_account_id' => $this->receipt_sub_account_id,
                 'type' => JournalEntry::TYPE_DEBIT,
-                'net_amount' => (int) $this->amount,
+                'gross_amount' => (int) $this->amount,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ];
         }
 
@@ -192,7 +207,6 @@ class Standard extends Component
                 'withholding',
                 'withholding_amount',
             ]);
-            $this->tax_option = self::TAX_OPTION_10;
             session()->flash('message', __('transactions.revenue_form.messages.registered'));
         } catch (\Exception $e) {
             session()->flash('error', __('transactions.revenue_form.errors.registration_failed').': '.$e->getMessage());

@@ -38,25 +38,27 @@
                     autocomplete="off"
                     class="block w-full px-3 py-2 text-base text-right tabular-nums bg-surface-muted text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus focus:bg-surface">
             </div>
-            <div>
-                <label class="block text-sm font-semibold text-content mb-1">
-                    {{ __('transactions.expense_form.fields.tax_option') }}
-                </label>
-                <div
-                    class="inline-flex rounded-control border border-line overflow-hidden bg-surface shadow-sm">
-                    @foreach (\App\Livewire\SolerUi\TransactionEntry\ExpenseForm\Standard::TAX_OPTIONS as $option)
-                        <button type="button" wire:click="$set('tax_option', '{{ $option }}')"
-                            @class([
-                                'px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-focus focus:z-10',
-                                'bg-action-primary text-action-primary-fg font-semibold' => $tax_option === $option,
-                                'text-content hover:bg-surface-muted' => $tax_option !== $option,
-                                'border-l border-line' => ! $loop->first,
-                            ])>
-                            {{ __('transactions.expense_form.tax_options.' . $option) }}
-                        </button>
-                    @endforeach
+            @if ($isTaxable)
+                <div>
+                    <label class="block text-sm font-semibold text-content mb-1">
+                        {{ __('transactions.expense_form.fields.tax_option') }}
+                    </label>
+                    <div
+                        class="inline-flex rounded-control border border-line overflow-hidden bg-surface shadow-sm">
+                        @foreach (\App\Livewire\SolerUi\TransactionEntry\ExpenseForm\Standard::TAX_OPTIONS as $option)
+                            <button type="button" wire:click="$set('tax_option', '{{ $option }}')"
+                                @class([
+                                    'px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-focus focus:z-10',
+                                    'bg-action-primary text-action-primary-fg font-semibold' => $tax_option === $option,
+                                    'text-content hover:bg-surface-muted' => $tax_option !== $option,
+                                    'border-l border-line' => ! $loop->first,
+                                ])>
+                                {{ __('transactions.expense_form.tax_options.' . $option) }}
+                            </button>
+                        @endforeach
+                    </div>
                 </div>
-            </div>
+            @endif
         </div>
         @error('date_input')
             <div class="text-xs text-status-danger-fg -mt-2">{{ $message }}</div>
@@ -64,9 +66,11 @@
         @error('amount')
             <div class="text-xs text-status-danger-fg -mt-2">{{ $message }}</div>
         @enderror
-        @error('tax_option')
-            <div class="text-xs text-status-danger-fg -mt-2">{{ $message }}</div>
-        @enderror
+        @if ($isTaxable)
+            @error('tax_option')
+                <div class="text-xs text-status-danger-fg -mt-2">{{ $message }}</div>
+            @enderror
+        @endif
 
         {{-- 経費の種類 --}}
         <div class="space-y-2">

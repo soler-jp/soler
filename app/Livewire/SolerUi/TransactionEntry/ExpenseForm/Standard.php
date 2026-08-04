@@ -42,6 +42,8 @@ class Standard extends Component
 
     public int $fiscalYearYear = 0;
 
+    public bool $isTaxable = false;
+
     public Collection $expenseAccountsStandard;
 
     public Collection $expenseAccountsUnclassified;
@@ -55,6 +57,11 @@ class Standard extends Component
         $unit = auth()->user()->selectedBusinessUnitOrFail();
         $fiscalYear = $unit->currentFiscalYear;
         $this->fiscalYearYear = (int) $fiscalYear->year;
+        $this->isTaxable = (bool) $fiscalYear->is_taxable;
+
+        if (! $fiscalYear->is_taxable) {
+            $this->tax_option = self::TAX_OPTION_10;
+        }
 
         $this->date_input = now()->format('md');
 
@@ -119,6 +126,11 @@ class Standard extends Component
 
         $date = sprintf('%04d-%02d-%02d', $this->fiscalYearYear, $month, $day);
         $description = $this->resolveDescription();
+
+        if (! $fiscalYear->is_taxable) {
+            $this->tax_option = self::TAX_OPTION_10;
+        }
+
         $debitTaxType = $this->mapDebitTaxType($fiscalYear, $this->tax_option);
 
         $transactionData = [
@@ -145,7 +157,8 @@ class Standard extends Component
                     [
                         'sub_account_id' => $this->credit_sub_account_id,
                         'type' => JournalEntry::TYPE_CREDIT,
-                        'net_amount' => (int) $this->amount,
+                        'gross_amount' => (int) $this->amount,
+                        'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                     ],
                 ],
                 $user,
@@ -159,7 +172,6 @@ class Standard extends Component
                 'credit_sub_account_id',
                 'counterparty_name',
             ]);
-            $this->tax_option = self::TAX_OPTION_10;
             session()->flash('message', __('transactions.expense_form.messages.registered'));
         } catch (\Exception $e) {
             session()->flash('error', __('transactions.expense_form.errors.registration_failed').': '.$e->getMessage());

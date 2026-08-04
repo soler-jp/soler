@@ -73,7 +73,7 @@ class StandardTest extends TestCase
     public function 非課税を選ぶと税額が計上されずexemptになる()
     {
         $user = User::factory()->create();
-        $unit = $this->initializeUnit($user);
+        $unit = $this->initializeUnit($user, isTaxable: true);
 
         $revenueSub = $unit->getAccountByName('売上高')->subAccounts()->first();
         $cashSub = $unit->getAccountByName('現金')->subAccounts()->first();
@@ -101,7 +101,7 @@ class StandardTest extends TestCase
     public function 源泉徴収ありの売上が即時入金で登録できる()
     {
         $user = User::factory()->create();
-        $unit = $this->initializeUnit($user);
+        $unit = $this->initializeUnit($user, isTaxable: true);
 
         $revenueSub = $unit->getAccountByName('売上高')->subAccounts()->first();
         $cashSub = $unit->getAccountByName('現金')->subAccounts()->first();
@@ -209,6 +209,47 @@ class StandardTest extends TestCase
             ->test(Standard::class)
             ->assertSet('revenue_sub_account_id', $revenueSub->id)
             ->assertSet('withheld_tax_sub_account_id', $withheldSub->id);
+    }
+
+    #[Test]
+    public function 免税事業者では消費税の選択肢を表示しない()
+    {
+        $user = User::factory()->create();
+        $this->initializeUnit($user, isTaxable: false);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->assertSet('isTaxable', false)
+            ->assertDontSee(__('transactions.revenue_form.fields.tax_option'));
+    }
+
+    #[Test]
+    public function 免税事業者では消費税の選択を変えてもみなし10パーセントで登録される()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, isTaxable: false);
+
+        $revenueSub = $unit->getAccountByName('売上高')->subAccounts()->first();
+        $cashSub = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0401')
+            ->set('amount', 11000)
+            ->set('tax_option', Standard::TAX_OPTION_EXEMPT)
+            ->set('revenue_sub_account_id', $revenueSub->id)
+            ->set('receipt_sub_account_id', $cashSub->id)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('tax_option', Standard::TAX_OPTION_10);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $revenueSub->id,
+            'type' => JournalEntry::TYPE_CREDIT,
+            'net_amount' => 10000,
+            'tax_amount' => 1000,
+            'tax_type' => JournalEntry::TAX_TYPE_DEEMED_TAXABLE_SALES_10,
+        ]);
     }
 
     #[Test]
@@ -374,7 +415,7 @@ class StandardTest extends TestCase
     public function 銀行サブアカウントに入金された売上が登録できる()
     {
         $user = User::factory()->create();
-        $unit = $this->initializeUnit($user);
+        $unit = $this->initializeUnit($user, isTaxable: true);
 
         $revenueSub = $unit->getAccountByName('売上高')->subAccounts()->first();
         $bankAccount = $unit->getAccountByName('その他の預金');

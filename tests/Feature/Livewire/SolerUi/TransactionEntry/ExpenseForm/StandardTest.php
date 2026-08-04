@@ -93,7 +93,7 @@ class StandardTest extends TestCase
     public function 非課税を選ぶと税額が計上されず税区分がexemptになる()
     {
         $user = User::factory()->create();
-        $unit = $this->initializeUnit($user);
+        $unit = $this->initializeUnit($user, isTaxable: true);
 
         $debit = $unit->getAccountByName('消耗品費')->subAccounts()->first();
         $credit = $unit->getAccountByName('現金')->subAccounts()->first();
@@ -249,6 +249,47 @@ class StandardTest extends TestCase
             ->assertSet('showExpanded', true)
             ->call('toggleExpanded')
             ->assertSet('showExpanded', false);
+    }
+
+    #[Test]
+    public function 免税事業者では消費税の選択肢を表示しない()
+    {
+        $user = User::factory()->create();
+        $this->initializeUnit($user, isTaxable: false);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->assertSet('isTaxable', false)
+            ->assertDontSee(__('transactions.expense_form.fields.tax_option'));
+    }
+
+    #[Test]
+    public function 免税事業者では消費税の選択を変えてもみなし10パーセントで登録される()
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, isTaxable: false);
+
+        $debit = $unit->getAccountByName('消耗品費')->subAccounts()->first();
+        $credit = $unit->getAccountByName('現金')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0510')
+            ->set('amount', 1100)
+            ->set('tax_option', Standard::TAX_OPTION_EXEMPT)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $credit->id)
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('tax_option', Standard::TAX_OPTION_10);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $debit->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => 1000,
+            'tax_amount' => 100,
+            'tax_type' => JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10,
+        ]);
     }
 
     #[Test]
