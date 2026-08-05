@@ -341,6 +341,12 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             'example' => '商工会議所、商工会、同業者団体、協同組合、商店会、青色申告会などの会費や組合費',
             'caution' => '事業と直接関係しない団体や、個人的な交流を目的とする団体の会費は経費にならない場合があります。',
         ],
+        [
+            'name' => '繰延資産償却',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '開業費、開発費などの繰延資産を当年の必要経費にするための償却額',
+            'caution' => '車両、パソコン、建物などの固定資産に係る減価償却費とは区別します。ただし、青色申告決算書では減価償却費に合算します。',
+        ],
         ['name' => self::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME, 'type' => Account::TYPE_EXPENSE],
     ];
 
@@ -369,6 +375,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         '会議費',
         '研修費',
         '諸会費',
+        '繰延資産償却',
     ];
 
     /**
@@ -391,6 +398,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         '会議費',
         '研修費',
         '諸会費',
+        '繰延資産償却',
     ];
 
     /**
