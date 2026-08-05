@@ -22,7 +22,7 @@
 </head>
 
 <body class="font-sans antialiased">
-    <div class="min-h-screen bg-stone-100 lg:flex">
+    <div class="min-h-screen bg-canvas lg:flex">
         @include('layouts.navigation')
 
         <div class="flex min-h-screen min-w-0 flex-1 flex-col">

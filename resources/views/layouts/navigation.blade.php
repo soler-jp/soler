@@ -1,16 +1,41 @@
 @php
-    $navigationItems = [
-        ['label' => __('Dashboard'), 'route' => 'dashboard'],
-        ['label' => '売上一覧', 'route' => 'transactions.revenues'],
-        ['label' => '経費の月別一覧', 'route' => 'transactions.expenses'],
-        ['label' => '経費の種類別一覧', 'route' => 'transactions.expense-types'],
-        ['label' => '仕入れ一覧', 'route' => 'transactions.purchases'],
-        ['label' => '仕訳帳一覧', 'route' => 'transactions.journal'],
-        ['label' => '勘定科目集計', 'route' => 'accounts.summary'],
-        ['label' => '年度管理', 'route' => 'fiscal-years.index'],
-        ['label' => '固定費', 'route' => 'fixed-expenses'],
-        ['label' => '青色申告決算書PDF', 'route' => 'blue-return-statement.pdf.show'],
-        ['label' => 'Help', 'route' => 'help.accounting-basics'],
+    $navigationSections = [
+        [
+            'items' => [
+                ['label' => __('Dashboard'), 'route' => 'dashboard'],
+                ['label' => __('navigation.revenue'), 'route' => 'transactions.revenues'],
+                ['label' => __('navigation.expense'), 'route' => 'transactions.expenses'],
+                ['label' => __('navigation.fixed_expenses'), 'route' => 'fixed-expenses'],
+                ['label' => __('navigation.purchase'), 'route' => 'transactions.purchases'],
+            ],
+        ],
+        [
+            'header' => __('navigation.section_review'),
+            'items' => [
+                ['label' => __('navigation.expense_monthly'), 'route' => 'transactions.expenses'],
+                ['label' => __('navigation.expense_by_type'), 'route' => 'transactions.expense-types'],
+                ['label' => __('navigation.journal'), 'route' => 'transactions.journal'],
+                ['label' => __('navigation.account_summary'), 'route' => 'accounts.summary'],
+            ],
+        ],
+        [
+            'header' => __('navigation.section_other'),
+            'items' => [
+                ['label' => __('navigation.fixed_assets'), 'route' => 'fixed-assets.index'],
+                ['label' => __('navigation.blue_return_pdf'), 'route' => 'blue-return-statement.pdf.show'],
+            ],
+        ],
+        [
+            'header' => __('navigation.section_settings'),
+            'items' => [
+                ['label' => __('navigation.fiscal_years'), 'route' => 'fiscal-years.index'],
+            ],
+        ],
+        [
+            'items' => [
+                ['label' => 'Help', 'route' => 'help.accounting-basics'],
+            ],
+        ],
     ];
 
     $adminItems = [];
@@ -27,7 +52,7 @@
 @endphp
 
 <nav x-data="{ open: false }"
-    class="border-b border-chrome-muted/20 bg-chrome lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:self-start lg:flex-col lg:overflow-hidden lg:border-b-0 lg:border-r lg:border-r-chrome-muted/20">
+    class="border-b border-chrome-muted/20 bg-chrome lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:self-start lg:flex-col lg:overflow-hidden lg:border-b-0">
     <div class="flex h-14 items-center justify-between border-b border-chrome-muted/20 bg-chrome px-4 lg:hidden">
         <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5">
             <span class="flex h-8 w-8 items-center justify-center">
@@ -63,37 +88,54 @@
         </div>
 
         <div class="flex-1 overflow-y-auto py-3">
-            <div>
-                <p class="border-b border-chrome-muted/20 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-chrome-muted">Main Menu</p>
-                <div class="py-1">
-                    @foreach ($navigationItems as $item)
-                        @php
-                            $isActive = request()->routeIs($item['route']);
-                            $linkClasses = $isActive
-                                ? 'border-brand bg-surface font-semibold text-content'
-                                : 'border-transparent text-chrome-fg hover:border-chrome-muted/40 hover:bg-chrome-hover hover:text-chrome-fg';
-                        @endphp
-                        <a href="{{ route($item['route']) }}"
-                            class="{{ $linkClasses }} flex items-center border-l-[3px] px-5 py-2.5 text-[13px] leading-5 transition">
-                            {{ $item['label'] }}
-                        </a>
-                    @endforeach
+            @foreach ($navigationSections as $sectionIndex => $section)
+                <div @class(['mt-4' => $sectionIndex > 0])>
+                    @if (isset($section['header']))
+                        <p class="border-b border-chrome-muted/20 px-5 py-2 text-[10px] font-medium uppercase tracking-[0.2em] text-chrome-muted/70">
+                            {{ $section['header'] }}
+                        </p>
+                    @elseif ($sectionIndex > 0)
+                        <div class="border-t border-chrome-muted/20"></div>
+                    @endif
+                    <div class="py-1">
+                        @foreach ($section['items'] as $item)
+                            @if (isset($item['route']))
+                                @php
+                                    $isActive = request()->routeIs($item['route']);
+                                @endphp
+                                <a href="{{ route($item['route']) }}"
+                                    @class([
+                                        'flex items-center border-l-[3px] py-2.5 text-[13px] leading-5 transition',
+                                        'border-brand bg-canvas pl-5 font-semibold text-content' => $isActive,
+                                        'border-transparent px-5 text-chrome-fg hover:border-chrome-muted/40 hover:bg-chrome-hover' => ! $isActive,
+                                    ])>
+                                    {{ $item['label'] }}
+                                </a>
+                            @else
+                                <span
+                                    class="flex cursor-default items-center border-l-[3px] border-transparent px-5 py-2.5 text-[13px] leading-5 text-chrome-muted/50">
+                                    {{ $item['label'] }}
+                                </span>
+                            @endif
+                        @endforeach
+                    </div>
                 </div>
-            </div>
+            @endforeach
 
             @if ($adminItems !== [])
                 <div class="mt-4">
-                    <p class="border-b border-chrome-muted/20 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-chrome-muted">Admin</p>
+                    <p class="border-b border-chrome-muted/20 px-5 py-2 text-[10px] font-medium uppercase tracking-[0.2em] text-chrome-muted/70">Admin</p>
                     <div class="py-1">
                         @foreach ($adminItems as $item)
-                        @php
-                            $isActive = request()->routeIs($item['route']);
-                            $linkClasses = $isActive
-                                ? 'border-brand bg-surface font-semibold text-content'
-                                : 'border-transparent text-chrome-fg hover:border-chrome-muted/40 hover:bg-chrome-hover hover:text-chrome-fg';
+                            @php
+                                $isActive = request()->routeIs($item['route']);
                             @endphp
                             <a href="{{ route($item['route']) }}"
-                                class="{{ $linkClasses }} flex items-center border-l-[3px] px-5 py-2.5 text-[13px] leading-5 transition">
+                                @class([
+                                    'flex items-center border-l-[3px] py-2.5 text-[13px] leading-5 transition',
+                                    'border-brand bg-canvas pl-5 font-semibold text-content' => $isActive,
+                                    'border-transparent px-5 text-chrome-fg hover:border-chrome-muted/40 hover:bg-chrome-hover' => ! $isActive,
+                                ])>
                                 {{ $item['label'] }}
                             </a>
                         @endforeach
@@ -126,31 +168,48 @@
             <p class="text-sm font-semibold text-chrome-fg">{{ $fiscalYearLabel }}</p>
         </div>
 
-        <div class="py-1">
-            @foreach ($navigationItems as $item)
-                @php
-                    $isActive = request()->routeIs($item['route']);
-                    $linkClasses = $isActive
-                        ? 'border-brand bg-surface font-semibold text-content'
-                        : 'border-transparent text-chrome-fg hover:border-chrome-muted/40 hover:bg-chrome-hover hover:text-chrome-fg';
-                @endphp
-                <a href="{{ route($item['route']) }}"
-                    class="{{ $linkClasses }} block border-l-[3px] px-4 py-2.5 text-sm transition">
-                    {{ $item['label'] }}
-                </a>
-            @endforeach
-        </div>
+        @foreach ($navigationSections as $sectionIndex => $section)
+            <div @class([
+                'py-1',
+                'border-t border-chrome-muted/20' => $sectionIndex > 0,
+            ])>
+                @if (isset($section['header']))
+                    <p class="px-4 pb-1 pt-2 text-[10px] font-medium uppercase tracking-[0.2em] text-chrome-muted/70">
+                        {{ $section['header'] }}
+                    </p>
+                @endif
+                @foreach ($section['items'] as $item)
+                    @if (isset($item['route']))
+                        @php
+                            $isActive = request()->routeIs($item['route']);
+                            $linkClasses = $isActive
+                                ? 'border-brand bg-canvas font-semibold text-content'
+                                : 'border-transparent text-chrome-fg hover:border-chrome-muted/40 hover:bg-chrome-hover';
+                        @endphp
+                        <a href="{{ route($item['route']) }}"
+                            class="{{ $linkClasses }} block border-l-[3px] px-4 py-2.5 text-sm transition">
+                            {{ $item['label'] }}
+                        </a>
+                    @else
+                        <span
+                            class="block cursor-default border-l-[3px] border-transparent px-4 py-2.5 text-sm text-chrome-muted/50">
+                            {{ $item['label'] }}
+                        </span>
+                    @endif
+                @endforeach
+            </div>
+        @endforeach
 
         @if ($adminItems !== [])
             <div class="border-t border-chrome-muted/20 py-2">
-                <p class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-chrome-muted">Admin</p>
+                <p class="px-3 pb-1 text-[10px] font-medium uppercase tracking-[0.2em] text-chrome-muted/70">Admin</p>
                 <div>
                     @foreach ($adminItems as $item)
                         @php
                             $isActive = request()->routeIs($item['route']);
                             $linkClasses = $isActive
-                                ? 'border-brand bg-surface font-semibold text-content'
-                                : 'border-transparent text-chrome-fg hover:border-chrome-muted/40 hover:bg-chrome-hover hover:text-chrome-fg';
+                                ? 'border-brand bg-canvas font-semibold text-content'
+                                : 'border-transparent text-chrome-fg hover:border-chrome-muted/40 hover:bg-chrome-hover';
                         @endphp
                         <a href="{{ route($item['route']) }}"
                             class="{{ $linkClasses }} block border-l-[3px] px-4 py-2.5 text-sm transition">
@@ -171,7 +230,7 @@
                     @csrf
 
                     <a href="{{ route('logout') }}"
-                        class="block border-l-[3px] border-transparent px-4 py-2.5 text-sm text-chrome-fg transition hover:border-chrome-muted/40 hover:bg-chrome-hover hover:text-chrome-fg"
+                        class="block border-l-[3px] border-transparent px-4 py-2.5 text-sm text-chrome-fg transition hover:border-chrome-muted/40 hover:bg-chrome-hover"
                         onclick="event.preventDefault(); this.closest('form').submit();">
                         {{ __('Log Out') }}
                     </a>

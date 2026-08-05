@@ -20,11 +20,14 @@ class NavigationLayoutTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('年度未設定');
-        $response->assertSee('売上一覧');
-        $response->assertSee('経費の月別一覧');
-        $response->assertSee('勘定科目集計');
-        $response->assertSee('年度管理');
-        $response->assertSee('固定費');
+        $response->assertSee(__('navigation.revenue'));
+        $response->assertSee(__('navigation.expense'));
+        $response->assertSee(__('navigation.fixed_expenses'));
+        $response->assertSee(__('navigation.purchase'));
+        $response->assertSee(__('navigation.expense_monthly'));
+        $response->assertSee(__('navigation.account_summary'));
+        $response->assertSee(__('navigation.fiscal_years'));
+        $response->assertSee(__('Dashboard'));
         $response->assertSee('青色申告決算書PDF');
         $response->assertSee('Help');
         $response->assertSee('brand/logo-mark-light.png');

@@ -23,6 +23,7 @@
   --theme-amber-50:     255 251 235;
   --theme-amber-200:    253 230 138;
   --theme-amber-700:    180 83 9;
+  --theme-emerald-50:   245 254 250;
   --theme-emerald-100:  209 250 229;
   --theme-emerald-400:  52 211 153;
   --theme-emerald-600:  5 150 105;
@@ -37,7 +38,7 @@
   --theme-orange-700:   194 65 12;
 
   /* ── 契約: 表層 ── */
-  --color-canvas:         var(--theme-slate-50);
+  --color-canvas:         var(--theme-emerald-50);
   --color-surface:        255 255 255;
   --color-surface-muted:  var(--theme-slate-100);
   --color-line:           var(--theme-slate-200);
@@ -65,7 +66,7 @@
 
   /* ── 契約: chrome (navmenu 等の濃色クローム) ── */
   --color-chrome-bg:    var(--theme-emerald-950);
-  --color-chrome-fg:    var(--theme-emerald-100);
+  --color-chrome-fg:    255 255 255;
   --color-chrome-muted: var(--theme-emerald-400);
   --color-chrome-hover: var(--theme-emerald-900);
 
