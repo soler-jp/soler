@@ -4,6 +4,7 @@
 
     $carSummary = $this->carPresetSummary();
     $advSummary = $this->advancedSummary();
+    $openingTransferSummary = $this->openingTransferConfirmSummary();
 @endphp
 
 <div class="space-y-6">
@@ -20,6 +21,48 @@
             @if (session()->has('fixed_asset_panel_error'))
                 <div class="p-2 rounded-control bg-status-danger text-status-danger-fg border border-status-danger-border text-sm">
                     {{ session('fixed_asset_panel_error') }}
+                </div>
+            @endif
+
+            {{-- 期首振替の確認カード --}}
+            @if ($openingTransferSummary !== null)
+                <div wire:key="opening-transfer-confirm" class="rounded-card border border-status-warning-border bg-status-warning text-status-warning-fg p-4 space-y-3">
+                    <h4 class="text-sm font-semibold">{{ __('fixed_assets.opening_transfer.confirm_heading') }}</h4>
+
+                    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                        <div class="flex gap-2">
+                            <dt class="text-content-muted w-28 shrink-0">{{ __('fixed_assets.opening_transfer.confirm_labels.asset') }}</dt>
+                            <dd class="text-content">{{ $openingTransferSummary['asset_name'] }}</dd>
+                        </div>
+                        <div class="flex gap-2">
+                            <dt class="text-content-muted w-28 shrink-0">{{ __('fixed_assets.opening_transfer.confirm_labels.account') }}</dt>
+                            <dd class="text-content">{{ $openingTransferSummary['account_name'] }}</dd>
+                        </div>
+                        <div class="flex gap-2">
+                            <dt class="text-content-muted w-28 shrink-0">{{ __('fixed_assets.opening_transfer.confirm_labels.acquisition_date') }}</dt>
+                            <dd class="text-content tabular-nums">{{ $openingTransferSummary['acquisition_date'] }}</dd>
+                        </div>
+                        <div class="flex gap-2">
+                            <dt class="text-content-muted w-28 shrink-0">{{ __('fixed_assets.opening_transfer.confirm_labels.fiscal_year') }}</dt>
+                            <dd class="text-content tabular-nums">{{ $openingTransferSummary['fiscal_year'] }}</dd>
+                        </div>
+                        <div class="flex gap-2 sm:col-span-2">
+                            <dt class="text-content-muted w-28 shrink-0">{{ __('fixed_assets.opening_transfer.confirm_labels.opening_balance') }}</dt>
+                            <dd class="text-content tabular-nums font-semibold">{{ number_format($openingTransferSummary['opening_balance']) }} {{ __('fixed_assets.units.yen') }}</dd>
+                        </div>
+                    </dl>
+
+                    <p class="text-xs text-content-muted">{{ __('fixed_assets.opening_transfer.notes.formula') }}</p>
+                    <p class="text-xs text-content-muted">{{ __('fixed_assets.opening_transfer.notes.capital') }}</p>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <x-ui.button variant="secondary" type="button" wire:click="cancelOpeningTransferConfirm">
+                            {{ __('fixed_assets.opening_transfer.actions.cancel') }}
+                        </x-ui.button>
+                        <x-ui.button variant="confirm" type="button" wire:click="submitOpeningTransfer" class="min-w-[10rem]">
+                            {{ __('fixed_assets.opening_transfer.actions.submit') }}
+                        </x-ui.button>
+                    </div>
                 </div>
             @endif
 
@@ -44,6 +87,7 @@
                             </thead>
                             <tbody class="divide-y divide-line">
                                 @foreach ($this->fixedAssets as $asset)
+                                    @php $needsOpeningTransfer = $this->assetNeedsOpeningTransfer($asset); @endphp
                                     <tr>
                                         <td class="py-2 pr-3">
                                             <div class="font-medium text-content">{{ $asset->name }}</div>
@@ -54,11 +98,27 @@
                                         <td class="py-2 pr-3 text-right tabular-nums text-content">{{ number_format($asset->acquisition_cost) }} {{ __('fixed_assets.units.yen') }}</td>
                                         <td class="py-2 pr-3 text-right tabular-nums text-content">{{ $asset->useful_life }} {{ __('fixed_assets.units.months') }}</td>
                                         <td class="py-2 pr-3">
-                                            @if ($asset->is_disposed)
-                                                <span class="text-xs px-2 py-0.5 rounded-control bg-status-warning text-status-warning-fg border border-status-warning-border">{{ __('fixed_assets.list.status.disposed') }}</span>
-                                            @else
-                                                <span class="text-xs px-2 py-0.5 rounded-control bg-status-info text-status-info-fg border border-status-info-border">{{ __('fixed_assets.list.status.in_use') }}</span>
-                                            @endif
+                                            <div class="flex flex-col gap-1">
+                                                @if ($asset->is_disposed)
+                                                    <span class="text-xs px-2 py-0.5 rounded-control bg-status-warning text-status-warning-fg border border-status-warning-border">{{ __('fixed_assets.list.status.disposed') }}</span>
+                                                @else
+                                                    <span class="text-xs px-2 py-0.5 rounded-control bg-status-info text-status-info-fg border border-status-info-border">{{ __('fixed_assets.list.status.in_use') }}</span>
+                                                @endif
+
+                                                @if ($needsOpeningTransfer)
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-xs px-2 py-0.5 rounded-control bg-status-warning text-status-warning-fg border border-status-warning-border">
+                                                            {{ __('fixed_assets.opening_transfer.not_booked_label') }}
+                                                        </span>
+                                                        <button type="button"
+                                                            wire:click="startOpeningTransferConfirm({{ $asset->id }})"
+                                                            class="text-xs px-2 py-0.5 rounded-control bg-action-primary text-action-primary-fg border border-transparent hover:opacity-90"
+                                                            title="{{ __('fixed_assets.opening_transfer.prompt') }}">
+                                                            {{ __('fixed_assets.opening_transfer.actions.start') }}
+                                                        </button>
+                                                    </div>
+                                                @endif
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach

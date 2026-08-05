@@ -78,6 +78,30 @@ return [
     'messages' => [
         'registered' => '固定資産を登録しました。',
         'registration_failed' => '固定資産の登録に失敗しました',
+        'opening_transfer_registered' => '期首残高として計上しました。',
+        'opening_transfer_failed' => '期首残高の計上に失敗しました',
+    ],
+
+    'opening_transfer' => [
+        'not_booked_label' => '未計上',
+        'prompt' => '今年の資産としてまだ計上されていません。計上しますか？',
+        'confirm_heading' => '期首残高として計上します',
+        'confirm_labels' => [
+            'asset' => '資産',
+            'account' => '計上先',
+            'acquisition_date' => '取得日',
+            'fiscal_year' => '対象年度',
+            'opening_balance' => '期首簿価 (計上額)',
+        ],
+        'notes' => [
+            'formula' => 'この金額は資産情報から自動算出されています。値が違う場合は、まず取得価額・耐用月数を確認してください。',
+            'capital' => '相手勘定は元入金です。差引で再計算されます。',
+        ],
+        'actions' => [
+            'start' => '計上する',
+            'submit' => 'この内容で計上する',
+            'cancel' => 'キャンセル',
+        ],
     ],
 
     'auto_description' => ':name を取得',

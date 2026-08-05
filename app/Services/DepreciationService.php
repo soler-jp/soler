@@ -19,7 +19,8 @@ class DepreciationService
     use AuthorizesBusinessUnitAccess;
 
     public function __construct(
-        private readonly TransactionRegistrar $transactionRegistrar
+        private readonly TransactionRegistrar $transactionRegistrar,
+        private readonly TransactionRevisor $transactionRevisor,
     ) {}
 
     private const NEW_STANDARD_CAR_PRESET = [
@@ -502,6 +503,185 @@ class DepreciationService
         }
     }
 
+    /**
+     * 過年度取得の固定資産に対して、$fiscalYear の期首仕訳へ
+     * 借方: 資産勘定 (期首簿価) を追加する。貸方 (元入金) は total を再計算。
+     *
+     * 既存の active な期首仕訳 (Bank/Cash/OpeningBalance 由来) があれば行追加で revise し、
+     * 無ければ新規作成する。同一資産の二重登録は FixedAsset.initial_opening_transaction_id で拒否。
+     */
+    public function registerInitialOpeningTransfer(
+        FixedAsset $asset,
+        FiscalYear $fiscalYear,
+        ?User $actor,
+    ): Transaction {
+        $this->authorizeBusinessUnitAccess($asset, $actor, 'この固定資産の期首振替を作成する権限がありません。');
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度に期首振替を作成する権限がありません。');
+        assert($actor instanceof User);
+
+        if ($asset->business_unit_id !== $fiscalYear->business_unit_id) {
+            throw new \InvalidArgumentException('資産と会計年度の事業体が一致しません。');
+        }
+
+        $acquisitionDate = $asset->acquisition_date;
+
+        if ($acquisitionDate === null) {
+            throw new \InvalidArgumentException('取得日が未設定の固定資産には期首振替を作成できません。');
+        }
+
+        if (! $acquisitionDate->lt(Carbon::parse($fiscalYear->start_date))) {
+            throw new \InvalidArgumentException('過年度取得の固定資産にのみ期首振替を作成できます。');
+        }
+
+        $openingBalance = $this->calculateOpeningBalanceFor($asset, $fiscalYear);
+
+        if ($openingBalance <= 0) {
+            throw new \InvalidArgumentException('期首簿価が 0 以下のため期首振替は作成できません。');
+        }
+
+        $assetSubAccount = $this->resolveFixedAssetSubAccount($fiscalYear, $asset);
+
+        return DB::transaction(function () use ($asset, $fiscalYear, $openingBalance, $assetSubAccount, $actor) {
+            // Race safety: fixed_assets 行をロックしてから FK を再確認する。
+            $lockedAsset = FixedAsset::whereKey($asset->id)->lockForUpdate()->firstOrFail();
+
+            if ($lockedAsset->initial_opening_transaction_id !== null) {
+                throw new \InvalidArgumentException('この固定資産の期首振替は既に登録されています。');
+            }
+
+            $transaction = $this->syncOpeningEntryForFixedAsset(
+                $fiscalYear,
+                $assetSubAccount,
+                $openingBalance,
+                $lockedAsset->name,
+                $actor,
+            );
+
+            $lockedAsset->forceFill([
+                'initial_opening_transaction_id' => $transaction->id,
+            ])->save();
+
+            return $transaction;
+        });
+    }
+
+    /**
+     * 期首仕訳へ資産の debit 行を追加し、元入金を差引で再計算する。
+     * 既存の active な opening entry があれば TransactionRevisor で行追加、
+     * 無ければ TransactionRegistrar で新規作成する。
+     *
+     * 「元入金」以外の行 (資産・負債・その他) は全て保持し、
+     * 元入金だけは (総debit - 総credit) で再計算する:
+     *  - 正なら credit 側
+     *  - 負なら debit 側 (負債超過ケース)
+     *
+     * 貸方が「元入金」1本と決まっているケース以外 (rollover 後の資産+負債+元入金など) にも対応する。
+     * 元入金以外の credit (例: 借入金) の科目残高を勝手に増やさない。
+     *
+     * TODO: BankAccountRegistrationService::syncOpeningEntries および
+     *       CashOnHandRegistrationService::syncOpeningEntries と同型のコピペ実装。
+     *       将来 OpeningBalanceRegistrationService に additive な addDebitLine プリミティブを
+     *       追加できたら、Bank/Cash と一緒にそちらへ移行する。
+     */
+    private function syncOpeningEntryForFixedAsset(
+        FiscalYear $fiscalYear,
+        SubAccount $assetSubAccount,
+        int $amount,
+        string $assetName,
+        User $actor,
+    ): Transaction {
+        $capitalSubAccount = $this->resolveOwnerCapitalSubAccount($fiscalYear);
+
+        $existingOpeningEntry = $fiscalYear->transactions()
+            ->where('is_opening_entry', true)
+            ->where('is_active', true)
+            ->lockForUpdate()
+            ->first();
+
+        if ($existingOpeningEntry === null) {
+            return $this->transactionRegistrar->register(
+                $fiscalYear,
+                [
+                    'date' => $fiscalYear->start_date->toDateString(),
+                    'description' => '期首残高設定',
+                    'is_opening_entry' => true,
+                ],
+                [
+                    [
+                        'sub_account_id' => $assetSubAccount->id,
+                        'type' => JournalEntry::TYPE_DEBIT,
+                        'net_amount' => $amount,
+                    ],
+                    [
+                        'sub_account_id' => $capitalSubAccount->id,
+                        'type' => JournalEntry::TYPE_CREDIT,
+                        'net_amount' => $amount,
+                    ],
+                ],
+                $actor,
+            );
+        }
+
+        $existingOpeningEntry->loadMissing('journalEntries');
+
+        // 元入金の行 (debit/credit いずれも) は捨てて後で差引計算し直す。
+        // それ以外の行 (資産・負債など) は完全に保持する。
+        $rows = $existingOpeningEntry->journalEntries
+            ->reject(fn (JournalEntry $entry): bool => $entry->sub_account_id === $capitalSubAccount->id)
+            ->map(fn (JournalEntry $entry): array => [
+                'sub_account_id' => $entry->sub_account_id,
+                'type' => $entry->type,
+                'net_amount' => (int) $entry->net_amount,
+            ])
+            ->values();
+
+        // 資産の debit 行を追加。
+        $rows->push([
+            'sub_account_id' => $assetSubAccount->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => $amount,
+        ]);
+
+        // 元入金を除外した rows で差引計算する。
+        $totalDebit = (int) $rows->where('type', JournalEntry::TYPE_DEBIT)->sum('net_amount');
+        $totalCredit = (int) $rows->where('type', JournalEntry::TYPE_CREDIT)->sum('net_amount');
+        $capital = $totalDebit - $totalCredit;
+
+        if ($capital > 0) {
+            $rows->push([
+                'sub_account_id' => $capitalSubAccount->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => $capital,
+            ]);
+        } elseif ($capital < 0) {
+            $rows->push([
+                'sub_account_id' => $capitalSubAccount->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => -$capital,
+            ]);
+        }
+
+        return $this->transactionRevisor->revise(
+            $existingOpeningEntry,
+            $actor,
+            [
+                'transaction' => [
+                    'revision_reason' => sprintf('固定資産「%s」の期首残高を追加', $assetName),
+                ],
+                'journal_entries' => $rows->all(),
+            ],
+        );
+    }
+
+    #[SkipActorGuard('read-only な期首簿価計算。呼び出し側で FixedAsset を actor でガードする前提。')]
+    public function calculateOpeningBalanceFor(FixedAsset $asset, FiscalYear $fiscalYear): int
+    {
+        $schedule = $this->calculateDepreciationScheduleUntilFullyDepreciated($asset);
+        $previousYear = $fiscalYear->year - 1;
+
+        return (int) ($schedule[$previousYear]['ending_balance'] ?? 0);
+    }
+
     public function registerTransactionFor(DepreciationEntry $entry, User $actor): void
     {
         $this->authorizeBusinessUnitAccess($entry, $actor, 'この減価償却明細を記帳する権限がありません。');
@@ -566,6 +746,17 @@ class DepreciationService
 
         if ($subAccount === null) {
             throw new \RuntimeException('減価償却費の補助科目が見つかりません。');
+        }
+
+        return $subAccount;
+    }
+
+    private function resolveOwnerCapitalSubAccount(FiscalYear $fiscalYear): SubAccount
+    {
+        $subAccount = $fiscalYear->businessUnit->getSubAccountByName('元入金', '元入金');
+
+        if ($subAccount === null) {
+            throw new \RuntimeException('元入金の補助科目が見つかりません。');
         }
 
         return $subAccount;

@@ -72,6 +72,8 @@ class FixedAssetsIndex extends Component
 
     public string $adv_transaction_description = '';
 
+    public ?int $opening_transfer_asset_id = null;
+
     public function mount(): void
     {
         $fiscalYear = $this->fiscalYear();
@@ -353,6 +355,92 @@ class FixedAssetsIndex extends Component
     public function render()
     {
         return view('livewire.pages.fixed-assets-index');
+    }
+
+    public function startOpeningTransferConfirm(int $assetId): void
+    {
+        $unit = auth()->user()->selectedBusinessUnitOrFail();
+        $asset = $unit->fixedAssets()->whereKey($assetId)->first();
+
+        if ($asset === null || ! $asset->needsInitialOpeningTransfer($this->fiscalYear())) {
+            return;
+        }
+
+        $this->opening_transfer_asset_id = $assetId;
+    }
+
+    public function cancelOpeningTransferConfirm(): void
+    {
+        $this->opening_transfer_asset_id = null;
+    }
+
+    public function submitOpeningTransfer(): void
+    {
+        if ($this->opening_transfer_asset_id === null) {
+            return;
+        }
+
+        $unit = auth()->user()->selectedBusinessUnitOrFail();
+        $asset = $unit->fixedAssets()->whereKey($this->opening_transfer_asset_id)->first();
+        $fiscalYear = $this->fiscalYear();
+
+        if ($asset === null) {
+            $this->opening_transfer_asset_id = null;
+
+            return;
+        }
+
+        try {
+            app(DepreciationService::class)->registerInitialOpeningTransfer(
+                $asset,
+                $fiscalYear,
+                auth()->user(),
+            );
+        } catch (\Throwable $e) {
+            session()->flash('fixed_asset_panel_error', __('fixed_assets.messages.opening_transfer_failed').': '.$e->getMessage());
+            $this->opening_transfer_asset_id = null;
+
+            return;
+        }
+
+        session()->flash('fixed_asset_panel_message', __('fixed_assets.messages.opening_transfer_registered'));
+        $this->opening_transfer_asset_id = null;
+        unset($this->fixedAssets);
+        $this->dispatch('dashboard-transaction-created');
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function openingTransferConfirmSummary(): ?array
+    {
+        if ($this->opening_transfer_asset_id === null) {
+            return null;
+        }
+
+        $unit = auth()->user()->selectedBusinessUnitOrFail();
+        $asset = $unit->fixedAssets()->with('account')->whereKey($this->opening_transfer_asset_id)->first();
+
+        if ($asset === null) {
+            return null;
+        }
+
+        $fiscalYear = $this->fiscalYear();
+        $openingBalance = app(DepreciationService::class)->calculateOpeningBalanceFor($asset, $fiscalYear);
+
+        return [
+            'asset_id' => $asset->id,
+            'asset_name' => $asset->name,
+            'account_name' => $asset->account?->name,
+            'acquisition_date' => $asset->acquisition_date?->toDateString(),
+            'fiscal_year' => $fiscalYear->year,
+            'opening_balance' => $openingBalance,
+        ];
+    }
+
+    public function assetNeedsOpeningTransfer(FixedAsset $asset): bool
+    {
+        return $asset->needsInitialOpeningTransfer($this->fiscalYear());
     }
 
     /**

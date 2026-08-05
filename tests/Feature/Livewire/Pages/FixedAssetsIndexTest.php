@@ -6,6 +6,7 @@ use App\Livewire\Pages\FixedAssetsIndex;
 use App\Models\DepreciationEntry;
 use App\Models\FixedAsset;
 use App\Models\User;
+use App\Services\DepreciationService;
 use App\Setup\Initializers\GeneralBusinessInitializer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -541,5 +542,167 @@ class FixedAssetsIndexTest extends TestCase
         $this->assertDatabaseMissing('fixed_assets', [
             'name' => '初度登録が取得後の壊れた入力',
         ]);
+    }
+
+    #[Test]
+    public function 過年度取得の資産に未計上バッジと計上ボタンが出る(): void
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, year: 2025);
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $paymentSub = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+
+        $service = app(DepreciationService::class);
+        $pastAsset = $service->registerNewLightCar(
+            $fiscalYear,
+            $paymentSub,
+            [
+                'name' => '過年取得の軽自動車',
+                'acquisition_date' => '2023-05-10',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 120_000,
+            ],
+            ['date' => '2023-05-10', 'description' => '過年取得の軽自動車 を取得'],
+            true,
+        );
+
+        Livewire::actingAs($user)
+            ->test(FixedAssetsIndex::class)
+            ->assertSee(__('fixed_assets.opening_transfer.not_booked_label'))
+            ->assertSee(__('fixed_assets.opening_transfer.actions.start'))
+            ->assertSeeHtml('wire:click="startOpeningTransferConfirm('.$pastAsset->id.')"');
+    }
+
+    #[Test]
+    public function 当年度取得の資産には未計上バッジも計上ボタンも出ない(): void
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, year: 2025);
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $paymentSub = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+
+        app(DepreciationService::class)->registerNewLightCar(
+            $fiscalYear,
+            $paymentSub,
+            [
+                'name' => '当年取得の軽自動車',
+                'acquisition_date' => $fiscalYear->start_date->toDateString(),
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 120_000,
+            ],
+            ['date' => $fiscalYear->start_date->toDateString(), 'description' => '当年取得の軽自動車 を取得'],
+        );
+
+        Livewire::actingAs($user)
+            ->test(FixedAssetsIndex::class)
+            ->assertDontSee(__('fixed_assets.opening_transfer.not_booked_label'))
+            ->assertDontSee(__('fixed_assets.opening_transfer.actions.start'));
+    }
+
+    #[Test]
+    public function 期首振替の計上ボタンを押すと確認カードに金額が表示される(): void
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, year: 2025);
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $paymentSub = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+
+        $pastAsset = app(DepreciationService::class)->registerNewLightCar(
+            $fiscalYear,
+            $paymentSub,
+            [
+                'name' => '過年取得の軽自動車',
+                'acquisition_date' => '2023-05-10',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 120_000,
+            ],
+            ['date' => '2023-05-10', 'description' => '過年取得の軽自動車 を取得'],
+            true,
+        );
+
+        // 軽自動車 (48ヶ月) 2023-05 取得 → 償却率 0.250, 年額 330_000
+        // 2023: 8ヶ月, 220_000, ending = 1_100_000
+        // 2024: 12ヶ月, 330_000, ending = 770_000
+        // 2025 期首簿価 = 770_000
+        $expectedOpeningBalance = 770_000;
+
+        Livewire::actingAs($user)
+            ->test(FixedAssetsIndex::class)
+            ->call('startOpeningTransferConfirm', $pastAsset->id)
+            ->assertSet('opening_transfer_asset_id', $pastAsset->id)
+            ->assertSee(__('fixed_assets.opening_transfer.confirm_heading'))
+            ->assertSee(number_format($expectedOpeningBalance));
+    }
+
+    #[Test]
+    public function 期首振替を確認から送信すると期首仕訳が作成され_f_kが立つ(): void
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, year: 2025);
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $paymentSub = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+
+        $pastAsset = app(DepreciationService::class)->registerNewLightCar(
+            $fiscalYear,
+            $paymentSub,
+            [
+                'name' => '過年取得の軽自動車',
+                'acquisition_date' => '2023-05-10',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 120_000,
+            ],
+            ['date' => '2023-05-10', 'description' => '過年取得の軽自動車 を取得'],
+            true,
+        );
+
+        Livewire::actingAs($user)
+            ->test(FixedAssetsIndex::class)
+            ->call('startOpeningTransferConfirm', $pastAsset->id)
+            ->call('submitOpeningTransfer')
+            ->assertSet('opening_transfer_asset_id', null)
+            ->assertSee(__('fixed_assets.messages.opening_transfer_registered'));
+
+        $this->assertNotNull($pastAsset->fresh()->initial_opening_transaction_id);
+
+        // opening entry が 1 本作成されている
+        $this->assertSame(
+            1,
+            $fiscalYear->transactions()->where('is_opening_entry', true)->where('is_active', true)->count(),
+        );
+    }
+
+    #[Test]
+    public function 計上済みの資産にはボタンが出ない(): void
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user, year: 2025);
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $paymentSub = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+
+        $service = app(DepreciationService::class);
+        $pastAsset = $service->registerNewLightCar(
+            $fiscalYear,
+            $paymentSub,
+            [
+                'name' => '過年取得の軽自動車',
+                'acquisition_date' => '2023-05-10',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 120_000,
+            ],
+            ['date' => '2023-05-10', 'description' => '過年取得の軽自動車 を取得'],
+            true,
+        );
+
+        $service->registerInitialOpeningTransfer($pastAsset, $fiscalYear, $user);
+
+        Livewire::actingAs($user)
+            ->test(FixedAssetsIndex::class)
+            ->assertDontSee(__('fixed_assets.opening_transfer.not_booked_label'))
+            ->assertDontSee(__('fixed_assets.opening_transfer.actions.start'));
     }
 }

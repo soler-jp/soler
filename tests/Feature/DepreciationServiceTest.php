@@ -8,6 +8,7 @@ use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\DepreciationService;
+use App\Services\TransactionRegistrar;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -1387,6 +1388,986 @@ class DepreciationServiceTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         $service->registerTransactionFor($entry->fresh(), $user);
+    }
+
+    #[Test]
+    public function register_initial_opening_transferは_過年度取得の資産に期首振替仕訳を作成する_2022取得2023登録()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+
+        // schedule: 2022 は 2ヶ月, ordinary = 6313499 * 0.167 * 2/12 = 175726 (round half up)
+        // 2022 ending_balance = 6313499 - 175726 = 6137773
+        $expectedOpeningBalance = 6_137_773;
+
+        $transaction = app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            $user,
+        );
+
+        $this->assertNotNull($transaction);
+        $this->assertSame($fiscalYear2023->id, $transaction->fiscal_year_id);
+        $this->assertTrue($transaction->is_opening_entry);
+        $this->assertFalse((bool) $transaction->is_adjusting_entry);
+        $this->assertSame('2023-01-01', $transaction->date->toDateString());
+        $this->assertSame('期首残高設定', $transaction->description);
+
+        $this->assertCount(2, $transaction->journalEntries);
+
+        $debit = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+        $credit = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+        $this->assertSame($expectedOpeningBalance, (int) $debit->net_amount);
+        $this->assertSame($expectedOpeningBalance, (int) $credit->net_amount);
+        $this->assertSame('車両運搬具', $debit->subAccount->account->name);
+        $this->assertSame('元入金', $credit->subAccount->account->name);
+
+        $this->assertSame($transaction->id, $fixedAsset->fresh()->initial_opening_transaction_id);
+    }
+
+    #[Test]
+    public function register_initial_opening_transferは途中の_fiscal_yearが存在しなくても正しい期首簿価で作成する_2020取得2023登録()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerNewLightCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => '2020取得N-BOX',
+                'acquisition_date' => '2020-04-15',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 120_000,
+            ],
+            ['date' => '2020-04-15', 'description' => '2020取得N-BOX取得'],
+            true,
+        );
+
+        // 軽自動車: 耐用年数 48ヶ月, 償却率 = ceil(12/48*1000)/1000 = 0.250
+        // 年額 = 1_320_000 * 0.250 = 330_000
+        // 2020: 9ヶ月 (4月〜12月) → 330_000 * 9/12 = 247_500, ending = 1_072_500
+        // 2021: 12ヶ月 → 330_000, ending = 742_500
+        // 2022: 12ヶ月 → 330_000, ending = 412_500
+        $expectedOpeningBalance = 412_500;
+
+        $transaction = app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            $user,
+        );
+
+        $debit = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+        $credit = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+        $this->assertSame($expectedOpeningBalance, (int) $debit->net_amount);
+        $this->assertSame($expectedOpeningBalance, (int) $credit->net_amount);
+        $this->assertSame('車両運搬具', $debit->subAccount->account->name);
+        $this->assertSame('元入金', $credit->subAccount->account->name);
+
+        // 途中年度 (2020,2021,2022) の FiscalYear が DB に無いことも改めて確認
+        $this->assertFalse($unit->fiscalYears()->where('year', 2020)->exists());
+        $this->assertFalse($unit->fiscalYears()->where('year', 2021)->exists());
+        $this->assertFalse($unit->fiscalYears()->where('year', 2022)->exists());
+    }
+
+    #[Test]
+    public function register_initial_opening_transferは取得日が当年度内なら例外()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => '当年取得車',
+                'acquisition_date' => '2023-05-01',
+                'taxable_amount' => 3_000_000,
+                'tax_amount' => 300_000,
+            ],
+            ['date' => '2023-05-01', 'description' => '当年取得車購入'],
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('過年度取得の固定資産にのみ期首振替を作成できます。');
+
+        app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            $user,
+        );
+    }
+
+    #[Test]
+    public function register_initial_opening_transferは二重登録を例外で拒否する()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+
+        $service = app(DepreciationService::class);
+        $service->registerInitialOpeningTransfer($fixedAsset, $fiscalYear2023, $user);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('この固定資産の期首振替は既に登録されています。');
+
+        $service->registerInitialOpeningTransfer($fixedAsset->fresh(), $fiscalYear2023, $user);
+    }
+
+    #[Test]
+    public function register_initial_opening_transferは他ユーザーからの呼び出しを拒否する()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+
+        $otherUser = User::factory()->create();
+
+        $this->expectException(AuthorizationException::class);
+
+        app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            $otherUser,
+        );
+    }
+
+    #[Test]
+    public function register_initial_opening_transferはactorがnullなら_authorization_exception()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+
+        $this->expectException(AuthorizationException::class);
+
+        app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            null,
+        );
+    }
+
+    #[Test]
+    public function register_initial_opening_transferは期首簿価0の完全償却済み資産で例外()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        // 軽自動車 (48ヶ月) を 2018-01-01 に取得 → 2021 末で償却終了。
+        // 2022 は schedule に存在せず、期首簿価は 0 になる。
+        $fixedAsset = app(DepreciationService::class)->registerNewLightCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => '古い軽',
+                'acquisition_date' => '2018-01-01',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 0,
+            ],
+            ['date' => '2018-01-01', 'description' => '古い軽取得'],
+            true,
+        );
+
+        $this->assertSame(
+            0,
+            app(DepreciationService::class)->calculateOpeningBalanceFor($fixedAsset, $fiscalYear2023),
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('期首簿価が 0 以下のため期首振替は作成できません。');
+
+        app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            $user,
+        );
+    }
+
+    #[Test]
+    public function active_initial_opening_transactionはrevision_chainを辿って現行の_activeを返す()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $service = app(DepreciationService::class);
+
+        // 1件目登録 → 新規 opening entry (T1)
+        $assetA = $service->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+
+        $t1 = $service->registerInitialOpeningTransfer($assetA, $fiscalYear2023, $user);
+
+        // 2件目登録 → 既存 opening entry を revise (T2)
+        $assetB = $service->registerNewLightCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'N-BOX',
+                'acquisition_date' => '2022-01-01',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 120_000,
+            ],
+            ['date' => '2022-01-01', 'description' => 'N-BOX取得'],
+            true,
+        );
+
+        $t2 = $service->registerInitialOpeningTransfer($assetB, $fiscalYear2023, $user);
+
+        $this->assertNotSame($t1->id, $t2->id);
+
+        // T1 は deactivated、revision は T2
+        $this->assertFalse($t1->fresh()->is_active);
+        $this->assertTrue($t2->fresh()->is_active);
+
+        // 1件目資産の FK は T1 を指したまま
+        $assetA->refresh();
+        $this->assertSame($t1->id, $assetA->initial_opening_transaction_id);
+
+        // active accessor は revision chain を辿って T2 を返す
+        $active = $assetA->activeInitialOpeningTransaction();
+        $this->assertNotNull($active);
+        $this->assertSame($t2->id, $active->id);
+        $this->assertTrue($active->is_active);
+
+        // 2件目資産は FK 自体が T2
+        $assetB->refresh();
+        $this->assertSame($t2->id, $assetB->initial_opening_transaction_id);
+    }
+
+    #[Test]
+    public function 期首振替_transactionを削除すると_fixed_assetの_fkが_nullにされる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+
+        $transaction = app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            $user,
+        );
+
+        $this->assertSame($transaction->id, $fixedAsset->fresh()->initial_opening_transaction_id);
+
+        $transaction->delete();
+
+        $this->assertNull($fixedAsset->fresh()->initial_opening_transaction_id);
+
+        // FK がクリアされたので、再度期首振替を作成できる
+        $newTransaction = app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset->fresh(),
+            $fiscalYear2023,
+            $user,
+        );
+        $this->assertNotSame($transaction->id, $newTransaction->id);
+    }
+
+    #[Test]
+    public function register_initial_opening_transferは既存opening_entryが無ければ新規作成()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $this->assertSame(
+            0,
+            $fiscalYear2023->transactions()->where('is_opening_entry', true)->count(),
+        );
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+
+        $transaction = app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            $user,
+        );
+
+        $this->assertSame(
+            1,
+            $fiscalYear2023->transactions()->where('is_opening_entry', true)->where('is_active', true)->count(),
+        );
+        $this->assertSame('期首残高設定', $transaction->description);
+    }
+
+    #[Test]
+    public function register_initial_opening_transferは既存opening_entryに車両運搬具行が無ければ_行追加でrevise()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        // 既存の opening entry を「現金 1_000_000 / 元入金 1_000_000」で用意
+        $fiscalYear2023->registerOpeningEntry(
+            [
+                ['account_name' => '現金', 'sub_account_name' => '現金', 'amount' => 1_000_000],
+            ],
+            $user,
+        );
+
+        $originalOpeningEntry = $fiscalYear2023->transactions()
+            ->where('is_opening_entry', true)
+            ->where('is_active', true)
+            ->firstOrFail();
+        $originalId = $originalOpeningEntry->id;
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+
+        $expectedOpeningBalance = 6_137_773;
+
+        $revised = app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            $user,
+        );
+
+        // 元の opening entry は deactivated
+        $this->assertNotSame($originalId, $revised->id);
+        $this->assertFalse(Transaction::find($originalId)->is_active);
+        $this->assertTrue($revised->is_active);
+
+        // active opening entry は 1 本のまま
+        $this->assertSame(
+            1,
+            $fiscalYear2023->transactions()->where('is_opening_entry', true)->where('is_active', true)->count(),
+        );
+
+        // 借方 2 行 (現金 保持 + 車両運搬具 新規), 貸方 1 行 (元入金 合計)
+        $revised->load('journalEntries.subAccount.account');
+        $debits = $revised->journalEntries->where('type', JournalEntry::TYPE_DEBIT)->values();
+        $credits = $revised->journalEntries->where('type', JournalEntry::TYPE_CREDIT)->values();
+
+        $this->assertCount(2, $debits);
+        $this->assertCount(1, $credits);
+
+        $accountNames = $debits->map(fn ($e) => $e->subAccount->account->name)->all();
+        $this->assertContains('現金', $accountNames);
+        $this->assertContains('車両運搬具', $accountNames);
+
+        $cashAmount = $debits->firstWhere(fn ($e) => $e->subAccount->account->name === '現金')->net_amount;
+        $vehicleAmount = $debits->firstWhere(fn ($e) => $e->subAccount->account->name === '車両運搬具')->net_amount;
+        $this->assertSame(1_000_000, (int) $cashAmount);
+        $this->assertSame($expectedOpeningBalance, (int) $vehicleAmount);
+
+        $creditAmount = (int) $credits->first()->net_amount;
+        $this->assertSame(1_000_000 + $expectedOpeningBalance, $creditAmount);
+        $this->assertSame('元入金', $credits->first()->subAccount->account->name);
+    }
+
+    #[Test]
+    public function register_initial_opening_transferは既存opening_entryに同じ車両運搬具行があっても_additiveで別行を追加()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        // 既存の opening entry に「車両運搬具 3_000_000」の debit がある状態を作る
+        $fiscalYear2023->registerOpeningEntry(
+            [
+                ['account_name' => '車両運搬具', 'sub_account_name' => '車両運搬具', 'amount' => 3_000_000],
+            ],
+            $user,
+        );
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+
+        $expectedOpeningBalance = 6_137_773;
+
+        $revised = app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            $user,
+        );
+
+        $revised->load('journalEntries.subAccount.account');
+        $vehicleDebits = $revised->journalEntries
+            ->where('type', JournalEntry::TYPE_DEBIT)
+            ->filter(fn ($e) => $e->subAccount->account->name === '車両運搬具')
+            ->values();
+
+        // 車両運搬具 の debit 行は 2 行 (既存 3_000_000 + 新規 期首簿価)
+        $this->assertCount(2, $vehicleDebits);
+        $amounts = $vehicleDebits->map(fn ($e) => (int) $e->net_amount)->sort()->values()->all();
+        $this->assertSame([3_000_000, $expectedOpeningBalance], $amounts);
+
+        // 貸方は total
+        $credit = $revised->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+        $this->assertSame(3_000_000 + $expectedOpeningBalance, (int) $credit->net_amount);
+    }
+
+    #[Test]
+    public function 複数固定資産を登録すると1つのopening_entryに複数debit行が並ぶ_同じ車両運搬具()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $service = app(DepreciationService::class);
+
+        $assetA = $service->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+        $service->registerInitialOpeningTransfer($assetA, $fiscalYear2023, $user);
+
+        $assetB = $service->registerNewLightCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'N-BOX',
+                'acquisition_date' => '2022-01-01',
+                'taxable_amount' => 1_200_000,
+                'tax_amount' => 120_000,
+            ],
+            ['date' => '2022-01-01', 'description' => 'N-BOX取得'],
+            true,
+        );
+        $service->registerInitialOpeningTransfer($assetB, $fiscalYear2023, $user);
+
+        // active な opening entry は 1 本
+        $this->assertSame(
+            1,
+            $fiscalYear2023->transactions()->where('is_opening_entry', true)->where('is_active', true)->count(),
+        );
+
+        $activeOpening = $fiscalYear2023->transactions()
+            ->with('journalEntries.subAccount.account')
+            ->where('is_opening_entry', true)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $vehicleDebits = $activeOpening->journalEntries
+            ->where('type', JournalEntry::TYPE_DEBIT)
+            ->filter(fn ($e) => $e->subAccount->account->name === '車両運搬具')
+            ->values();
+
+        $this->assertCount(2, $vehicleDebits);
+
+        // Tesla 期首簿価 = 6_137_773, N-BOX (48ヶ月, 2022年 12ヶ月償却) = 990_000
+        // N-BOX: rate = 0.250, annual = 330_000, 2022 ending = 990_000
+        $expectedNBoxOpening = 990_000;
+        $amounts = $vehicleDebits->map(fn ($e) => (int) $e->net_amount)->sort()->values()->all();
+        $this->assertSame([$expectedNBoxOpening, 6_137_773], $amounts);
+    }
+
+    #[Test]
+    public function 異なるsub_accountの固定資産を登録するとsub_accountごとにdebit行が並ぶ()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $vehicleSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', '車両運搬具'))
+            ->firstOrFail();
+        $machinerySubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', '機械装置'))
+            ->firstOrFail();
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $service = app(DepreciationService::class);
+
+        $car = $service->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+        $service->registerInitialOpeningTransfer($car, $fiscalYear2023, $user);
+
+        $machine = $service->registerFixedAsset(
+            $fiscalYear2023,
+            $machinerySubAccount,
+            $paymentSubAccount,
+            [
+                'name' => '旋盤',
+                'asset_category' => 'machinery',
+                'acquisition_date' => '2022-01-01',
+                'taxable_amount' => 500_000,
+                'tax_amount' => 0,
+                'useful_life' => 120,
+                'depreciation_method' => 'straight_line',
+            ],
+            ['date' => '2022-01-01', 'description' => '旋盤取得'],
+            true,
+        );
+        $service->registerInitialOpeningTransfer($machine, $fiscalYear2023, $user);
+
+        $activeOpening = $fiscalYear2023->transactions()
+            ->with('journalEntries.subAccount.account')
+            ->where('is_opening_entry', true)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $debits = $activeOpening->journalEntries->where('type', JournalEntry::TYPE_DEBIT)->values();
+        $accountNames = $debits->map(fn ($e) => $e->subAccount->account->name)->sort()->values()->all();
+
+        $this->assertContains('車両運搬具', $accountNames);
+        $this->assertContains('機械装置', $accountNames);
+    }
+
+    #[Test]
+    public function 既存opening_entryの貸方が非元入金のみでも_資産分は元入金の新規行として追加される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        // 現金 500_000 debit + 借入金 500_000 credit (元入金は含まない) の期首仕訳を手動で作成
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $loanSubAccount = $unit->accounts()->where('name', '借入金')->firstOrFail()
+            ->subAccounts()->firstOrCreate(['name' => '借入金']);
+
+        app(TransactionRegistrar::class)->register(
+            $fiscalYear2023,
+            [
+                'date' => $fiscalYear2023->start_date->toDateString(),
+                'description' => '期首残高設定',
+                'is_opening_entry' => true,
+            ],
+            [
+                ['sub_account_id' => $cashSubAccount->id, 'type' => JournalEntry::TYPE_DEBIT, 'net_amount' => 500_000],
+                ['sub_account_id' => $loanSubAccount->id, 'type' => JournalEntry::TYPE_CREDIT, 'net_amount' => 500_000],
+            ],
+            $user,
+        );
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+
+        $expectedOpeningBalance = 6_137_773;
+
+        $revised = app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            $user,
+        );
+
+        $revised->load('journalEntries.subAccount.account');
+        $credits = $revised->journalEntries->where('type', JournalEntry::TYPE_CREDIT)->values();
+
+        // 借入金 credit は据え置き、元入金 credit が新規に追加される
+        $this->assertCount(2, $credits);
+
+        $loanCredit = $credits->firstWhere(fn ($e) => $e->subAccount->account->name === '借入金');
+        $capitalCredit = $credits->firstWhere(fn ($e) => $e->subAccount->account->name === '元入金');
+
+        $this->assertNotNull($loanCredit, '借入金 credit は保持される');
+        $this->assertNotNull($capitalCredit, '元入金 credit が資産分として新規追加される');
+        $this->assertSame(500_000, (int) $loanCredit->net_amount, '借入金 は勝手に増額されない');
+        $this->assertSame($expectedOpeningBalance, (int) $capitalCredit->net_amount);
+
+        // 借方の合計と貸方の合計が一致
+        $totalDebit = (int) $revised->journalEntries->where('type', JournalEntry::TYPE_DEBIT)->sum('net_amount');
+        $totalCredit = (int) $revised->journalEntries->where('type', JournalEntry::TYPE_CREDIT)->sum('net_amount');
+        $this->assertSame($totalDebit, $totalCredit);
+    }
+
+    #[Test]
+    public function ロールオーバー型_資産と負債と元入金_の期首仕訳にも固定資産を追加できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        // rollover 相当の期首仕訳を手動で作成:
+        //   借方: 現金 1_000_000
+        //   貸方: 借入金 300_000, 元入金 700_000
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $capitalSubAccount = $unit->getSubAccountByName('元入金', '元入金');
+        $loanSubAccount = $unit->accounts()->where('name', '借入金')->firstOrFail()
+            ->subAccounts()->firstOrCreate(['name' => '借入金']);
+
+        app(TransactionRegistrar::class)->register(
+            $fiscalYear2023,
+            [
+                'date' => $fiscalYear2023->start_date->toDateString(),
+                'description' => '期首残高設定',
+                'is_opening_entry' => true,
+            ],
+            [
+                ['sub_account_id' => $cashSubAccount->id, 'type' => JournalEntry::TYPE_DEBIT, 'net_amount' => 1_000_000],
+                ['sub_account_id' => $loanSubAccount->id, 'type' => JournalEntry::TYPE_CREDIT, 'net_amount' => 300_000],
+                ['sub_account_id' => $capitalSubAccount->id, 'type' => JournalEntry::TYPE_CREDIT, 'net_amount' => 700_000],
+            ],
+            $user,
+        );
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+
+        $expectedOpeningBalance = 6_137_773;
+
+        $revised = app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            $user,
+        );
+
+        $revised->load('journalEntries.subAccount.account');
+
+        $debits = $revised->journalEntries->where('type', JournalEntry::TYPE_DEBIT)->values();
+        $credits = $revised->journalEntries->where('type', JournalEntry::TYPE_CREDIT)->values();
+
+        // 現金 debit と 車両運搬具 debit の 2 行
+        $this->assertCount(2, $debits);
+        $cashDebit = $debits->firstWhere(fn ($e) => $e->subAccount->account->name === '現金');
+        $vehicleDebit = $debits->firstWhere(fn ($e) => $e->subAccount->account->name === '車両運搬具');
+        $this->assertSame(1_000_000, (int) $cashDebit->net_amount);
+        $this->assertSame($expectedOpeningBalance, (int) $vehicleDebit->net_amount);
+
+        // 借入金 は据え置き、元入金 は差引で再計算される
+        $this->assertCount(2, $credits);
+        $loanCredit = $credits->firstWhere(fn ($e) => $e->subAccount->account->name === '借入金');
+        $capitalCredit = $credits->firstWhere(fn ($e) => $e->subAccount->account->name === '元入金');
+        $this->assertSame(300_000, (int) $loanCredit->net_amount, '借入金 は勝手に増額されない');
+
+        // 元入金 = (1_000_000 + 6_137_773) - 300_000 = 6_837_773
+        $this->assertSame(1_000_000 + $expectedOpeningBalance - 300_000, (int) $capitalCredit->net_amount);
+        // 元の 700_000 から資産分だけ増加していることを差分でも確認
+        $this->assertSame($expectedOpeningBalance, (int) $capitalCredit->net_amount - 700_000 - (-300_000 + 300_000));
+
+        // 借方 = 貸方
+        $totalDebit = (int) $revised->journalEntries->where('type', JournalEntry::TYPE_DEBIT)->sum('net_amount');
+        $totalCredit = (int) $revised->journalEntries->where('type', JournalEntry::TYPE_CREDIT)->sum('net_amount');
+        $this->assertSame($totalDebit, $totalCredit);
+    }
+
+    #[Test]
+    public function 負債超過ケースでは元入金がdebit側に来る()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        // 現金 100_000 debit + 元入金 9_900_000 debit + 借入金 10_000_000 credit
+        // (負債超過 = 元入金 debit)
+        $cashSubAccount = $unit->getSubAccountByName('現金', '現金');
+        $capitalSubAccount = $unit->getSubAccountByName('元入金', '元入金');
+        $loanSubAccount = $unit->accounts()->where('name', '借入金')->firstOrFail()
+            ->subAccounts()->firstOrCreate(['name' => '借入金']);
+
+        app(TransactionRegistrar::class)->register(
+            $fiscalYear2023,
+            [
+                'date' => $fiscalYear2023->start_date->toDateString(),
+                'description' => '期首残高設定',
+                'is_opening_entry' => true,
+            ],
+            [
+                ['sub_account_id' => $cashSubAccount->id, 'type' => JournalEntry::TYPE_DEBIT, 'net_amount' => 100_000],
+                ['sub_account_id' => $capitalSubAccount->id, 'type' => JournalEntry::TYPE_DEBIT, 'net_amount' => 9_900_000],
+                ['sub_account_id' => $loanSubAccount->id, 'type' => JournalEntry::TYPE_CREDIT, 'net_amount' => 10_000_000],
+            ],
+            $user,
+        );
+
+        $fixedAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => 'Tesla',
+                'acquisition_date' => '2022-11-20',
+                'taxable_amount' => 5_682_150,
+                'tax_amount' => 631_349,
+            ],
+            ['date' => '2022-11-20', 'description' => 'Tesla取得'],
+            true,
+        );
+
+        $expectedOpeningBalance = 6_137_773;
+
+        $revised = app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $fixedAsset,
+            $fiscalYear2023,
+            $user,
+        );
+
+        $revised->load('journalEntries.subAccount.account');
+
+        // 元入金は debit 側に残るはず
+        // 元入金以外の debit = 100_000 + 6_137_773 = 6_237_773
+        // credit = 10_000_000 (借入金)
+        // capital = 6_237_773 - 10_000_000 = -3_762_227 → 元入金 debit 3_762_227
+        $capitalRows = $revised->journalEntries
+            ->filter(fn ($e) => $e->subAccount->account->name === '元入金')
+            ->values();
+
+        $this->assertCount(1, $capitalRows);
+        $capital = $capitalRows->first();
+        $this->assertSame(JournalEntry::TYPE_DEBIT, $capital->type);
+        $this->assertSame(10_000_000 - $expectedOpeningBalance - 100_000, (int) $capital->net_amount);
+
+        // 借入金 は据え置き
+        $loanCredit = $revised->journalEntries
+            ->firstWhere(fn ($e) => $e->subAccount->account->name === '借入金');
+        $this->assertSame(10_000_000, (int) $loanCredit->net_amount);
+
+        // 借方 = 貸方
+        $totalDebit = (int) $revised->journalEntries->where('type', JournalEntry::TYPE_DEBIT)->sum('net_amount');
+        $totalCredit = (int) $revised->journalEntries->where('type', JournalEntry::TYPE_CREDIT)->sum('net_amount');
+        $this->assertSame($totalDebit, $totalCredit);
+    }
+
+    #[Test]
+    public function needs_initial_opening_transferは過年度取得かつ未登録のときのみtrue()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+        $fiscalYear2023 = $unit->createFiscalYear(2023, $user);
+
+        $paymentSubAccount = $unit->subAccounts()
+            ->whereHas('account', fn ($query) => $query->where('name', 'その他の預金'))
+            ->firstOrFail();
+
+        $currentYearAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => '当年取得車',
+                'acquisition_date' => '2023-05-01',
+                'taxable_amount' => 3_000_000,
+                'tax_amount' => 300_000,
+            ],
+            ['date' => '2023-05-01', 'description' => '当年取得車購入'],
+        );
+
+        $pastAsset = app(DepreciationService::class)->registerNewStandardCar(
+            $fiscalYear2023,
+            $paymentSubAccount,
+            [
+                'name' => '過年取得車',
+                'acquisition_date' => '2022-05-01',
+                'taxable_amount' => 3_000_000,
+                'tax_amount' => 300_000,
+            ],
+            ['date' => '2022-05-01', 'description' => '過年取得車取得'],
+            true,
+        );
+
+        $this->assertFalse($currentYearAsset->needsInitialOpeningTransfer($fiscalYear2023));
+        $this->assertTrue($pastAsset->needsInitialOpeningTransfer($fiscalYear2023));
+
+        app(DepreciationService::class)->registerInitialOpeningTransfer(
+            $pastAsset,
+            $fiscalYear2023,
+            $user,
+        );
+
+        $this->assertFalse($pastAsset->fresh()->needsInitialOpeningTransfer($fiscalYear2023));
     }
 
     // 後回し

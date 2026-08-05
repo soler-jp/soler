@@ -34,6 +34,7 @@ class FixedAsset extends Model implements ResolvesBusinessUnit
         'tax_amount',
         'useful_life',
         'depreciation_method',
+        'initial_opening_transaction_id',
         'is_disposed',
         'disposed_at',
         'disposal_amount',
@@ -114,5 +115,44 @@ class FixedAsset extends Model implements ResolvesBusinessUnit
     public function depreciationEntries(): HasMany
     {
         return $this->hasMany(DepreciationEntry::class);
+    }
+
+    /**
+     * この資産の期首残高を反映した期首仕訳。
+     * 固定資産専用の仕訳とは限らず、他の開始残高行と同じ期首仕訳を共有することがある。
+     * TransactionRevisor で修正されると、この FK は元の（deactivated な）Transaction を指したままになる。
+     * 現行の active な仕訳を取りたい場合は activeInitialOpeningTransaction() を使う。
+     */
+    public function initialOpeningTransaction(): BelongsTo
+    {
+        return $this->belongsTo(Transaction::class, 'initial_opening_transaction_id');
+    }
+
+    /**
+     * initial_opening_transaction から revision chain を辿って、現行の active な期首振替を返す。
+     * 修正されていなければ initialOpeningTransaction と同じ。すべて無効化されていれば null。
+     */
+    public function activeInitialOpeningTransaction(): ?Transaction
+    {
+        $transaction = $this->initialOpeningTransaction;
+
+        while ($transaction !== null && ! $transaction->is_active) {
+            $transaction = $transaction->revision;
+        }
+
+        return $transaction;
+    }
+
+    public function needsInitialOpeningTransfer(FiscalYear $fiscalYear): bool
+    {
+        if ($this->acquisition_date === null) {
+            return false;
+        }
+
+        if (! $this->acquisition_date->lt($fiscalYear->start_date)) {
+            return false;
+        }
+
+        return $this->initial_opening_transaction_id === null;
     }
 }
