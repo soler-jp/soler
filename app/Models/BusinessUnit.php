@@ -305,6 +305,42 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             'type' => Account::TYPE_EXPENSE,
             'example' => '事業上の費用で他の経費に当てはまらない経費',
         ],
+        [
+            'name' => '車両費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '事業で使用する自動車のガソリン代、駐車料金、有料道路料金、修理代など',
+            'caution' => '私生活でも使用する自動車の費用は、事業で使用した分だけを経費にします。自動車の購入費や資産価値を高める改良費は、固定資産として減価償却する場合があります。',
+        ],
+        [
+            'name' => '新聞図書費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '事業に関連する新聞、書籍、専門誌、業界紙、電子書籍などの購入費',
+            'caution' => '個人的な趣味や生活のために購入したものは経費になりません。事業との関係を説明できるものだけを記録します。',
+        ],
+        [
+            'name' => '支払手数料',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '振込手数料、決済サービスの利用手数料、販売サービスの手数料など',
+            'caution' => '固定資産の購入に直接かかった仲介手数料などは、その年の経費ではなく、固定資産の取得価額に含める場合があります。',
+        ],
+        [
+            'name' => '会議費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '事業上の打ち合わせに使用した会議室代、飲み物代、軽食代など',
+            'caution' => '取引先などをもてなすことが主な目的の飲食費や贈答費は、接待交際費として扱う場合があります。',
+        ],
+        [
+            'name' => '研修費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '事業に必要な知識や技術を学ぶための研修、セミナー、講習会、オンライン講座などの参加費',
+            'caution' => '事業と直接関係しない講座や、個人的な教養・趣味を目的とした学習費用は経費になりません。',
+        ],
+        [
+            'name' => '諸会費',
+            'type' => Account::TYPE_EXPENSE,
+            'example' => '商工会議所、商工会、同業者団体、協同組合、商店会、青色申告会などの会費や組合費',
+            'caution' => '事業と直接関係しない団体や、個人的な交流を目的とする団体の会費は経費にならない場合があります。',
+        ],
         ['name' => self::UNCLASSIFIED_EXPENSE_ACCOUNT_NAME, 'type' => Account::TYPE_EXPENSE],
     ];
 
@@ -327,6 +363,12 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         '修繕費',
         '消耗品費',
         '雑費',
+        '車両費',
+        '新聞図書費',
+        '支払手数料',
+        '会議費',
+        '研修費',
+        '諸会費',
     ];
 
     /**
@@ -343,6 +385,12 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         '雑費',
         '広告宣伝費',
         '修繕費',
+        '車両費',
+        '新聞図書費',
+        '支払手数料',
+        '会議費',
+        '研修費',
+        '諸会費',
     ];
 
     /**

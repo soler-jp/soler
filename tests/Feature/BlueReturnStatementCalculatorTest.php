@@ -323,14 +323,14 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $cash = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
         $sales = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
         $meetingExpense = $businessUnit->createAccount([
-            'name' => '会議費',
+            'name' => '研究開発費',
             'type' => Account::TYPE_EXPENSE,
         ], $businessUnit->user)
             ->subAccounts()
             ->firstOrFail();
 
         $bookExpense = $businessUnit->createAccount([
-            'name' => '新聞図書費',
+            'name' => '事務用品費',
             'type' => Account::TYPE_EXPENSE,
         ], $businessUnit->user)
             ->subAccounts()
@@ -354,7 +354,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-02-10',
-            'description' => '任意科目テスト会議費',
+            'description' => '任意科目テスト研究開発費',
         ], [
             [
                 'sub_account_id' => $meetingExpense->id,
@@ -370,7 +370,7 @@ class BlueReturnStatementCalculatorTest extends TestCase
 
         app(TransactionRegistrar::class)->register($fiscalYear, [
             'date' => '2025-03-10',
-            'description' => '任意科目テスト新聞図書費',
+            'description' => '任意科目テスト事務用品費',
         ], [
             [
                 'sub_account_id' => $bookExpense->id,
@@ -390,8 +390,8 @@ class BlueReturnStatementCalculatorTest extends TestCase
         $this->assertSame(12_000, $profitAndLoss['custom_expense_1']);
         $this->assertSame(8_000, $profitAndLoss['custom_expense_2']);
         $this->assertSame(0, $profitAndLoss['custom_expense_3']);
-        $this->assertSame('会議費', $statement['custom_expense_labels']['custom_expense_1_label']);
-        $this->assertSame('新聞図書費', $statement['custom_expense_labels']['custom_expense_2_label']);
+        $this->assertSame('研究開発費', $statement['custom_expense_labels']['custom_expense_1_label']);
+        $this->assertSame('事務用品費', $statement['custom_expense_labels']['custom_expense_2_label']);
         $this->assertSame('', $statement['custom_expense_labels']['custom_expense_3_label']);
         $this->assertSame(20_000, $profitAndLoss['total_expenses']);
         $this->assertSame(30_000, $profitAndLoss['income_before_blue_return_deduction']);

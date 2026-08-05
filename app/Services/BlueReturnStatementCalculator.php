@@ -202,6 +202,13 @@ class BlueReturnStatementCalculator
             )
         );
 
+        // 任意科目欄には残高のある勘定科目のみを載せる。
+        // 既定シードに含まれるが未使用の勘定科目が 6 スロットを塞いでしまうことを防ぐ。
+        $customExpenseAccountNames = array_values(array_filter(
+            $customExpenseAccountNames,
+            fn (string $accountName): bool => $this->amountForAccount($totalsByAccountName, $accountName) !== 0
+        ));
+
         $profitAndLoss = $this->calculateProfitAndLoss($totalsByAccountName, $customExpenseAccountNames, $blueReturnDeduction);
         $openingBalanceSummary = $this->balanceCalculator->calculateOpening($fiscalYear);
         $endingBalanceSummary = $this->balanceCalculator->calculate($fiscalYear);

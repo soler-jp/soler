@@ -810,12 +810,12 @@ class BusinessUnitTest extends TestCase
             'name' => 'カスタム勘定科目テスト事業所',
         ]);
 
-        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $user);
+        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '研究開発費', null, $user);
 
-        $this->assertSame('会議費', $account->name);
+        $this->assertSame('研究開発費', $account->name);
         $this->assertSame(Account::TYPE_EXPENSE, $account->type);
         $this->assertCount(1, $account->subAccounts);
-        $this->assertSame('会議費', $account->subAccounts->first()->name);
+        $this->assertSame('研究開発費', $account->subAccounts->first()->name);
     }
 
     #[Test]
@@ -831,7 +831,7 @@ class BusinessUnitTest extends TestCase
         $this->expectException(AuthorizationException::class);
 
         $businessUnit->createAccount([
-            'name' => '会議費',
+            'name' => '研究開発費',
             'type' => Account::TYPE_EXPENSE,
         ], $otherUser);
     }
@@ -844,9 +844,9 @@ class BusinessUnitTest extends TestCase
             'name' => 'カスタム補助科目テスト事業所',
         ]);
 
-        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', '役員会議', $user);
+        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '研究開発費', '役員会議', $user);
 
-        $this->assertSame('会議費', $account->name);
+        $this->assertSame('研究開発費', $account->name);
         $this->assertCount(1, $account->subAccounts);
         $this->assertSame('役員会議', $account->subAccounts->first()->name);
     }
@@ -859,12 +859,12 @@ class BusinessUnitTest extends TestCase
             'name' => '重複勘定科目テスト事業所',
         ]);
 
-        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $user);
+        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '研究開発費', null, $user);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('同名の勘定科目は既に存在します。');
 
-        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $user);
+        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '研究開発費', null, $user);
     }
 
     #[Test]
@@ -879,7 +879,7 @@ class BusinessUnitTest extends TestCase
 
         $this->expectException(AuthorizationException::class);
 
-        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $otherUser);
+        $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '研究開発費', null, $otherUser);
     }
 
     #[Test]
@@ -890,9 +890,9 @@ class BusinessUnitTest extends TestCase
             'name' => 'null補助科目テスト事業所',
         ]);
 
-        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '会議費', null, $user);
+        $account = $businessUnit->addCustomAccount(Account::TYPE_EXPENSE, '研究開発費', null, $user);
 
-        $this->assertSame('会議費', $account->subAccounts->first()->name);
+        $this->assertSame('研究開発費', $account->subAccounts->first()->name);
     }
 
     #[Test]
