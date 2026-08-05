@@ -3,6 +3,7 @@
 namespace App\Livewire\Recurring;
 
 use App\Models\Account;
+use App\Models\BusinessUnit;
 use App\Models\RecurringTransactionPlan;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -40,11 +41,7 @@ class Form extends Component
             ->orderBy('name')
             ->get();
 
-        $this->creditAccounts = $unit->accounts()
-            ->with('subAccounts')
-            ->whereIn('name', ['現金', '普通預金', '事業主借'])
-            ->orderByRaw("CASE name WHEN '現金' THEN 0 WHEN '普通預金' THEN 1 WHEN '事業主借' THEN 2 ELSE 3 END")
-            ->get();
+        $this->creditAccounts = $unit->paymentAccounts(BusinessUnit::PAYMENT_ACCOUNT_PRESET_PAYMENT);
     }
 
     public function save()

@@ -487,6 +487,33 @@ class FixedAssetsIndexTest extends TestCase
     }
 
     #[Test]
+    public function 買掛金を支払元にして固定資産を登録できる(): void
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $accountsPayableSub = $unit->getAccountByName('買掛金')->subAccounts()->firstOrFail();
+
+        Livewire::actingAs($user)
+            ->test(FixedAssetsIndex::class)
+            ->call('setCategory', FixedAsset::ASSET_CATEGORY_NEW_STANDARD_CAR)
+            ->set('car_name', '買掛の車')
+            ->set('car_acquisition_date', $fiscalYear->start_date->toDateString())
+            ->set('car_gross_amount', 2_200_000)
+            ->set('car_tax_amount', 200_000)
+            ->set('car_payment_sub_account_id', $accountsPayableSub->id)
+            ->call('confirmCarPreset')
+            ->assertHasNoErrors()
+            ->call('submitCarPreset')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('fixed_assets', [
+            'name' => '買掛の車',
+        ]);
+    }
+
+    #[Test]
     public function サービスが例外を投げた時にconfirmingが解除されエラーメッセージが出る(): void
     {
         $user = User::factory()->create();

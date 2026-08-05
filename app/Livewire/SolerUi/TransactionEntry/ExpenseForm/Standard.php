@@ -4,6 +4,7 @@ namespace App\Livewire\SolerUi\TransactionEntry\ExpenseForm;
 
 use App\Livewire\SolerUi\TransactionEntry\Concerns\FormatsJapaneseAmount;
 use App\Models\Account;
+use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\SubAccount;
@@ -103,11 +104,7 @@ class Standard extends Component
                 && $sub->system_purpose === null)
             ->values();
 
-        $this->creditAccounts = $unit->accounts()
-            ->with(['subAccounts' => fn ($q) => $q->where('visibility', '!=', SubAccount::VISIBILITY_HIDDEN)])
-            ->whereIn('name', ['現金', '普通預金', '事業主借'])
-            ->orderByRaw("CASE name WHEN '現金' THEN 0 WHEN '普通預金' THEN 1 WHEN '事業主借' THEN 2 ELSE 3 END")
-            ->get();
+        $this->creditAccounts = $unit->paymentAccounts(BusinessUnit::PAYMENT_ACCOUNT_PRESET_PAYMENT);
 
         $this->expenseAccountPickerRows = $unit->accounts()
             ->with(['subAccounts' => fn ($q) => $q

@@ -426,6 +426,25 @@ class BusinessUnitTest extends TestCase
     }
 
     #[Test]
+    public function 支払元プリセットに応じた勘定科目を想定順で取得できる(): void
+    {
+        $user = User::factory()->create();
+
+        $unit = $user->createBusinessUnitWithDefaults([
+            'name' => '支払元プリセット確認',
+        ]);
+
+        $unit->addCustomAccount(Account::TYPE_ASSET, '普通預金', '普通預金', $user);
+
+        $paymentNames = $unit->paymentAccounts(BusinessUnit::PAYMENT_ACCOUNT_PRESET_PAYMENT)
+            ->pluck('name')
+            ->values()
+            ->all();
+
+        $this->assertSame(['現金', '普通預金', 'その他の預金', '事業主借', '買掛金'], $paymentNames);
+    }
+
+    #[Test]
     public function tax_paid_accountは仮払消費税の_accountを返す()
     {
         $user = User::factory()->create();

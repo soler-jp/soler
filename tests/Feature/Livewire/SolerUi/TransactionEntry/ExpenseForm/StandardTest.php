@@ -218,7 +218,70 @@ class StandardTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertSame(['現金', '事業主借'], $creditAccountNames);
+        $this->assertSame(['現金', 'その他の預金', '事業主借', '買掛金'], $creditAccountNames);
+    }
+
+    #[Test]
+    public function 買掛金を支払方法にして経費を登録できる(): void
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $debit = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+        $accountsPayableSub = $unit->getAccountByName('買掛金')->subAccounts()->firstOrFail();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0515')
+            ->set('note', '備品の後払い購入')
+            ->set('amount', 2200)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $accountsPayableSub->id)
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $debit->id,
+            'type' => JournalEntry::TYPE_DEBIT,
+            'net_amount' => 2000,
+            'tax_amount' => 200,
+            'tax_type' => JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10,
+        ]);
+
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $accountsPayableSub->id,
+            'type' => JournalEntry::TYPE_CREDIT,
+            'net_amount' => 2200,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+        ]);
+    }
+
+    #[Test]
+    public function 銀行口座_その他の預金の補助科目_を支払方法にして経費を登録できる(): void
+    {
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $debit = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+        $bankSub = $unit->getAccountByName('その他の預金')
+            ->addCustomSubAccount('メインバンク', $user);
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0510')
+            ->set('note', '備品購入')
+            ->set('amount', 1100)
+            ->set('debit_sub_account_id', $debit->id)
+            ->set('credit_sub_account_id', $bankSub->id)
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('journal_entries', [
+            'sub_account_id' => $bankSub->id,
+            'type' => JournalEntry::TYPE_CREDIT,
+            'net_amount' => 1100,
+            'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+        ]);
     }
 
     #[Test]

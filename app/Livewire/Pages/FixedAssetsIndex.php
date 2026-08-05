@@ -3,6 +3,7 @@
 namespace App\Livewire\Pages;
 
 use App\Models\Account;
+use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
 use App\Models\FixedAsset;
 use App\Models\SubAccount;
@@ -36,10 +37,6 @@ class FixedAssetsIndex extends Component
         '車両運搬具',
         '工具器具備品',
     ];
-
-    private const PAYMENT_ACCOUNT_NAMES = ['現金', '普通預金', 'その他の預金', '事業主借'];
-
-    private const PAYMENT_ACCOUNT_ORDER_SQL = "CASE name WHEN '現金' THEN 0 WHEN '普通預金' THEN 1 WHEN 'その他の預金' THEN 1 WHEN '事業主借' THEN 2 ELSE 3 END";
 
     public string $selected_category = FixedAsset::ASSET_CATEGORY_NEW_STANDARD_CAR;
 
@@ -140,11 +137,7 @@ class FixedAssetsIndex extends Component
     {
         $unit = auth()->user()->selectedBusinessUnitOrFail();
 
-        return $unit->accounts()
-            ->with(['subAccounts' => fn ($q) => $q->where('visibility', '!=', SubAccount::VISIBILITY_HIDDEN)])
-            ->whereIn('name', self::PAYMENT_ACCOUNT_NAMES)
-            ->orderByRaw(self::PAYMENT_ACCOUNT_ORDER_SQL)
-            ->get();
+        return $unit->paymentAccounts(BusinessUnit::PAYMENT_ACCOUNT_PRESET_PAYMENT);
     }
 
     /**
