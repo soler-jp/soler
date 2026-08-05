@@ -283,9 +283,12 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
 
         $cards = $fiscalYear->managementSummaryCards();
 
-        $this->assertSame(['revenue', 'expense', 'profit'], array_column($cards, 'key'));
+        $this->assertSame(['revenue', 'expense', 'profit', 'cash_balance'], array_column($cards, 'key'));
         $this->assertSame(7000, $cards[2]['amount']);
-        $this->assertSame([], $cards[1]['excluded_account_names']);
+        $this->assertSame(
+            ['期首商品（棚卸高）', '仕入金額', '期末商品（棚卸高）'],
+            $cards[1]['excluded_account_names'],
+        );
     }
 
     #[Test]
@@ -299,15 +302,205 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
         $this->registerExpense($unit, $fiscalYear, '2025-08-03', 6000, '仕入れ', accountName: '仕入金額');
 
         $cards = $fiscalYear->managementSummaryCards();
+        $cogsAccountNames = ['期首商品（棚卸高）', '仕入金額', '期末商品（棚卸高）'];
 
-        $this->assertSame(['revenue', 'expense', 'purchase', 'current_difference'], array_column($cards, 'key'));
-        $this->assertSame(['仕入金額'], $cards[1]['excluded_account_names']);
+        $this->assertSame(
+            ['revenue', 'expense', 'purchase', 'current_difference', 'cash_balance'],
+            array_column($cards, 'key'),
+        );
+        $this->assertSame('仕入れ', $cards[2]['title']);
+        $this->assertSame($cogsAccountNames, $cards[1]['excluded_account_names']);
         $this->assertSame(['仕入金額'], $cards[2]['account_names']);
+        $this->assertSame(
+            [
+                'opening_inventory' => 0,
+                'purchases' => 6000,
+                'ending_inventory' => 0,
+                'cost_of_goods_sold' => 6000,
+            ],
+            $cards[2]['inventory_adjustment'],
+        );
+        $this->assertSame([], $cards[2]['note_lines'], '棚卸がなければ補足文言は出さない');
         $this->assertSame(10000, $cards[3]['amount']);
         $this->assertSame([
             '売上から、記録済みの経費と仕入(6,000円)を引いた金額です。',
             '年末に在庫を入力すると、最終的な利益は変わることがあります。',
         ], $cards[3]['note_lines']);
+    }
+
+    #[Test]
+    public function 経営サマリーカードは期末棚卸を経費でなく仕入れの相殺として扱う(): void
+    {
+        [, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $this->registerRevenue($unit, $fiscalYear, '2025-09-01', 100000, '売上');
+        $this->registerExpense($unit, $fiscalYear, '2025-09-02', 30000, '通常経費');
+        $this->registerExpense($unit, $fiscalYear, '2025-09-03', 40000, '仕入', accountName: '仕入金額');
+        $this->registerClosingInventoryAdjustment($unit, $fiscalYear, '2025-12-31', 12640);
+
+        $cards = $fiscalYear->managementSummaryCards();
+
+        $expenseCard = collect($cards)->firstWhere('key', 'expense');
+        $purchaseCard = collect($cards)->firstWhere('key', 'purchase');
+        $differenceCard = collect($cards)->firstWhere('key', 'current_difference');
+
+        $expenseAmount = $fiscalYear->monthlyAccountTypeSummaryData(
+            Account::TYPE_EXPENSE,
+            excludedAccountNames: $expenseCard['excluded_account_names'],
+        )['total_amount'];
+        $purchaseAmount = $fiscalYear->monthlyAccountTypeSummaryData(
+            Account::TYPE_EXPENSE,
+            accountNames: $purchaseCard['account_names'],
+        )['total_amount'];
+
+        $this->assertSame(30000, $expenseAmount, '期末棚卸で経費が減額されてはいけない');
+        $this->assertSame(40000, $purchaseAmount, '仕入れカードには支払った仕入額そのものが出る');
+
+        $this->assertSame(
+            [
+                'opening_inventory' => 0,
+                'purchases' => 40000,
+                'ending_inventory' => 12640,
+                'cost_of_goods_sold' => 40000 - 12640,
+            ],
+            $purchaseCard['inventory_adjustment'],
+        );
+        $this->assertSame([
+            'ただし、期末に残っている 12,640 円分を差し引いて、27,360 円を経費として計上します。',
+        ], $purchaseCard['note_lines']);
+        $this->assertSame(100000 - 30000 - (40000 - 12640), $differenceCard['amount']);
+        $this->assertSame(
+            '売上から、記録済みの経費と仕入(27,360円)を引いた金額です。',
+            $differenceCard['note_lines'][0],
+        );
+    }
+
+    #[Test]
+    public function 仕入れカードのモーダル冒頭に期首と期末の棚卸残を表示する(): void
+    {
+        [, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $this->registerRevenue($unit, $fiscalYear, '2025-09-01', 100000, '売上');
+        $this->registerExpense($unit, $fiscalYear, '2025-09-03', 40000, '仕入', accountName: '仕入金額');
+        $this->registerOpeningInventoryAdjustment($unit, $fiscalYear, '2025-01-01', 3000);
+        $this->registerClosingInventoryAdjustment($unit, $fiscalYear, '2025-12-15', 12640);
+
+        $cards = $fiscalYear->managementSummaryCards();
+        $purchaseCard = collect($cards)->firstWhere('key', 'purchase');
+
+        $this->assertSame(['仕入金額'], $purchaseCard['account_names'], 'モーダル月別は仕入だけを表示');
+        $this->assertSame(
+            '前期から 3,000 円分の在庫が繰り越されていて、期末には 12,640 円分が残っています。',
+            $purchaseCard['modal_header_note'],
+        );
+        $this->assertArrayNotHasKey(
+            'drill_account_names',
+            $purchaseCard,
+            '棚卸仕訳は集計に混ぜないので drill 用の絞り込みは不要',
+        );
+    }
+
+    #[Test]
+    public function 仕入れカードのモーダルnoteは期末のみでも文言を出す(): void
+    {
+        [, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $this->registerRevenue($unit, $fiscalYear, '2025-09-01', 100000, '売上');
+        $this->registerExpense($unit, $fiscalYear, '2025-09-03', 40000, '仕入', accountName: '仕入金額');
+        $this->registerClosingInventoryAdjustment($unit, $fiscalYear, '2025-12-15', 12640);
+
+        $purchaseCard = collect($fiscalYear->managementSummaryCards())->firstWhere('key', 'purchase');
+
+        $this->assertSame(
+            '期末には 12,640 円分の在庫が残っています。',
+            $purchaseCard['modal_header_note'],
+        );
+    }
+
+    #[Test]
+    public function 仕入れカードのモーダルnoteは棚卸がなければ空になる(): void
+    {
+        [, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $this->registerRevenue($unit, $fiscalYear, '2025-08-01', 20000, '売上');
+        $this->registerExpense($unit, $fiscalYear, '2025-08-03', 6000, '仕入', accountName: '仕入金額');
+
+        $purchaseCard = collect($fiscalYear->managementSummaryCards())->firstWhere('key', 'purchase');
+
+        $this->assertSame('', $purchaseCard['modal_header_note']);
+    }
+
+    #[Test]
+    public function 経営サマリーカードは期首棚卸を仕入れの補足で表示する(): void
+    {
+        [, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $this->registerRevenue($unit, $fiscalYear, '2025-10-01', 50000, '売上');
+        $this->registerExpense($unit, $fiscalYear, '2025-10-02', 5000, '通常経費');
+        $this->registerOpeningInventoryAdjustment($unit, $fiscalYear, '2025-01-01', 8000);
+        $this->registerExpense($unit, $fiscalYear, '2025-10-03', 20000, '仕入', accountName: '仕入金額');
+        $this->registerClosingInventoryAdjustment($unit, $fiscalYear, '2025-12-31', 5000);
+
+        $cards = $fiscalYear->managementSummaryCards();
+        $purchaseCard = collect($cards)->firstWhere('key', 'purchase');
+
+        $this->assertSame(
+            [
+                'opening_inventory' => 8000,
+                'purchases' => 20000,
+                'ending_inventory' => 5000,
+                'cost_of_goods_sold' => 8000 + 20000 - 5000,
+            ],
+            $purchaseCard['inventory_adjustment'],
+        );
+        $this->assertSame([
+            '前年から繰り越した在庫 8,000 円を加算します。',
+            'ただし、期末に残っている 5,000 円分を差し引いて、23,000 円を経費として計上します。',
+        ], $purchaseCard['note_lines']);
+    }
+
+    #[Test]
+    public function 経営サマリーカードは期末棚卸のみでも仕入れカードを表示し経費から除外する(): void
+    {
+        [, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $this->registerRevenue($unit, $fiscalYear, '2025-11-01', 30000, '売上');
+        $this->registerExpense($unit, $fiscalYear, '2025-11-02', 5000, '通常経費');
+        $this->registerClosingInventoryAdjustment($unit, $fiscalYear, '2025-12-31', 3000);
+
+        $cards = $fiscalYear->managementSummaryCards();
+
+        $this->assertSame(
+            ['revenue', 'expense', 'purchase', 'current_difference', 'cash_balance'],
+            array_column($cards, 'key'),
+        );
+
+        $expenseCard = $cards[1];
+        $purchaseCard = $cards[2];
+        $differenceCard = $cards[3];
+
+        $expenseAmount = $fiscalYear->monthlyAccountTypeSummaryData(
+            Account::TYPE_EXPENSE,
+            excludedAccountNames: $expenseCard['excluded_account_names'],
+        )['total_amount'];
+
+        $this->assertSame(5000, $expenseAmount, '経費は棚卸で減額されない');
+        $this->assertSame(
+            [
+                'opening_inventory' => 0,
+                'purchases' => 0,
+                'ending_inventory' => 3000,
+                'cost_of_goods_sold' => -3000,
+            ],
+            $purchaseCard['inventory_adjustment'],
+        );
+        $this->assertSame(30000 - 5000 - (-3000), $differenceCard['amount']);
     }
 
     #[Test]
@@ -411,6 +604,62 @@ class FiscalYearAccountTypeTransactionSummaryTest extends TestCase
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => $amount,
                 'tax_type' => $reverse ? $taxType : JournalEntry::TAX_TYPE_EXEMPT,
+            ],
+        ], $fiscalYear->businessUnit->user);
+    }
+
+    private function registerClosingInventoryAdjustment(
+        BusinessUnit $unit,
+        FiscalYear $fiscalYear,
+        string $date,
+        int $amount,
+    ): Transaction {
+        $inventoryAsset = $unit->getAccountByName('棚卸資産')->subAccounts()->firstOrFail();
+        $closing = $unit->getAccountByName('期末商品（棚卸高）')->subAccounts()->firstOrFail();
+
+        return (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => $date,
+            'description' => '期末棚卸',
+        ], [
+            [
+                'sub_account_id' => $inventoryAsset->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => $amount,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $closing->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => $amount,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $fiscalYear->businessUnit->user);
+    }
+
+    private function registerOpeningInventoryAdjustment(
+        BusinessUnit $unit,
+        FiscalYear $fiscalYear,
+        string $date,
+        int $amount,
+    ): Transaction {
+        $inventoryAsset = $unit->getAccountByName('棚卸資産')->subAccounts()->firstOrFail();
+        $opening = $unit->getAccountByName('期首商品（棚卸高）')->subAccounts()->firstOrFail();
+
+        return (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => $date,
+            'description' => '期首棚卸',
+        ], [
+            [
+                'sub_account_id' => $opening->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => $amount,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $inventoryAsset->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => $amount,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ], $fiscalYear->businessUnit->user);
     }

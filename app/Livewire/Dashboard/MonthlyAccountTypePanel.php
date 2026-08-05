@@ -6,6 +6,11 @@ use App\Models\Account;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
+// TODO: 実態は「勘定タイプ ± 特定科目のフィルタで年度合計を出し、
+// クリックで月別→取引明細にドリルできるカード」。
+// 主表示は月別ではなく合計なので `Monthly-` は誤解を招く。
+// 親の `ProfitSummary` を `ManagementSummary` にリネームするタイミングで
+// `Dashboard/ManagementSummary/AccountPanel` に揃える。
 class MonthlyAccountTypePanel extends Component
 {
     public string $accountType;
@@ -26,6 +31,17 @@ class MonthlyAccountTypePanel extends Component
      */
     public array $excludedAccountNames = [];
 
+    /**
+     * @var array<int, string>
+     */
+    public array $noteLines = [];
+
+    /**
+     * モーダル冒頭に表示する補足文言。棚卸のように「集計には混ぜないが
+     * ユーザーには知らせたい」文脈情報を出す用途。
+     */
+    public string $modalHeaderNote = '';
+
     public bool $showMonthsModal = false;
 
     public bool $showTransactionsModal = false;
@@ -43,12 +59,16 @@ class MonthlyAccountTypePanel extends Component
         ?string $variant = null,
         array $accountNames = [],
         array $excludedAccountNames = [],
+        array $noteLines = [],
+        string $modalHeaderNote = '',
     ): void {
         $this->accountType = $accountType;
         $this->title = $title;
         $this->variant = $variant ?? $accountType;
         $this->accountNames = $accountNames;
         $this->excludedAccountNames = $excludedAccountNames;
+        $this->noteLines = $noteLines;
+        $this->modalHeaderNote = $modalHeaderNote;
 
         $this->reload();
     }

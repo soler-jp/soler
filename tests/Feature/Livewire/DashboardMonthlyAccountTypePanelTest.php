@@ -251,6 +251,103 @@ class DashboardMonthlyAccountTypePanelTest extends TestCase
             ->assertSee('1,000');
     }
 
+    #[Test]
+    public function modal_header_noteを渡すとモーダル冒頭に表示される(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-03-10',
+            'description' => '仕入',
+        ], [
+            [
+                'sub_account_id' => $unit->getAccountByName('仕入金額')->subAccounts()->firstOrFail()->id,
+                'type' => 'debit',
+                'net_amount' => 40000,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
+                'type' => 'credit',
+                'net_amount' => 40000,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $user);
+
+        Livewire::actingAs($user)
+            ->test(MonthlyAccountTypePanel::class, [
+                'accountType' => 'expense',
+                'title' => '仕入れ',
+                'variant' => 'purchase',
+                'accountNames' => ['仕入金額'],
+                'modalHeaderNote' => '期末には 12,640 円分の在庫が残っています。',
+            ])
+            ->assertSet('totalAmount', 40000)
+            ->call('openMonthsModal')
+            ->assertSet('showMonthsModal', true)
+            ->assertSee('期末には 12,640 円分の在庫が残っています。')
+            ->assertSee('合計 40,000 円')
+            ->assertSee('2025年3月');
+    }
+
+    #[Test]
+    public function 仕入モーダルの月別集計に期末棚卸の減額は混ざらない(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+        $registrar = new TransactionRegistrar;
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-03-10',
+            'description' => '仕入',
+        ], [
+            [
+                'sub_account_id' => $unit->getAccountByName('仕入金額')->subAccounts()->firstOrFail()->id,
+                'type' => 'debit',
+                'net_amount' => 40000,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $unit->getAccountByName('現金')->subAccounts()->firstOrFail()->id,
+                'type' => 'credit',
+                'net_amount' => 40000,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $user);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-12-15',
+            'description' => '期末棚卸',
+        ], [
+            [
+                'sub_account_id' => $unit->getAccountByName('棚卸資産')->subAccounts()->firstOrFail()->id,
+                'type' => 'debit',
+                'net_amount' => 12640,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $unit->getAccountByName('期末商品（棚卸高）')->subAccounts()->firstOrFail()->id,
+                'type' => 'credit',
+                'net_amount' => 12640,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $user);
+
+        Livewire::actingAs($user)
+            ->test(MonthlyAccountTypePanel::class, [
+                'accountType' => 'expense',
+                'title' => '仕入れ',
+                'variant' => 'purchase',
+                'accountNames' => ['仕入金額'],
+            ])
+            ->assertSet('totalAmount', 40000)
+            ->call('openMonthsModal')
+            ->assertSee('2025年3月')
+            ->assertDontSee('2025年12月')
+            ->assertDontSee('-12,640');
+    }
+
     /**
      * @return array{0: User, 1: BusinessUnit}
      */

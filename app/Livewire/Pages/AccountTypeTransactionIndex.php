@@ -9,7 +9,10 @@ use Livewire\Component;
 
 class AccountTypeTransactionIndex extends Component
 {
-    private const PURCHASE_ACCOUNT_NAMES = ['仕入金額'];
+    /**
+     * 経費（月別一覧・種類別一覧）から除外する売上原価の損益科目。青色申告決算書と同じ扱い。
+     */
+    private const COST_OF_GOODS_SOLD_ACCOUNT_NAMES = ['期首商品（棚卸高）', '仕入金額', '期末商品（棚卸高）'];
 
     public string $kind;
 
@@ -139,7 +142,7 @@ class AccountTypeTransactionIndex extends Component
                 'variant' => Account::TYPE_EXPENSE,
                 'group_by_month' => true,
                 'account_names' => [],
-                'excluded_account_names' => self::PURCHASE_ACCOUNT_NAMES,
+                'excluded_account_names' => self::COST_OF_GOODS_SOLD_ACCOUNT_NAMES,
             ],
             'expense_type' => [
                 'title' => '経費の種類別一覧',
@@ -148,15 +151,15 @@ class AccountTypeTransactionIndex extends Component
                 'variant' => Account::TYPE_EXPENSE,
                 'group_by_month' => false,
                 'account_names' => [],
-                'excluded_account_names' => self::PURCHASE_ACCOUNT_NAMES,
+                'excluded_account_names' => self::COST_OF_GOODS_SOLD_ACCOUNT_NAMES,
             ],
             'purchase' => [
-                'title' => '仕入れ一覧',
-                'description' => '仕入金額の取引だけを月ごとに確認できます。',
+                'title' => '仕入・棚卸一覧',
+                'description' => '仕入金額と、期首・期末棚卸の決算整理仕訳をまとめて月ごとに確認できます。',
                 'account_type' => Account::TYPE_EXPENSE,
                 'variant' => Account::TYPE_EXPENSE,
                 'group_by_month' => true,
-                'account_names' => ['仕入金額'],
+                'account_names' => self::COST_OF_GOODS_SOLD_ACCOUNT_NAMES,
                 'excluded_account_names' => [],
             ],
             default => throw new InvalidArgumentException('Unsupported kind.'),

@@ -5,6 +5,10 @@ namespace App\Livewire\Dashboard;
 use App\Models\FiscalYear;
 use Livewire\Component;
 
+// TODO: `ProfitSummary` は経営サマリー全体（売上・経費・仕入れ・差し引き・現金）を表示する
+// コンテナだが、名前が「利益」に限定されて誤解を招く。`Dashboard/ManagementSummary` にリネームし、
+// 併せて子の `MonthlyAccountTypePanel` / `MonthlyTransactionTable` を
+// `Dashboard/ManagementSummary/AccountPanel` / `TransactionTable` に揃える。
 class ProfitSummary extends Component
 {
     public int $fiscalYearId;

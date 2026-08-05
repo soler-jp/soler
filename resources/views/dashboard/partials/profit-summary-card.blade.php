@@ -40,6 +40,8 @@
                 'variant' => $card['variant'],
                 'accountNames' => $card['account_names'],
                 'excludedAccountNames' => $card['excluded_account_names'],
+                'noteLines' => $card['note_lines'] ?? [],
+                'modalHeaderNote' => $card['modal_header_note'] ?? '',
             ],
             key('profit-summary-'.$card['key'])
         )

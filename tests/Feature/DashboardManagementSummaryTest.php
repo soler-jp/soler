@@ -72,6 +72,36 @@ class DashboardManagementSummaryTest extends TestCase
             ->assertDontSee('>利益</h2>', false);
     }
 
+    #[Test]
+    public function 期末棚卸は経費カードから除外され仕入れカードで相殺表示される(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $this->registerRevenue($unit, $fiscalYear, 100000);
+        $this->registerExpense($unit, $fiscalYear, 30000);
+        $this->registerExpense($unit, $fiscalYear, 40000, '仕入金額');
+        $this->registerClosingInventoryAdjustment($unit, $fiscalYear, 12640);
+
+        $expectedCostOfGoodsSold = 40000 - 12640;
+        $expectedDifference = 100000 - 30000 - $expectedCostOfGoodsSold;
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('仕入れ')
+            ->assertSee('40,000') // 仕入れカードの主表示は支払った仕入額
+            ->assertSee(sprintf(
+                'ただし、期末に残っている 12,640 円分を差し引いて、%s 円を経費として計上します。',
+                number_format($expectedCostOfGoodsSold),
+            ))
+            ->assertSee(number_format($expectedDifference))
+            ->assertSee(sprintf(
+                '売上から、記録済みの経費と仕入(%s円)を引いた金額です。',
+                number_format($expectedCostOfGoodsSold),
+            ));
+    }
+
     /**
      * @return array{0: User, 1: BusinessUnit}
      */
@@ -130,6 +160,33 @@ class DashboardManagementSummaryTest extends TestCase
             ],
             [
                 'sub_account_id' => $unit->getAccountByName($paymentAccountName)->subAccounts()->firstOrFail()->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => $amount,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $unit->user);
+    }
+
+    private function registerClosingInventoryAdjustment(
+        BusinessUnit $unit,
+        FiscalYear $fiscalYear,
+        int $amount,
+    ): Transaction {
+        $inventoryAsset = $unit->getAccountByName('棚卸資産')->subAccounts()->firstOrFail();
+        $closing = $unit->getAccountByName('期末商品（棚卸高）')->subAccounts()->firstOrFail();
+
+        return (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-12-31',
+            'description' => '期末棚卸',
+        ], [
+            [
+                'sub_account_id' => $inventoryAsset->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => $amount,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $closing->id,
                 'type' => JournalEntry::TYPE_CREDIT,
                 'net_amount' => $amount,
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,

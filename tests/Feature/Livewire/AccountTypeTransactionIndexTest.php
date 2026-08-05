@@ -46,7 +46,7 @@ class AccountTypeTransactionIndexTest extends TestCase
     }
 
     #[Test]
-    public function 仕入れ一覧は仕入金額だけを表示する(): void
+    public function 仕入棚卸一覧は仕入と期末棚卸を含み通常経費は含めない(): void
     {
         [$user, $unit] = $this->createInitializedUser();
         $fiscalYear = $unit->currentFiscalYear;
@@ -55,6 +55,8 @@ class AccountTypeTransactionIndexTest extends TestCase
         $purchase = $unit->getAccountByName('仕入金額')->subAccounts()->firstOrFail();
         $expense = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
         $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $inventoryAsset = $unit->getAccountByName('棚卸資産')->subAccounts()->firstOrFail();
+        $endingInventory = $unit->getAccountByName('期末商品（棚卸高）')->subAccounts()->firstOrFail();
 
         $registrar = new TransactionRegistrar;
 
@@ -95,12 +97,40 @@ class AccountTypeTransactionIndexTest extends TestCase
             ],
         ], $user);
 
-        Livewire::actingAs($user)
-            ->test(AccountTypeTransactionIndex::class, ['kind' => 'purchase'])
+        $registrar->register($fiscalYear, [
+            'date' => '2025-12-15',
+            'description' => '期末棚卸',
+        ], [
+            [
+                'sub_account_id' => $inventoryAsset->id,
+                'type' => 'debit',
+                'net_amount' => 4200,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $endingInventory->id,
+                'type' => 'credit',
+                'net_amount' => 4200,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $user);
+
+        $component = Livewire::actingAs($user)
+            ->test(AccountTypeTransactionIndex::class, ['kind' => 'purchase']);
+
+        $component
             ->assertSee('12,000')
             ->assertSee('仕入金額')
             ->assertSee('仕入先')
+            ->assertSee('期末棚卸')
+            ->assertSee('期末商品（棚卸高）')
             ->assertDontSee('消耗品費');
+
+        $this->assertSame('仕入・棚卸一覧', $component->get('title'));
+        $this->assertSame(
+            ['期首商品（棚卸高）', '仕入金額', '期末商品（棚卸高）'],
+            $component->get('accountNames'),
+        );
     }
 
     #[Test]

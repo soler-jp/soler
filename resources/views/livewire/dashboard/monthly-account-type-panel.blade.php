@@ -8,6 +8,14 @@
                 <span class="text-xl font-bold lg:text-2xl">{{ number_format($totalAmount) }}</span>
                 <span class="text-[11px] font-medium leading-none">円</span>
             </p>
+
+            @if ($noteLines !== [])
+                <div class="mt-3 space-y-1 text-[11px] leading-4 text-gray-600">
+                    @foreach ($noteLines as $noteLine)
+                        <p>{{ $noteLine }}</p>
+                    @endforeach
+                </div>
+            @endif
         </button>
     </div>
 
@@ -27,6 +35,12 @@
             </div>
 
             <div class="space-y-3 p-6">
+                @if ($modalHeaderNote !== '')
+                    <p class="rounded-lg bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-600">
+                        {{ $modalHeaderNote }}
+                    </p>
+                @endif
+
                 <div class="flex items-center justify-between">
                     <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $palette['chip'] }}">
                         {{ count($months) }} ヶ月

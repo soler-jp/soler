@@ -27,7 +27,21 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
 {
     use HasFactory;
 
-    private const PURCHASE_ACCOUNT_NAMES = ['仕入金額'];
+    private const OPENING_INVENTORY_ACCOUNT_NAME = '期首商品（棚卸高）';
+
+    private const PURCHASE_ACCOUNT_NAME = '仕入金額';
+
+    private const ENDING_INVENTORY_ACCOUNT_NAME = '期末商品（棚卸高）';
+
+    /**
+     * 売上原価を構成する損益科目。青色申告決算書と同じく、期首棚卸と期末棚卸も
+     * 一般経費ではなくここに含める（期末棚卸は貸方残高となり原価を減額する）。
+     */
+    private const COST_OF_GOODS_SOLD_ACCOUNT_NAMES = [
+        self::OPENING_INVENTORY_ACCOUNT_NAME,
+        self::PURCHASE_ACCOUNT_NAME,
+        self::ENDING_INVENTORY_ACCOUNT_NAME,
+    ];
 
     private const CASH_BALANCE_ACCOUNT_NAMES = ['現金', '当座預金', '定期預金', 'その他の預金', '普通預金'];
 
@@ -124,22 +138,40 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
      *     account_type?: string,
      *     account_names?: array<int, string>,
      *     excluded_account_names?: array<int, string>,
+     *     modal_header_note?: string,
      *     amount?: int,
      *     note_lines?: array<int, string>,
+     *     inventory_adjustment?: array{
+     *         opening_inventory: int,
+     *         purchases: int,
+     *         ending_inventory: int,
+     *         cost_of_goods_sold: int
+     *     },
      *     breakdowns?: array<int, array{label: string, amount: int}>
      * }>
      */
     public function managementSummaryCards(): array
     {
         $revenueAmount = $this->monthlyAccountTypeSummaryData(Account::TYPE_REVENUE)['total_amount'];
-        $purchaseAmount = $this->monthlyAccountTypeSummaryData(
-            Account::TYPE_EXPENSE,
-            self::PURCHASE_ACCOUNT_NAMES,
-        )['total_amount'];
         $expenseAmount = $this->monthlyAccountTypeSummaryData(
             Account::TYPE_EXPENSE,
-            excludedAccountNames: self::PURCHASE_ACCOUNT_NAMES,
+            excludedAccountNames: self::COST_OF_GOODS_SOLD_ACCOUNT_NAMES,
         )['total_amount'];
+        $purchasesAmount = $this->monthlyAccountTypeSummaryData(
+            Account::TYPE_EXPENSE,
+            [self::PURCHASE_ACCOUNT_NAME],
+        )['total_amount'];
+        $openingInventoryAmount = $this->monthlyAccountTypeSummaryData(
+            Account::TYPE_EXPENSE,
+            [self::OPENING_INVENTORY_ACCOUNT_NAME],
+        )['total_amount'];
+        // 期末棚卸は貸方残高で monthlyAccountTypeSummaries が負値を返すので、
+        // 表示上は符号反転して「差し引く金額」として扱う。
+        $endingInventoryAmount = -$this->monthlyAccountTypeSummaryData(
+            Account::TYPE_EXPENSE,
+            [self::ENDING_INVENTORY_ACCOUNT_NAME],
+        )['total_amount'];
+        $costOfGoodsSoldAmount = $openingInventoryAmount + $purchasesAmount - $endingInventoryAmount;
         $cashBalanceAmount = $this->cashBalanceAmount();
 
         $cards = [
@@ -148,11 +180,15 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
                 'expense',
                 '経費',
                 Account::TYPE_EXPENSE,
-                excludedAccountNames: $purchaseAmount > 0 ? self::PURCHASE_ACCOUNT_NAMES : [],
+                excludedAccountNames: self::COST_OF_GOODS_SOLD_ACCOUNT_NAMES,
             ),
         ];
 
-        if ($purchaseAmount <= 0) {
+        $hasInventoryActivity = $purchasesAmount !== 0
+            || $openingInventoryAmount !== 0
+            || $endingInventoryAmount !== 0;
+
+        if (! $hasInventoryActivity) {
             $cards[] = [
                 'key' => 'profit',
                 'type' => 'amount',
@@ -172,21 +208,44 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
             return $cards;
         }
 
-        $cards[] = $this->managementAccountTypeCard(
+        $purchaseCard = $this->managementAccountTypeCard(
             'purchase',
             '仕入れ',
             Account::TYPE_EXPENSE,
-            accountNames: self::PURCHASE_ACCOUNT_NAMES,
+            accountNames: [self::PURCHASE_ACCOUNT_NAME],
             variant: 'purchase',
         );
+        $purchaseCard['note_lines'] = $this->buildPurchaseCardNoteLines(
+            $openingInventoryAmount,
+            $purchasesAmount,
+            $endingInventoryAmount,
+            $costOfGoodsSoldAmount,
+        );
+        $purchaseCard['inventory_adjustment'] = [
+            'opening_inventory' => $openingInventoryAmount,
+            'purchases' => $purchasesAmount,
+            'ending_inventory' => $endingInventoryAmount,
+            'cost_of_goods_sold' => $costOfGoodsSoldAmount,
+        ];
+        // モーダルの月別表示は仕入金額のままにし、棚卸の文脈は
+        // 集計に混ぜず冒頭の説明文で伝える。
+        $purchaseCard['modal_header_note'] = $this->buildPurchaseModalHeaderNote(
+            $openingInventoryAmount,
+            $endingInventoryAmount,
+        );
+        $cards[] = $purchaseCard;
+
         $cards[] = [
             'key' => 'current_difference',
             'type' => 'amount',
             'title' => '今の差し引き',
             'variant' => 'current_difference',
-            'amount' => $revenueAmount - $expenseAmount - $purchaseAmount,
+            'amount' => $revenueAmount - $expenseAmount - $costOfGoodsSoldAmount,
             'note_lines' => [
-                sprintf('売上から、記録済みの経費と仕入(%s円)を引いた金額です。', number_format($purchaseAmount)),
+                sprintf(
+                    '売上から、記録済みの経費と仕入(%s円)を引いた金額です。',
+                    number_format($costOfGoodsSoldAmount),
+                ),
                 '年末に在庫を入力すると、最終的な利益は変わることがあります。',
             ],
         ];
@@ -199,6 +258,69 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
         );
 
         return $cards;
+    }
+
+    private function buildPurchaseModalHeaderNote(
+        int $openingInventoryAmount,
+        int $endingInventoryAmount,
+    ): string {
+        if ($openingInventoryAmount === 0 && $endingInventoryAmount === 0) {
+            return '';
+        }
+
+        if ($openingInventoryAmount !== 0 && $endingInventoryAmount !== 0) {
+            return sprintf(
+                '前期から %s 円分の在庫が繰り越されていて、期末には %s 円分が残っています。',
+                number_format($openingInventoryAmount),
+                number_format($endingInventoryAmount),
+            );
+        }
+
+        if ($openingInventoryAmount !== 0) {
+            return sprintf(
+                '前期から %s 円分の在庫が繰り越されています。',
+                number_format($openingInventoryAmount),
+            );
+        }
+
+        return sprintf(
+            '期末には %s 円分の在庫が残っています。',
+            number_format($endingInventoryAmount),
+        );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function buildPurchaseCardNoteLines(
+        int $openingInventoryAmount,
+        int $purchasesAmount,
+        int $endingInventoryAmount,
+        int $costOfGoodsSoldAmount,
+    ): array {
+        $lines = [];
+
+        if ($openingInventoryAmount !== 0) {
+            $lines[] = sprintf(
+                '前年から繰り越した在庫 %s 円を加算します。',
+                number_format($openingInventoryAmount),
+            );
+        }
+
+        if ($endingInventoryAmount !== 0) {
+            $lines[] = sprintf(
+                'ただし、期末に残っている %s 円分を差し引いて、%s 円を経費として計上します。',
+                number_format($endingInventoryAmount),
+                number_format($costOfGoodsSoldAmount),
+            );
+        } elseif ($openingInventoryAmount !== 0) {
+            $lines[] = sprintf(
+                '%s 円を経費として計上します。',
+                number_format($costOfGoodsSoldAmount),
+            );
+        }
+
+        return $lines;
     }
 
     /**
