@@ -1,7 +1,15 @@
 <div class="py-12">
     @php($palette = $this->palette())
 
-    <div class="max-w-7xl mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
+        @if ($kind === 'revenue')
+            <livewire:soler-ui.transaction-entry.revenue-form.standard />
+        @elseif ($kind === 'expense' || $kind === 'expense_type')
+            <livewire:soler-ui.transaction-entry.expense-form.standard />
+        @elseif ($kind === 'purchase')
+            <livewire:soler-ui.transaction-entry.purchase-form.standard />
+        @endif
+
         @if (! $groupByMonth)
             <section class="rounded-2xl border shadow-sm {{ $palette['monthCard'] }}">
                 <div class="space-y-4 p-5 sm:p-6">

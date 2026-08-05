@@ -60,7 +60,33 @@
                     </div>
                 </div>
             @endif
+
+            <div>
+                <label class="block text-sm font-semibold text-content mb-1">
+                    {{ __('transactions.expense_form.sections.payment_method') }}
+                </label>
+                <div class="flex flex-wrap gap-2">
+                    @foreach ($creditAccounts as $account)
+                        @foreach ($account->subAccounts as $subAccount)
+                            <button type="button"
+                                wire:click="$set('credit_sub_account_id', {{ $subAccount->id }})"
+                                @class([
+                                    'px-3 py-1.5 text-sm font-medium rounded-control border transition',
+                                    'bg-action-primary text-action-primary-fg border-transparent font-semibold' =>
+                                        $credit_sub_account_id === $subAccount->id,
+                                    'bg-surface text-content border-line hover:bg-surface-muted' =>
+                                        $credit_sub_account_id !== $subAccount->id,
+                                ])>
+                                {{ $subAccount->displayName() }}
+                            </button>
+                        @endforeach
+                    @endforeach
+                </div>
+            </div>
         </div>
+        @error('credit_sub_account_id')
+            <div class="text-xs text-status-danger-fg -mt-2">{{ $message }}</div>
+        @enderror
         @error('date_input')
             <div class="text-xs text-status-danger-fg -mt-2">{{ $message }}</div>
         @enderror
@@ -227,57 +253,31 @@
             @enderror
         </div>
 
-        {{-- 支払方法 --}}
-        <div class="space-y-2">
-            <label class="block text-sm font-semibold text-content">
-                {{ __('transactions.expense_form.sections.payment_method') }}
-            </label>
-            <div class="flex flex-wrap gap-2">
-                @foreach ($creditAccounts as $account)
-                    @foreach ($account->subAccounts as $subAccount)
-                        <button type="button"
-                            wire:click="$set('credit_sub_account_id', {{ $subAccount->id }})"
-                            @class([
-                                'px-3 py-1.5 text-sm font-medium rounded-control border transition',
-                                'bg-action-primary text-action-primary-fg border-transparent font-semibold' =>
-                                    $credit_sub_account_id === $subAccount->id,
-                                'bg-surface text-content border-line hover:bg-surface-muted' =>
-                                    $credit_sub_account_id !== $subAccount->id,
-                            ])>
-                            {{ $subAccount->displayName() }}
-                        </button>
-                    @endforeach
-                @endforeach
+        {{-- 何に使ったか / 支払い先 --}}
+        <div class="flex flex-wrap gap-3">
+            <div class="flex-1 min-w-[12rem]">
+                <label class="block text-sm font-semibold text-content mb-1">
+                    {{ __('transactions.expense_form.fields.note') }}
+                </label>
+                <input type="text" wire:model.defer="note"
+                    placeholder="{{ __('transactions.expense_form.placeholders.note') }}"
+                    class="block w-full px-3 py-2 text-sm bg-surface text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus">
+                @error('note')
+                    <div class="text-xs text-status-danger-fg mt-1">{{ $message }}</div>
+                @enderror
             </div>
-            @error('credit_sub_account_id')
-                <div class="text-xs text-status-danger-fg">{{ $message }}</div>
-            @enderror
-        </div>
 
-        {{-- 何に使ったか --}}
-        <div>
-            <label class="block text-sm font-semibold text-content mb-1">
-                {{ __('transactions.expense_form.fields.note') }}
-            </label>
-            <input type="text" wire:model.defer="note"
-                placeholder="{{ __('transactions.expense_form.placeholders.note') }}"
-                class="block w-full px-3 py-2 text-sm bg-surface text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus">
-            @error('note')
-                <div class="text-xs text-status-danger-fg mt-1">{{ $message }}</div>
-            @enderror
-        </div>
-
-        {{-- 支払い先 --}}
-        <div>
-            <label class="block text-sm font-semibold text-content mb-1">
-                {{ __('transactions.expense_form.fields.counterparty_name') }}
-            </label>
-            <input type="text" wire:model.defer="counterparty_name"
-                placeholder="{{ __('transactions.expense_form.placeholders.counterparty_name') }}"
-                class="block w-full px-3 py-2 text-sm bg-surface text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus">
-            @error('counterparty_name')
-                <div class="text-xs text-status-danger-fg mt-1">{{ $message }}</div>
-            @enderror
+            <div class="flex-1 min-w-[12rem]">
+                <label class="block text-sm font-semibold text-content mb-1">
+                    {{ __('transactions.expense_form.fields.counterparty_name') }}
+                </label>
+                <input type="text" wire:model.defer="counterparty_name"
+                    placeholder="{{ __('transactions.expense_form.placeholders.counterparty_name') }}"
+                    class="block w-full px-3 py-2 text-sm bg-surface text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus">
+                @error('counterparty_name')
+                    <div class="text-xs text-status-danger-fg mt-1">{{ $message }}</div>
+                @enderror
+            </div>
         </div>
 
         <div class="flex justify-end pt-1">

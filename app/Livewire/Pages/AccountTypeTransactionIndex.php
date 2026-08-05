@@ -4,6 +4,7 @@ namespace App\Livewire\Pages;
 
 use App\Models\Account;
 use InvalidArgumentException;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class AccountTypeTransactionIndex extends Component
@@ -194,6 +195,23 @@ class AccountTypeTransactionIndex extends Component
         return ($this->accountType === Account::TYPE_EXPENSE ? 4 : 3)
             + ($this->showTaxTypeColumn ? 1 : 0)
             + 2;
+    }
+
+    #[On('dashboard-transaction-created')]
+    public function onTransactionCreated(): void
+    {
+        $this->availableAccountCounts = $this->resolveAvailableAccountCounts();
+        $this->availableAccountNames = array_keys($this->availableAccountCounts);
+
+        if (! $this->groupByMonth) {
+            $this->accountNames = array_values(array_intersect($this->accountNames, $this->availableAccountNames));
+
+            if ($this->accountNames === []) {
+                $this->accountNames = $this->availableAccountNames;
+            }
+        }
+
+        $this->reloadTransactions();
     }
 
     public function updatedAccountNames(): void
