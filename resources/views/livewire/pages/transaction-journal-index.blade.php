@@ -1,5 +1,5 @@
 <div class="py-8">
-    <div class="mx-auto max-w-7xl space-y-3 px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto space-y-3 px-4 sm:px-6 lg:px-8">
         <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="space-y-3 p-3 sm:p-4">
             <div class="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
