@@ -128,6 +128,7 @@ class FiscalYearRolloverTest extends TestCase
             'fiscal_year_id' => $nextYear->id,
             'is_opening_entry' => true,
         ]);
+        $this->assertNotNull($closedYear->fresh()->rollover_at);
     }
 
     #[Test]

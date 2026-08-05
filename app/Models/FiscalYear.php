@@ -52,6 +52,7 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
         'is_closed',    // 決算済フラグ
         'closed_at',
         'closed_by',
+        'rollover_at',
         'is_taxable',   // 課税事業者ならtrue, 免税事業者なfalse
         'is_tax_exclusive',  // 税抜経理ならtrue, 税込経理ならfalse
         'opening_context',
@@ -66,6 +67,7 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
         'is_active' => 'boolean',
         'is_closed' => 'boolean',
         'closed_at' => 'datetime',
+        'rollover_at' => 'datetime',
         'closed_by' => 'integer',
         'start_date' => 'date',
         'end_date' => 'date',

@@ -43,6 +43,10 @@ class FiscalYearRollover
                 throw new DomainException('繰越する残高がありません。');
             }
 
+            $closedYear->forceFill([
+                'rollover_at' => now(),
+            ])->saveOrFail();
+
             return $openingTransaction;
         }, attempts: 5);
     }

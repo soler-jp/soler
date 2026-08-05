@@ -247,10 +247,12 @@ $nextFiscalYear = $businessUnit->fiscalYears()
     ->firstOrFail();
 
 $openingTransaction = app(FiscalYearRollover::class)
-    ->rollover($fiscalYear, $nextFiscalYear);
+    ->rollover($fiscalYear, $nextFiscalYear, $user);
 ```
 
-生成される期首仕訳は `OpeningEntryRegistrar` の期首仕訳と同じ形式（1 伝票、`is_opening_entry = true`）です。
+`FiscalYearRollover` は翌期繰越の実行入口です。繰越元・繰越先の整合性と認可を検証し、繰越データを計算したうえで、内部で `OpeningEntryRegistrar::registerForRollover()` を呼んで期首仕訳を作成します。
+
+生成される期首仕訳は `OpeningEntryRegistrar` の通常の期首仕訳と同じ形式（1 伝票、`is_opening_entry = true`）です。
 
 ## 制約
 
