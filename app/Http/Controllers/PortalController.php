@@ -57,6 +57,25 @@ class PortalController extends Controller
         ]);
     }
 
+    public function fixedAssets(Request $request)
+    {
+        $user = $request->user();
+
+        $unit = $user->selectedBusinessUnit;
+
+        if ($unit === null) {
+            return redirect()->route('initialize');
+        }
+
+        abort_unless($unit->canAccess($user), 403);
+
+        if (! $unit->currentFiscalYear) {
+            return redirect()->route('initialize');
+        }
+
+        return view('fixed-assets.index');
+    }
+
     public function transactionIndex(Request $request, string $kind)
     {
         $user = $request->user();

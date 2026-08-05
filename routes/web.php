@@ -25,6 +25,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/fixed-expenses', [PortalController::class, 'fixedExpenses'])
         ->name('fixed-expenses');
 
+    Route::get('/fixed-assets', [PortalController::class, 'fixedAssets'])
+        ->name('fixed-assets.index');
+
     Route::get('/blue-return-statement/pdf', [BlueReturnStatementPdfController::class, 'show'])
         ->name('blue-return-statement.pdf.show');
     Route::post('/blue-return-statement/pdf', [BlueReturnStatementPdfController::class, 'download'])
