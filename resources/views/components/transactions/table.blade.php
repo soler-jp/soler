@@ -12,6 +12,8 @@
     'expenseCreditHeader' => '支払い元',
     'taxTypeHeader' => '消費税',
     'counterpartyHeader' => '相手',
+    'deleteAction' => null,
+    'deleteConfirm' => 'この取引を削除しますか？',
 ])
 
 <div {{ $attributes->class(['overflow-hidden border bg-white', $tableWrapClass]) }}>
@@ -32,6 +34,9 @@
                     <th class="px-4 py-3 text-left font-semibold">{{ $counterpartyHeader }}</th>
                     <th class="px-4 py-3 text-left font-semibold">注釈</th>
                     <th class="px-4 py-3 text-right font-semibold">金額</th>
+                    @if ($deleteAction)
+                        <th class="px-4 py-3 text-right font-semibold"><span class="sr-only">操作</span></th>
+                    @endif
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
@@ -75,10 +80,20 @@
                             </div>
                         </td>
                         <td class="whitespace-nowrap px-4 py-3 text-right font-semibold">{{ number_format($transaction['amount']) }}</td>
+                        @if ($deleteAction)
+                            <td class="whitespace-nowrap px-4 py-3 text-right">
+                                <button type="button"
+                                    wire:click="{{ $deleteAction }}({{ $transaction['id'] }})"
+                                    wire:confirm="{{ $deleteConfirm }}"
+                                    class="text-xs font-medium text-red-600 hover:text-red-800 hover:underline">
+                                    削除
+                                </button>
+                            </td>
+                        @endif
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $emptyStateColspan }}" class="px-4 py-6 text-center text-gray-500">
+                        <td colspan="{{ $emptyStateColspan + ($deleteAction ? 1 : 0) }}" class="px-4 py-6 text-center text-gray-500">
                             {{ $emptyMessage }}
                         </td>
                     </tr>

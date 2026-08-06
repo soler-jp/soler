@@ -3,6 +3,7 @@
 namespace App\Livewire\Pages;
 
 use App\Models\Account;
+use App\Models\Transaction;
 use InvalidArgumentException;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -249,6 +250,25 @@ class AccountTypeTransactionIndex extends Component
 
         $this->accountNames = [];
         $this->reloadTransactions();
+    }
+
+    public function deleteTransaction(int $transactionId): void
+    {
+        $actor = auth()->user();
+        $transaction = Transaction::findOrFail($transactionId);
+
+        $transaction->deactivate($actor, '利用者による削除');
+
+        $this->availableAccountCounts = $this->resolveAvailableAccountCounts();
+        $this->availableAccountNames = array_keys($this->availableAccountCounts);
+
+        if (! $this->groupByMonth) {
+            $this->accountNames = array_values(array_intersect($this->accountNames, $this->availableAccountNames));
+        }
+
+        $this->reloadTransactions();
+
+        $this->dispatch('dashboard-transaction-created');
     }
 
     private function reloadTransactions(): void

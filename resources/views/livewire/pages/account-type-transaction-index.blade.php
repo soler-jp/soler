@@ -71,6 +71,7 @@
                         :empty-state-colspan="$this->emptyStateColspan()"
                         empty-message="表示する経費の種類を選ぶと、対象取引がここに表示されます。"
                         key-prefix="index-transaction"
+                        delete-action="deleteTransaction"
                     />
                 </div>
             </section>
@@ -100,6 +101,7 @@
                             :empty-state-colspan="$this->emptyStateColspan()"
                             empty-message="この月の対象取引はありません。"
                             key-prefix="index-transaction"
+                            delete-action="deleteTransaction"
                         />
                     </div>
                 </section>

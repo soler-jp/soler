@@ -6,6 +6,7 @@ use App\Livewire\Pages\AccountTypeTransactionIndex;
 use App\Models\BusinessUnit;
 use App\Models\Counterparty;
 use App\Models\JournalEntry;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -342,6 +343,123 @@ class AccountTypeTransactionIndexTest extends TestCase
         $this->assertSame('旅費交通費', $transactions[0]['debit_label']);
         $this->assertSame('2025-03-10', $transactions[1]['date']);
         $this->assertSame('消耗品費', $transactions[1]['debit_label']);
+    }
+
+    #[Test]
+    public function 経費一覧から取引を帳簿上削除できる(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $supplies = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+
+        $registrar = new TransactionRegistrar;
+
+        $transaction = $registrar->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '削除対象の経費',
+        ], [
+            [
+                'sub_account_id' => $supplies->id,
+                'type' => 'debit',
+                'net_amount' => 1500,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'credit',
+                'net_amount' => 1500,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $user);
+
+        $component = Livewire::actingAs($user)
+            ->test(AccountTypeTransactionIndex::class, ['kind' => 'expense'])
+            ->assertSee('削除対象の経費');
+
+        $component->call('deleteTransaction', $transaction->id)
+            ->assertDispatched('dashboard-transaction-created')
+            ->assertDontSee('削除対象の経費');
+
+        $this->assertFalse($transaction->fresh()->is_active);
+    }
+
+    #[Test]
+    public function 経費の種類別一覧から取引を帳簿上削除できる(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $supplies = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+
+        $registrar = new TransactionRegistrar;
+
+        $transaction = $registrar->register($fiscalYear, [
+            'date' => '2025-05-05',
+            'description' => '種類別で削除',
+        ], [
+            [
+                'sub_account_id' => $supplies->id,
+                'type' => 'debit',
+                'net_amount' => 2500,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'credit',
+                'net_amount' => 2500,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $user);
+
+        $component = Livewire::actingAs($user)
+            ->test(AccountTypeTransactionIndex::class, ['kind' => 'expense_type'])
+            ->set('accountNames', ['消耗品費'])
+            ->assertSee('種類別で削除');
+
+        $component->call('deleteTransaction', $transaction->id)
+            ->assertDispatched('dashboard-transaction-created')
+            ->assertDontSee('種類別で削除');
+
+        $this->assertFalse($transaction->fresh()->is_active);
+        $this->assertSame([], $component->get('transactions'));
+    }
+
+    #[Test]
+    public function 別ユーザーの取引は削除できない(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        [$otherUser, $otherUnit] = $this->createInitializedUser();
+        $otherFiscalYear = $otherUnit->currentFiscalYear;
+        $cash = $otherUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $supplies = $otherUnit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+
+        $registrar = new TransactionRegistrar;
+
+        $otherTransaction = $registrar->register($otherFiscalYear, [
+            'date' => '2025-04-10',
+            'description' => '他人の経費',
+        ], [
+            [
+                'sub_account_id' => $supplies->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $otherUser);
+
+        Livewire::actingAs($user)
+            ->test(AccountTypeTransactionIndex::class, ['kind' => 'expense'])
+            ->call('deleteTransaction', $otherTransaction->id)
+            ->assertStatus(403);
+
+        $this->assertTrue(Transaction::find($otherTransaction->id)->is_active);
     }
 
     /**
