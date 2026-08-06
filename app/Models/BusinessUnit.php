@@ -775,6 +775,48 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
         }
     }
 
+    /**
+     * 「過去年度を閲覧している」状態か。
+     * テーマ切替(stone) 判定用。当年より過去 かつ 未締めの後続年度が存在する場合に true。
+     * 過去に閉じ籠っていて、前に進む切替先がある状態を指す。
+     */
+    public function isViewingPastFiscalYear(): bool
+    {
+        $current = $this->currentFiscalYear;
+
+        if ($current === null) {
+            return false;
+        }
+
+        if ($current->year >= now()->year) {
+            return false;
+        }
+
+        return $this->switchableFiscalYears()
+            ->contains(fn (FiscalYear $fy): bool => $fy->year > $current->year);
+    }
+
+    /**
+     * 現在の会計年度以外で、まだ締めていない会計年度の一覧（年度昇順）。
+     * 過去・未来の両方向を含む。
+     *
+     * @return Collection<int, FiscalYear>
+     */
+    public function switchableFiscalYears(): Collection
+    {
+        $current = $this->currentFiscalYear;
+
+        if ($current === null) {
+            return collect();
+        }
+
+        return $this->fiscalYears()
+            ->where('is_closed', false)
+            ->where('id', '!=', $current->id)
+            ->orderBy('year')
+            ->get();
+    }
+
     public function createNextFiscalYearFrom(
         FiscalYear $fiscalYear,
         User $actor,

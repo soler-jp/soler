@@ -1,5 +1,10 @@
+@php
+    $dataTheme = auth()->user()?->selectedBusinessUnit?->isViewingPastFiscalYear()
+        ? 'stone'
+        : 'default';
+@endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="default">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="{{ $dataTheme }}">
 
 <head>
     <meta charset="utf-8">
@@ -33,6 +38,8 @@
                     </div>
                 </header>
             @endisset
+
+            <livewire:layout.fiscal-year-switcher />
 
             <main class="flex-1">
                 {{ $slot }}
