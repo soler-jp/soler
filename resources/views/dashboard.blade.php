@@ -24,6 +24,12 @@
                 </div>
             @endif
 
+            @if ($shouldPromptNextFiscalYear)
+                <div class="py-6 px-4 sm:px-6 lg:px-8">
+                    <livewire:dashboard.next-fiscal-year-prompt :business-unit="$selectedBusinessUnit" />
+                </div>
+            @endif
+
             <div class="py-6 px-4 sm:px-6 lg:px-8">
                 <livewire:dashboard.profit-summary :fiscal-year="$selectedBusinessUnit->currentFiscalYear" />
             </div>

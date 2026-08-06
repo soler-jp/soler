@@ -27,9 +27,13 @@ class PortalController extends Controller
 
         $fiscalYear = $unit->currentFiscalYear;
 
+        $shouldPromptNextFiscalYear = now()->year !== $fiscalYear->year
+            && ! $unit->fiscalYears()->where('year', $fiscalYear->year + 1)->exists();
+
         return view('dashboard', [
             'selectedBusinessUnit' => $unit,
             'pendingTodos' => $todoService->listPending($unit, $user, $fiscalYear),
+            'shouldPromptNextFiscalYear' => $shouldPromptNextFiscalYear,
         ]);
     }
 
