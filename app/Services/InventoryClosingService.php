@@ -21,9 +21,85 @@ class InventoryClosingService
 
     private const CLOSING_INVENTORY_ACCOUNT = '期末商品（棚卸高）';
 
+    private const PURCHASE_ACCOUNT = '仕入金額';
+
     public function __construct(
         private readonly TransactionRegistrar $transactionRegistrar,
     ) {}
+
+    /**
+     * 棚卸の決算整理仕訳を登録するためのプレビュー情報を返す。
+     * 仕入金額は税込 (net + tax) で借方 − 貸方 の当年度合計を返す。
+     *
+     * @return array{
+     *     already_registered: bool,
+     *     registered_transaction_id: int|null,
+     *     purchases_amount: int,
+     *     sub_accounts: array<int, array{id: int, name: string, opening_balance: int}>,
+     * }
+     */
+    public function previewFor(FiscalYear $fiscalYear, ?User $actor): array
+    {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度の棚卸プレビューを閲覧する権限がありません。');
+
+        $existingClosing = $fiscalYear->transactions()
+            ->where('is_active', true)
+            ->where('adjusting_entry_type', Transaction::ADJUSTING_ENTRY_TYPE_INVENTORY_CLOSING)
+            ->first();
+
+        $inventoryAccount = $this->resolveInventoryAccount($fiscalYear);
+        $openingBalances = $this->resolveOpeningInventoryBalances($fiscalYear, $inventoryAccount);
+
+        $subAccounts = $inventoryAccount->subAccounts()
+            ->orderBy('id')
+            ->get()
+            ->map(fn (SubAccount $sub): array => [
+                'id' => (int) $sub->id,
+                'name' => (string) $sub->name,
+                'opening_balance' => (int) ($openingBalances[$sub->id] ?? 0),
+            ])
+            ->all();
+
+        return [
+            'already_registered' => $existingClosing !== null,
+            'registered_transaction_id' => $existingClosing?->id,
+            'purchases_amount' => $this->resolvePurchasesAmount($fiscalYear),
+            'sub_accounts' => $subAccounts,
+        ];
+    }
+
+    /**
+     * 当年度における仕入金額勘定の税込合計 (借方 − 貸方) を返す。
+     * 期首/期末の棚卸決算整理仕訳は仕入金額勘定を使わないので除外不要。
+     */
+    protected function resolvePurchasesAmount(FiscalYear $fiscalYear): int
+    {
+        $purchaseAccount = $fiscalYear->businessUnit->getAccountByName(self::PURCHASE_ACCOUNT);
+
+        if ($purchaseAccount === null) {
+            return 0;
+        }
+
+        $entries = JournalEntry::query()
+            ->whereHas('transaction', function (Builder $query) use ($fiscalYear): void {
+                $query->whereBelongsTo($fiscalYear)
+                    ->where('is_active', true)
+                    ->where('is_planned', false);
+            })
+            ->whereHas('subAccount', function (Builder $query) use ($purchaseAccount): void {
+                $query->where('account_id', $purchaseAccount->id);
+            })
+            ->get(['type', 'net_amount', 'tax_amount']);
+
+        $total = 0;
+
+        foreach ($entries as $entry) {
+            $amount = (int) $entry->net_amount + (int) $entry->tax_amount;
+            $total += $entry->type === JournalEntry::TYPE_DEBIT ? $amount : -$amount;
+        }
+
+        return $total;
+    }
 
     /**
      * 期末の実地棚卸高から棚卸の決算整理仕訳を登録する。

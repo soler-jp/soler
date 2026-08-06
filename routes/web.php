@@ -53,6 +53,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/fiscal-years', [PortalController::class, 'fiscalYears'])
         ->name('fiscal-years.index');
+
+    Route::get('/fiscal-year-closing', [PortalController::class, 'fiscalYearClosing'])
+        ->name('fiscal-year-closing');
 });
 
 Route::middleware(['auth', 'admin'])

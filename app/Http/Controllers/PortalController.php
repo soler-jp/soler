@@ -131,4 +131,15 @@ class PortalController extends Controller
 
         return view('fiscal-years.index');
     }
+
+    public function fiscalYearClosing(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user->selectedBusinessUnit?->currentFiscalYear) {
+            return redirect()->route('initialize');
+        }
+
+        return view('fiscal-year-closing.index');
+    }
 }

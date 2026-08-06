@@ -683,6 +683,88 @@ class DepreciationService
         return (int) ($schedule[$previousYear]['ending_balance'] ?? 0);
     }
 
+    /**
+     * 期末処理向けの減価償却プレビュー。償却対象の各固定資産について
+     * 当年度の明細情報を返す。明細未作成の資産があれば prepareEntriesFor
+     * を呼び出して補完してから返す。
+     *
+     * @return array<int, array{
+     *     fixed_asset_id: int,
+     *     entry_id: int,
+     *     name: string,
+     *     total_amount: int,
+     *     business_usage_ratio: float,
+     *     deductible_amount: int,
+     *     is_posted: bool,
+     * }>
+     */
+    public function previewFor(FiscalYear $fiscalYear, ?User $actor): array
+    {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度の減価償却プレビューを閲覧する権限がありません。');
+
+        $this->prepareEntriesFor($fiscalYear, $actor);
+
+        $businessUnit = $fiscalYear->businessUnit;
+
+        return $businessUnit->depreciatingFixedAssets($fiscalYear)
+            ->map(function (FixedAsset $asset) use ($fiscalYear): ?array {
+                $entry = $asset->depreciationEntries()
+                    ->where('fiscal_year_id', $fiscalYear->id)
+                    ->first();
+
+                if ($entry === null) {
+                    return null;
+                }
+
+                return [
+                    'fixed_asset_id' => (int) $asset->id,
+                    'entry_id' => (int) $entry->id,
+                    'name' => (string) $asset->name,
+                    'total_amount' => (int) $entry->total_amount,
+                    'business_usage_ratio' => (float) $entry->business_usage_ratio,
+                    'deductible_amount' => (int) $entry->deductible_amount,
+                    'is_posted' => ! $entry->isUnposted(),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * 事業使用割合を上書きしてから当該減価償却明細を記帳する。
+     * $businessUsageRatio は 0.0 〜 1.0 の割合。
+     */
+    public function postWithRatio(
+        DepreciationEntry $entry,
+        float $businessUsageRatio,
+        User $actor,
+    ): void {
+        $this->authorizeBusinessUnitAccess($entry, $actor, 'この減価償却明細を記帳する権限がありません。');
+
+        if ($businessUsageRatio < 0.0 || $businessUsageRatio > 1.0) {
+            throw new \InvalidArgumentException('事業使用割合は 0% 〜 100% で指定してください。');
+        }
+
+        DB::transaction(function () use ($entry, $businessUsageRatio, $actor): void {
+            $lockedEntry = DepreciationEntry::query()
+                ->with(['fiscalYear.businessUnit', 'fixedAsset.account'])
+                ->lockForUpdate()
+                ->findOrFail($entry->getKey());
+
+            if (! $lockedEntry->isUnposted()) {
+                throw new \InvalidArgumentException('この減価償却明細は既に記帳済みです。');
+            }
+
+            $lockedEntry->forceFill([
+                'business_usage_ratio' => $businessUsageRatio,
+                'deductible_amount' => (int) floor((int) $lockedEntry->total_amount * $businessUsageRatio),
+            ])->save();
+
+            $this->registerTransactionFor($lockedEntry->refresh(), $actor);
+        });
+    }
+
     public function registerTransactionFor(DepreciationEntry $entry, User $actor): void
     {
         $this->authorizeBusinessUnitAccess($entry, $actor, 'この減価償却明細を記帳する権限がありません。');

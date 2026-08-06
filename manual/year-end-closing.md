@@ -54,7 +54,7 @@ $transaction->deactivate($user, '予定取消');
 
 その年度に償却が発生する固定資産の償却仕訳を計上します。
 
-### code例
+### code例（バッチで一括計上する場合）
 
 ```php
 use App\Services\DepreciationService;
@@ -62,7 +62,7 @@ use App\Services\DepreciationService;
 $service = app(DepreciationService::class);
 
 // その年度の償却予定を準備する（作成済みならスキップされます）
-$service->prepareEntriesFor($fiscalYear);
+$service->prepareEntriesFor($fiscalYear, $user);
 
 // 未計上の償却予定を取引として計上する
 foreach ($fiscalYear->businessUnit->depreciatingFixedAssets($fiscalYear) as $fixedAsset) {
@@ -75,7 +75,30 @@ foreach ($fiscalYear->businessUnit->depreciatingFixedAssets($fiscalYear) as $fix
         continue;
     }
 
-    $service->registerTransactionFor($entry);
+    $service->registerTransactionFor($entry, $user);
+}
+```
+
+### code例（UI から資産ごとに事業使用割合を指定して計上する場合）
+
+期末処理 UI のように、各資産ごとに事業使用割合（`business_usage_ratio`）を入力させながら順次計上する場合は、次の 2 つの API を使います。
+
+- `previewFor(FiscalYear, ?User)` — 償却対象の各資産について、当年度の `DepreciationEntry` の情報（`total_amount` / `business_usage_ratio` / `deductible_amount` / 計上済みか）を配列で返します。未準備の `DepreciationEntry` があれば内部で `prepareEntriesFor()` を呼んで補完します。
+- `postWithRatio(DepreciationEntry, float $businessUsageRatio, User $actor)` — 指定した割合（`0.0` 〜 `1.0`）で `business_usage_ratio` と `deductible_amount` を上書きしてから `registerTransactionFor()` に委譲します。
+
+```php
+$items = $service->previewFor($fiscalYear, $user);
+
+// 各資産について UI で割合を入力させ、選ばれた割合で計上する
+foreach ($items as $item) {
+    if ($item['is_posted']) {
+        continue;
+    }
+
+    $ratio = $userInputPercent[$item['entry_id']] / 100;  // 例: 50% → 0.5
+    $entry = \App\Models\DepreciationEntry::query()->findOrFail($item['entry_id']);
+
+    $service->postWithRatio($entry, $ratio, $user);
 }
 ```
 
@@ -145,6 +168,7 @@ app(InventoryClosingService::class)->registerFor(
         $inventory->subAccounts()->where('name', '製品')->value('id') => 150_000,
         $inventory->subAccounts()->where('name', '材料')->value('id') => 0,
     ],
+    $user,
 );
 ```
 
@@ -154,7 +178,22 @@ SubAccount を分離していない場合は、既定の `棚卸資産` SubAccou
 app(InventoryClosingService::class)->registerFor(
     $fiscalYear,
     [$inventory->subAccounts()->where('name', '棚卸資産')->value('id') => 500_000],
+    $user,
 );
+```
+
+期首・期末とも合計 0 の場合、`registerFor()` は仕訳を作らず `null` を返します。呼び出し側で null を判定して「登録は不要でした」等の表示に切り替えてください。
+
+### UI 用のプレビュー
+
+期末処理 UI から呼ぶ場合は `previewFor(FiscalYear, ?User)` を使うと、フォームに必要な情報が 1 コールでまとまって返ります。
+
+- `already_registered` / `registered_transaction_id` — 既に棚卸の決算整理仕訳が登録済みかどうか
+- `purchases_amount` — 当年度の `仕入金額` 勘定の税込合計（借方 − 貸方、`is_planned` は除外）
+- `sub_accounts[]` — `棚卸資産` 配下の各 SubAccount の `id` / `name` / `opening_balance`（期首の帳簿棚卸高）
+
+```php
+$preview = app(InventoryClosingService::class)->previewFor($fiscalYear, $user);
 ```
 
 ### SubAccount 単位で振り替える
