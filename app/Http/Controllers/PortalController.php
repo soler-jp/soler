@@ -26,14 +26,20 @@ class PortalController extends Controller
         }
 
         $fiscalYear = $unit->currentFiscalYear;
+        $previousFiscalYear = $unit->fiscalYears()
+            ->where('year', $fiscalYear->year - 1)
+            ->first();
 
         $shouldPromptNextFiscalYear = now()->year !== $fiscalYear->year
             && ! $unit->fiscalYears()->where('year', $fiscalYear->year + 1)->exists();
+        $shouldPromptPreviousFiscalYearRollover = $previousFiscalYear !== null
+            && $previousFiscalYear->rollover_at === null;
 
         return view('dashboard', [
             'selectedBusinessUnit' => $unit,
             'pendingTodos' => $todoService->listPending($unit, $user, $fiscalYear),
             'shouldPromptNextFiscalYear' => $shouldPromptNextFiscalYear,
+            'shouldPromptPreviousFiscalYearRollover' => $shouldPromptPreviousFiscalYearRollover,
         ]);
     }
 
