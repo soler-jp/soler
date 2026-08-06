@@ -257,7 +257,7 @@ class DepreciationServiceTest extends TestCase
         $this->assertSame(330_000, $entries[$fiscalYear2026->id]->total_amount);
         $this->assertSame(330_000, $entries[$fiscalYear2026->id]->deductible_amount);
 
-        app(DepreciationService::class)->prepareEntriesFor($fiscalYear2026);
+        app(DepreciationService::class)->prepareEntriesFor($fiscalYear2026, $user);
 
         $this->assertSame(
             2,

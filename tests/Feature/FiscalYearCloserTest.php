@@ -59,7 +59,7 @@ class FiscalYearCloserTest extends TestCase
             'useful_life' => 72,
         ]);
 
-        app(DepreciationService::class)->prepareEntriesFor($fiscalYear);
+        app(DepreciationService::class)->prepareEntriesFor($fiscalYear, $user);
 
         FixedAsset::factory()->create([
             'business_unit_id' => $unit->id,

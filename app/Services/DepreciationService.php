@@ -467,9 +467,10 @@ class DepreciationService
         return ($end->year - $start->year) * 12 + ($end->month - $start->month) + 1;
     }
 
-    #[SkipActorGuard('システムから呼ばれるバッチ処理。TODO: 呼び出し元で FiscalYear を actor でガードする経路を確認する。')]
-    public function prepareEntriesFor(FiscalYear $fiscalYear): void
+    public function prepareEntriesFor(FiscalYear $fiscalYear, ?User $actor): void
     {
+        $this->authorizeBusinessUnitAccess($fiscalYear, $actor, 'この会計年度の減価償却明細を準備する権限がありません。');
+
         $businessUnit = $fiscalYear->businessUnit;
 
         $fixedAssets = $businessUnit->fixedAssets()

@@ -568,7 +568,7 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
 
             $this->setCurrentFiscalYearIfNotSet($fiscalYear, $actor);
 
-            app(DepreciationService::class)->prepareEntriesFor($fiscalYear);
+            app(DepreciationService::class)->prepareEntriesFor($fiscalYear, $actor);
 
             return $fiscalYear;
         });
