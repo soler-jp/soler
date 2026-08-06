@@ -87,17 +87,27 @@
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
+                                    @php
+                                        $isCurrent = $currentFiscalYearId === $fiscalYear['id'];
+                                    @endphp
                                     <div class="flex flex-wrap justify-end gap-2">
                                         <button
                                             type="button"
                                             wire:click="switchFiscalYear({{ $fiscalYear['id'] }})"
-                                            @disabled($currentFiscalYearId === $fiscalYear['id'])
+                                            @disabled($isCurrent)
                                             class="inline-flex items-center justify-center border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                                         >
-                                            {{ $currentFiscalYearId === $fiscalYear['id'] ? '表示中です' : 'この年度を見る' }}
+                                            {{ $isCurrent ? '表示中です' : 'この年度を見る' }}
                                         </button>
 
-                                        @if ($fiscalYear['can_close'])
+                                        @if ($isCurrent && $fiscalYear['can_close'])
+                                            <a
+                                                href="{{ route('fiscal-year-closing') }}"
+                                                wire:navigate
+                                                class="inline-flex items-center justify-center border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+                                            >
+                                                1年のまとめをする
+                                            </a>
                                             <button
                                                 type="button"
                                                 wire:click="openCloseConfirm({{ $fiscalYear['id'] }})"
@@ -113,7 +123,7 @@
                                             >
                                                 {{ $fiscalYear['next_year'] }}年度の繰越内容を確認
                                             </button>
-                                        @else
+                                        @elseif ($fiscalYear['is_closed'])
                                             <span class="inline-flex items-center border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500">
                                                 翌年度は作成済み
                                             </span>

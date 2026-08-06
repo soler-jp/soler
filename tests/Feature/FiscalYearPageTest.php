@@ -36,6 +36,31 @@ class FiscalYearPageTest extends TestCase
         $response->assertSee('2024年度');
         $response->assertSee('この年度を見る');
         $response->assertSee('この年度を締める');
+        $response->assertSee('1年のまとめをする');
         $response->assertSee('2026年度の繰越内容を確認');
+    }
+
+    #[Test]
+    public function 現在の年度以外は締めボタンを表示しない(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '締めボタン制限テスト事業']);
+
+        // 未締めの過去年度と、未締めの現在年度を用意する
+        $pastFiscalYear = $unit->createFiscalYear(2024, $user);
+        $currentFiscalYear = $unit->createFiscalYear(2025, $user);
+        $unit->activateFiscalYear($currentFiscalYear, $user);
+
+        $response = $this->actingAs($user)->get(route('fiscal-years.index'));
+
+        $response->assertOk();
+        // 現在年度 (2025) には両方のボタンが出る
+        $response->assertSee('1年のまとめをする');
+        // 「この年度を締める」は1回しか表示されない (= 現在年度のみ)
+        $this->assertSame(
+            1,
+            substr_count($response->getContent(), 'この年度を締める'),
+            '「この年度を締める」は現在年度に対してのみ表示されること',
+        );
     }
 }
