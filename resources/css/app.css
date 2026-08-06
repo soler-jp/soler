@@ -1,5 +1,6 @@
 @import './design-system/themes/default.css';
 @import './design-system/themes/crimson.css';
+@import './design-system/themes/stone.css';
 
 @tailwind base;
 @tailwind components;
