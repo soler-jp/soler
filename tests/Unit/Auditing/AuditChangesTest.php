@@ -1,0 +1,87 @@
+<?php
+
+namespace Tests\Unit\Auditing;
+
+use App\Auditing\AuditChanges;
+use App\Models\Transaction;
+use Tests\TestCase;
+
+class AuditChangesTest extends TestCase
+{
+    public function test_default_construction_produces_empty_shape(): void
+    {
+        $changes = new AuditChanges;
+
+        $this->assertTrue($changes->isEmpty());
+        $this->assertSame(1, $changes->payloadVersion);
+    }
+
+    public function test_to_array_serializes_empty_subject_and_related_as_json_objects(): void
+    {
+        $changes = new AuditChanges;
+
+        $encoded = json_encode($changes->toArray());
+        $this->assertSame('{"subject":{},"related":{}}', $encoded);
+    }
+
+    public function test_to_array_serializes_populated_subject_as_json_object(): void
+    {
+        $changes = new AuditChanges(
+            subject: ['is_active' => [true, false]],
+        );
+
+        $encoded = json_encode($changes->toArray());
+        $this->assertSame('{"subject":{"is_active":[true,false]},"related":{}}', $encoded);
+    }
+
+    public function test_to_array_serializes_populated_related_correctly(): void
+    {
+        $changes = new AuditChanges(
+            subject: ['date' => [null, '2026-08-07']],
+            related: [
+                'journal_entries' => [
+                    'created' => [
+                        ['id' => 100, 'attributes' => ['sub_account_id' => 5]],
+                    ],
+                ],
+            ],
+        );
+
+        $decoded = json_decode(json_encode($changes->toArray()), true);
+        $this->assertSame([null, '2026-08-07'], $decoded['subject']['date']);
+        $this->assertSame(100, $decoded['related']['journal_entries']['created'][0]['id']);
+    }
+
+    public function test_is_empty_returns_true_only_when_both_subject_and_related_are_empty(): void
+    {
+        $this->assertTrue((new AuditChanges)->isEmpty());
+        $this->assertFalse((new AuditChanges(subject: ['x' => [1, 2]]))->isEmpty());
+        $this->assertFalse((new AuditChanges(related: ['rel' => ['created' => []]]))->isEmpty());
+    }
+
+    public function test_payload_version_is_preserved(): void
+    {
+        $changes = new AuditChanges(payloadVersion: 3);
+
+        $this->assertSame(3, $changes->payloadVersion);
+    }
+
+    public function test_for_transaction_deactivated_shape_is_fixed(): void
+    {
+        // shape 固定テスト。将来 shape を変える際は payloadVersion 増分と合わせる。
+        $transaction = new Transaction;
+        $transaction->deactivated_at = new \DateTimeImmutable('2026-08-07T12:34:56+00:00');
+
+        $changes = AuditChanges::forTransactionDeactivated($transaction);
+
+        $this->assertSame(1, $changes->payloadVersion);
+        $this->assertSame(
+            [
+                'is_active' => [true, false],
+                'deactivated_at' => [null, '2026-08-07T12:34:56+00:00'],
+            ],
+            $changes->subject,
+        );
+        $this->assertSame([], $changes->related);
+    }
+}
