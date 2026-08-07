@@ -90,4 +90,37 @@ class AuditLog extends Model implements ResolvesBusinessUnit
             ->orderByDesc('audit_logs.recorded_at')
             ->orderByDesc('audit_logs.id');
     }
+
+    public function scopeForFiscalYear(Builder $query, FiscalYear $fiscalYear): Builder
+    {
+        $businessUnitId = $fiscalYear->business_unit_id;
+        $fiscalYearType = $fiscalYear->getMorphClass();
+        $fiscalYearId = (string) $fiscalYear->getKey();
+        $transactionType = (new Transaction)->getMorphClass();
+
+        return $query
+            ->where('business_unit_id', $businessUnitId)
+            ->where(function (Builder $query) use ($fiscalYear, $fiscalYearType, $fiscalYearId, $transactionType, $businessUnitId): void {
+                $query->whereExists(function ($sub) use ($businessUnitId, $fiscalYearType, $fiscalYearId) {
+                    $sub->select(DB::raw(1))
+                        ->from('audit_log_targets')
+                        ->whereColumn('audit_log_targets.audit_log_id', 'audit_logs.id')
+                        ->where('audit_log_targets.business_unit_id', $businessUnitId)
+                        ->where('audit_log_targets.auditable_type', $fiscalYearType)
+                        ->where('audit_log_targets.auditable_id', $fiscalYearId);
+                })->orWhereExists(function ($sub) use ($fiscalYear, $transactionType, $businessUnitId) {
+                    $sub->select(DB::raw(1))
+                        ->from('audit_log_targets')
+                        ->join('transactions', function ($join) use ($transactionType) {
+                            $join->on('transactions.id', '=', 'audit_log_targets.auditable_id')
+                                ->where('audit_log_targets.auditable_type', '=', $transactionType);
+                        })
+                        ->whereColumn('audit_log_targets.audit_log_id', 'audit_logs.id')
+                        ->where('audit_log_targets.business_unit_id', $businessUnitId)
+                        ->where('transactions.fiscal_year_id', $fiscalYear->getKey());
+                });
+            })
+            ->orderByDesc('audit_logs.recorded_at')
+            ->orderByDesc('audit_logs.id');
+    }
 }

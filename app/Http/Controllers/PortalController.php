@@ -142,4 +142,22 @@ class PortalController extends Controller
 
         return view('fiscal-year-closing.index');
     }
+
+    public function auditLogs(Request $request)
+    {
+        $user = $request->user();
+        $unit = $user->selectedBusinessUnit;
+
+        if ($unit === null) {
+            return redirect()->route('initialize');
+        }
+
+        abort_unless($unit->canAccess($user), 403);
+
+        if (! $unit->currentFiscalYear) {
+            return redirect()->route('initialize');
+        }
+
+        return view('audit-logs.index');
+    }
 }

@@ -11,6 +11,7 @@ return [
     'expense_by_type' => '経費の種類別一覧',
     'journal' => '仕訳帳一覧',
     'account_summary' => '勘定科目集計',
+    'audit_logs' => 'ログを確認',
 
     'section_other' => 'その他',
     'fixed_assets' => '固定資産',

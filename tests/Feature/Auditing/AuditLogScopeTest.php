@@ -9,6 +9,9 @@ use App\Auditing\AuditTargetRole;
 use App\Models\AuditLog;
 use App\Models\AuditLogTarget;
 use App\Models\BusinessUnit;
+use App\Models\FiscalYear;
+use App\Models\Transaction;
+use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -93,6 +96,36 @@ class AuditLogScopeTest extends TestCase
         $this->assertCount(1, $logs, 'forAuditable() が重複行を返しています');
     }
 
+    public function test_for_fiscal_year_returns_logs_for_transactions_in_that_fiscal_year_regardless_of_recorded_at(): void
+    {
+        $user = User::factory()->create();
+        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '監査ログ対象']);
+        $currentFiscalYear = $businessUnit->createFiscalYear(2025, $user);
+        $otherFiscalYear = $businessUnit->createFiscalYear(2024, $user);
+
+        $currentTransaction = Transaction::factory()->create([
+            'fiscal_year_id' => $currentFiscalYear->id,
+            'created_by' => $user->id,
+        ]);
+        $otherTransaction = Transaction::factory()->create([
+            'fiscal_year_id' => $otherFiscalYear->id,
+            'created_by' => $user->id,
+        ]);
+
+        $visible = $this->logForTarget($businessUnit, $currentTransaction, '2026-08-07 12:00:00');
+        $this->logForTarget($businessUnit, $otherTransaction, '2026-08-07 12:05:00');
+        $this->logForTarget($businessUnit, $currentFiscalYear, '2026-08-07 12:10:00');
+
+        $logs = AuditLog::query()->forFiscalYear($currentFiscalYear)->get();
+
+        $this->assertCount(2, $logs);
+        $this->assertTrue($logs->contains(fn (AuditLog $log): bool => $log->is($visible)));
+        $this->assertTrue($logs->contains(fn (AuditLog $log): bool => $log->targets->contains(
+            fn (AuditLogTarget $target): bool => $target->auditable_type === $currentFiscalYear->getMorphClass()
+                && $target->auditable_id === (string) $currentFiscalYear->id
+        )));
+    }
+
     private function log(BusinessUnit $bu): AuditLog
     {
         $logger = app(AuditLogger::class);
@@ -112,5 +145,33 @@ class AuditLogScopeTest extends TestCase
         usleep(2000);
 
         return $log;
+    }
+
+    private function logForTarget(BusinessUnit $businessUnit, BusinessUnit|FiscalYear|Transaction $target, string $recordedAt): AuditLog
+    {
+        $log = new AuditLog;
+        $log->forceFill([
+            'business_unit_id' => $businessUnit->id,
+            'event_type' => AuditEvent::TransactionDeactivated->value,
+            'actor_id' => $businessUnit->user->id,
+            'actor_label' => $businessUnit->user->name,
+            'reason' => 'scope test',
+            'payload_version' => 1,
+            'changes' => null,
+            'context' => null,
+            'recorded_at' => $recordedAt,
+        ])->save();
+
+        $auditTarget = new AuditLogTarget;
+        $auditTarget->forceFill([
+            'audit_log_id' => $log->id,
+            'business_unit_id' => $businessUnit->id,
+            'role' => AuditTargetRole::Subject->value,
+            'auditable_type' => $target->getMorphClass(),
+            'auditable_id' => (string) $target->getKey(),
+            'recorded_at' => $recordedAt,
+        ])->save();
+
+        return $log->fresh('targets');
     }
 }

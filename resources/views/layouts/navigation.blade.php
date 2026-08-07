@@ -16,6 +16,7 @@
                 ['label' => __('navigation.expense_by_type'), 'route' => 'transactions.expense-types'],
                 ['label' => __('navigation.journal'), 'route' => 'transactions.journal'],
                 ['label' => __('navigation.account_summary'), 'route' => 'accounts.summary'],
+                ['label' => __('navigation.audit_logs'), 'route' => 'audit-logs.index'],
             ],
         ],
         [
