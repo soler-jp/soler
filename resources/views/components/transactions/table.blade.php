@@ -14,7 +14,15 @@
     'counterpartyHeader' => '相手',
     'deleteAction' => null,
     'deleteConfirm' => 'この取引を削除しますか？',
+    'editAction' => null,
+    'editingTransactionId' => null,
+    'editLivewireComponent' => null,
 ])
+
+@php
+    $actionColumnCount = ($deleteAction ? 1 : 0) + ($editAction ? 1 : 0);
+    $totalColumnCount = $emptyStateColspan + $actionColumnCount;
+@endphp
 
 <div {{ $attributes->class(['overflow-hidden border bg-white', $tableWrapClass]) }}>
     <div class="overflow-x-auto">
@@ -34,8 +42,8 @@
                     <th class="px-4 py-3 text-left font-semibold">{{ $counterpartyHeader }}</th>
                     <th class="px-4 py-3 text-left font-semibold">注釈</th>
                     <th class="px-4 py-3 text-right font-semibold">金額</th>
-                    @if ($deleteAction)
-                        <th class="px-4 py-3 text-right font-semibold"><span class="sr-only">操作</span></th>
+                    @if ($actionColumnCount > 0)
+                        <th class="px-4 py-3 text-right font-semibold" colspan="{{ $actionColumnCount }}"><span class="sr-only">操作</span></th>
                     @endif
                 </tr>
             </thead>
@@ -80,6 +88,17 @@
                             </div>
                         </td>
                         <td class="whitespace-nowrap px-4 py-3 text-right font-semibold">{{ number_format($transaction['amount']) }}</td>
+                        @if ($editAction)
+                            <td class="whitespace-nowrap px-4 py-3 text-right">
+                                @if (! empty($transaction['is_single_pair']))
+                                    <button type="button"
+                                        wire:click="{{ $editAction }}({{ $transaction['id'] }})"
+                                        class="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                                        編集
+                                    </button>
+                                @endif
+                            </td>
+                        @endif
                         @if ($deleteAction)
                             <td class="whitespace-nowrap px-4 py-3 text-right">
                                 <button type="button"
@@ -91,9 +110,16 @@
                             </td>
                         @endif
                     </tr>
+                    @if ($editAction && $editLivewireComponent && $editingTransactionId === $transaction['id'])
+                        <tr wire:key="{{ $keyPrefix }}-edit-{{ $transaction['id'] }}">
+                            <td colspan="{{ $totalColumnCount }}" class="bg-gray-50 px-4 py-4">
+                                @livewire($editLivewireComponent, ['transactionId' => $transaction['id']], key('edit-'.$transaction['id']))
+                            </td>
+                        </tr>
+                    @endif
                 @empty
                     <tr>
-                        <td colspan="{{ $emptyStateColspan + ($deleteAction ? 1 : 0) }}" class="px-4 py-6 text-center text-gray-500">
+                        <td colspan="{{ $totalColumnCount }}" class="px-4 py-6 text-center text-gray-500">
                             {{ $emptyMessage }}
                         </td>
                     </tr>

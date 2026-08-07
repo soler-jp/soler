@@ -499,7 +499,8 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
      *     credit_badge_class: string,
      *     tax_type_label: string,
      *     tax_type_badge_class: string,
-     *     counterparty_name: string
+     *     counterparty_name: string,
+     *     is_single_pair: bool
      * }>
      */
     public function monthlyAccountTypeTransactions(
@@ -575,6 +576,7 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
                     'tax_type_label' => $this->monthlyTaxTypeLabel($representativeEntries),
                     'tax_type_badge_class' => $this->monthlyTaxTypeBadgeClass($representativeEntries),
                     'counterparty_name' => $transaction->counterparty?->name ?? '',
+                    'is_single_pair' => $transaction->is_single_pair,
                 ];
             })
             ->filter(fn (array $transaction): bool => $transaction['amount'] !== 0)
@@ -640,7 +642,8 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
      *     credit_badge_class: string,
      *     tax_type_label: string,
      *     tax_type_badge_class: string,
-     *     counterparty_name: string
+     *     counterparty_name: string,
+     *     is_single_pair: bool
      * }>
      */
     public function accountTypeTransactions(
@@ -712,6 +715,7 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
                     'tax_type_label' => $this->monthlyTaxTypeLabel($representativeEntries),
                     'tax_type_badge_class' => $this->monthlyTaxTypeBadgeClass($representativeEntries),
                     'counterparty_name' => $transaction->counterparty?->name ?? '',
+                    'is_single_pair' => $transaction->is_single_pair,
                 ];
             })
             ->filter(fn (array $transaction): bool => $transaction['amount'] !== 0)

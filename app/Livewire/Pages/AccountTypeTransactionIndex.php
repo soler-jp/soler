@@ -29,6 +29,8 @@ class AccountTypeTransactionIndex extends Component
 
     public bool $groupByMonth = true;
 
+    public ?int $editingTransactionId = null;
+
     /**
      * @var array<int, string>
      */
@@ -250,6 +252,39 @@ class AccountTypeTransactionIndex extends Component
 
         $this->accountNames = [];
         $this->reloadTransactions();
+    }
+
+    public function startEditTransaction(int $transactionId): void
+    {
+        $this->editingTransactionId = $transactionId;
+    }
+
+    #[On('transaction-edit-cancelled')]
+    public function onTransactionEditCancelled(): void
+    {
+        $this->editingTransactionId = null;
+    }
+
+    #[On('transaction-edit-finished')]
+    public function onTransactionEditFinished(): void
+    {
+        $this->editingTransactionId = null;
+        $this->reloadTransactions();
+    }
+
+    public function editLivewireComponent(): ?string
+    {
+        return match ($this->kind) {
+            'expense', 'expense_type' => 'soler-ui.transaction-entry.expense-form.edit',
+            'revenue' => 'soler-ui.transaction-entry.revenue-form.edit',
+            'purchase' => 'soler-ui.transaction-entry.purchase-form.edit',
+            default => null,
+        };
+    }
+
+    public function editAction(): ?string
+    {
+        return $this->editLivewireComponent() !== null ? 'startEditTransaction' : null;
     }
 
     public function deleteTransaction(int $transactionId): void

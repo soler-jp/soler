@@ -29,6 +29,9 @@ return [
             'submit' => '登録する',
             'confirm' => '登録する',
             'back' => '修正する',
+            'update' => '更新する',
+            'update_suffix' => 'で更新する',
+            'cancel' => 'キャンセル',
         ],
         'tax_options' => [
             '10' => '10%',
@@ -53,10 +56,16 @@ return [
         ],
         'messages' => [
             'registered' => '売上を登録しました',
+            'updated' => '売上を更新しました',
+            'revision_reason' => '利用者による売上の編集',
         ],
         'errors' => [
             'registration_failed' => '売上の登録に失敗しました',
+            'update_failed' => '売上の更新に失敗しました',
             'invalid_date' => '日付が正しくありません。MMDD形式で入力してください。',
+        ],
+        'edit' => [
+            'title' => '売上を編集',
         ],
     ],
 
@@ -84,6 +93,9 @@ return [
             'show_less' => '折りたたむ',
             'add_account' => '勘定科目を追加する',
             'submit' => '登録する',
+            'update' => '更新する',
+            'update_suffix' => 'で更新する',
+            'cancel' => 'キャンセル',
         ],
         'tax_options' => [
             '10' => '10%',
@@ -105,10 +117,16 @@ return [
         ],
         'messages' => [
             'registered' => '経費を登録しました',
+            'updated' => '経費を更新しました',
+            'revision_reason' => '利用者による経費の編集',
         ],
         'errors' => [
             'registration_failed' => '経費の登録に失敗しました',
+            'update_failed' => '経費の更新に失敗しました',
             'invalid_date' => '日付が正しくありません。MMDD形式で入力してください。',
+        ],
+        'edit' => [
+            'title' => '経費を編集',
         ],
     ],
 
@@ -131,6 +149,9 @@ return [
         ],
         'actions' => [
             'submit' => '登録する',
+            'update' => '更新する',
+            'update_suffix' => 'で更新する',
+            'cancel' => 'キャンセル',
         ],
         'tax_options' => [
             '10' => '10%',
@@ -139,10 +160,16 @@ return [
         ],
         'messages' => [
             'registered' => '仕入を登録しました',
+            'updated' => '仕入を更新しました',
+            'revision_reason' => '利用者による仕入の編集',
         ],
         'errors' => [
             'registration_failed' => '仕入の登録に失敗しました',
+            'update_failed' => '仕入の更新に失敗しました',
             'invalid_date' => '日付が正しくありません。MMDD形式で入力してください。',
+        ],
+        'edit' => [
+            'title' => '仕入を編集',
         ],
     ],
 
