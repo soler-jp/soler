@@ -189,6 +189,22 @@ class Transaction extends Model implements ResolvesBusinessUnit
         return $this->journalEntries->where('type', 'credit')->sum('net_amount');
     }
 
+    public function getIsSinglePairAttribute(): bool
+    {
+        $entries = $this->relationLoaded('journalEntries')
+            ? $this->journalEntries
+            : $this->loadMissing('journalEntries')->journalEntries;
+
+        if ($entries->count() !== 2) {
+            return false;
+        }
+
+        $debitCount = $entries->where('type', JournalEntry::TYPE_DEBIT)->count();
+        $creditCount = $entries->where('type', JournalEntry::TYPE_CREDIT)->count();
+
+        return $debitCount === 1 && $creditCount === 1;
+    }
+
     public function getBusinessRatioAttribute(): ?int
     {
         if ($this->business_ratio_state !== self::BUSINESS_RATIO_STATE_UNIFORM) {
