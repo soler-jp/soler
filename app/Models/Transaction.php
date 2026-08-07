@@ -2,8 +2,14 @@
 
 namespace App\Models;
 
+use App\Auditing\AuditChanges;
+use App\Auditing\AuditContext;
+use App\Auditing\AuditEvent;
+use App\Auditing\AuditTarget;
+use App\Auditing\AuditTargetRole;
 use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Contracts\ResolvesBusinessUnit;
+use App\Services\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -231,12 +237,24 @@ class Transaction extends Model implements ResolvesBusinessUnit
         }
 
         DB::transaction(function () use ($actor, $reason) {
-            $this->forceFill([
-                'is_active' => false,
-                'deactivated_at' => now(),
-                'deactivated_by' => $actor->id,
-                'deactivation_reason' => $reason,
-            ])->save();
+            AuditContext::within(AuditEvent::TransactionDeactivated, function () use ($actor, $reason): void {
+                $this->forceFill([
+                    'is_active' => false,
+                    'deactivated_at' => now(),
+                    'deactivated_by' => $actor->id,
+                    'deactivation_reason' => $reason,
+                ])->save();
+
+                app(AuditLogger::class)->record(
+                    event: AuditEvent::TransactionDeactivated,
+                    targets: [
+                        new AuditTarget(AuditTargetRole::Subject, $this),
+                    ],
+                    actor: $actor,
+                    changes: AuditChanges::forTransactionDeactivated($this),
+                    reason: $reason,
+                );
+            });
         });
     }
 

@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Livewire;
 
+use App\Auditing\AuditEvent;
 use App\Livewire\Pages\AccountTypeTransactionIndex;
+use App\Models\AuditLog;
 use App\Models\BusinessUnit;
 use App\Models\Counterparty;
 use App\Models\JournalEntry;
@@ -382,6 +384,16 @@ class AccountTypeTransactionIndexTest extends TestCase
             ->assertDontSee('削除対象の経費');
 
         $this->assertFalse($transaction->fresh()->is_active);
+        $this->assertDatabaseHas('audit_logs', [
+            'business_unit_id' => $unit->id,
+            'event_type' => AuditEvent::TransactionDeactivated->value,
+            'actor_id' => $user->id,
+            'reason' => '利用者による削除',
+        ]);
+
+        $auditLog = AuditLog::query()->latest('id')->firstOrFail();
+
+        $this->assertTrue($auditLog->targets()->exists());
     }
 
     #[Test]

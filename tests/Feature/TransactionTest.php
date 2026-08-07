@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Auditing\AuditEvent;
+use App\Models\AuditLog;
 use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\Transaction;
@@ -66,6 +68,13 @@ class TransactionTest extends TestCase
         $this->assertNotNull($transaction->deactivated_at);
         $this->assertSame($user->id, $transaction->deactivated_by);
         $this->assertSame('誤登録のため無効化', $transaction->deactivation_reason);
+
+        $auditLog = AuditLog::query()->latest('id')->first();
+
+        $this->assertNotNull($auditLog);
+        $this->assertSame(AuditEvent::TransactionDeactivated, $auditLog->event_type);
+        $this->assertSame($user->id, $auditLog->actor_id);
+        $this->assertSame('誤登録のため無効化', $auditLog->reason);
     }
 
     #[Test]
