@@ -48,7 +48,6 @@
                     <th class="border px-4 py-2 text-left">名前</th>
                     <th class="border px-4 py-2 text-left">メール</th>
                     <th class="border px-4 py-2 text-left">管理者</th>
-                    <th class="border px-4 py-2 text-left">操作</th>
                 </tr>
             </thead>
             <tbody>
@@ -59,12 +58,6 @@
                         <td class="border px-4 py-2">{{ $user->email }}</td>
                         <td class="border px-4 py-2">
                             {{ $user->is_admin ? '✔' : '' }}
-                        </td>
-                        <td class="border px-4 py-2">
-                            <button wire:click="deleteUser({{ $user->id }})"
-                                class="text-sm text-red-600 hover:underline" onclick="return confirm('本当に削除しますか？')">
-                                削除
-                            </button>
                         </td>
                     </tr>
                 @endforeach

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Contracts\ResolvesBusinessUnit;
+use App\Exceptions\PhysicalDeletionNotAllowed;
 use App\Services\DepreciationService;
 use App\Services\TransactionRegistrar;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -80,18 +81,15 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
 
     protected static function booted(): void
     {
+        // BusinessUnit の物理削除は初期実装ではサポートしない。
+        // 監査ログをはじめ会計データが長期保存対象になるため、削除は
+        // 「退会」「無効化」「匿名化」の別フローとして設計する必要がある。
+        // 現状はドメイン上の禁則として fail-closed で拒否する。
         static::deleting(function (BusinessUnit $businessUnit): void {
-            if ($businessUnit->current_fiscal_year_id !== null) {
-                $businessUnit->updateQuietly([
-                    'current_fiscal_year_id' => null,
-                ]);
-            }
-
-            $businessUnit->fixedAssets()->delete();
-            $businessUnit->fiscalYears()->each(function (FiscalYear $fiscalYear): void {
-                $fiscalYear->delete();
-            });
-            $businessUnit->accounts->each->delete();
+            throw new PhysicalDeletionNotAllowed(
+                'BusinessUnit の物理削除は許可されていません。'
+                .'退会や無効化は将来の専用フローで扱います。',
+            );
         });
     }
 

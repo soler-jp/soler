@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\FixedAsset;
+use App\Exceptions\PhysicalDeletionNotAllowed;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,17 +49,17 @@ class UserTest extends TestCase
     }
 
     #[Test]
-    public function current_business_unitが削除されたらnullになる()
+    public function business_unitの物理削除は拒否される(): void
     {
+        // 監査ログ導入に伴い、BusinessUnit の物理削除はサポートしない。
+        // 削除は将来の退会・匿名化フローで扱う。
         $user = User::factory()->create();
         $unit = $user->createBusinessUnitWithDefaults(['name' => '削除予定']);
 
-        $user->update(['current_business_unit_id' => $unit->id]);
+        $this->expectException(PhysicalDeletionNotAllowed::class);
+        $this->expectExceptionMessageMatches('/物理削除は許可されていません/');
+
         $unit->delete();
-
-        $user->refresh();
-
-        $this->assertNull($user->selectedBusinessUnit);
     }
 
     #[Test]
@@ -100,49 +100,16 @@ class UserTest extends TestCase
     }
 
     #[Test]
-    public function userを削除すると関連する事業体と仕訳データも削除できる()
+    public function userの物理削除は拒否される(): void
     {
+        // 監査ログ (actor_id) や会計データが長期保存対象になるため、
+        // User の物理削除はサポートしない。
         $user = User::factory()->create();
-        $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '削除対象事業体']);
-        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
+        $user->createBusinessUnitWithDefaults(['name' => '対象事業体']);
 
-        $cashSubAccount = $businessUnit->getAccountByName('現金')->subAccounts()->firstOrFail();
-        $salesSubAccount = $businessUnit->getAccountByName('売上高')->subAccounts()->firstOrFail();
-        $fixedAssetAccount = $businessUnit->getAccountByName('車両運搬具');
-
-        $transaction = $fiscalYear->registerTransaction(
-            [
-                'date' => '2025-01-01',
-                'description' => 'テスト売上',
-            ],
-            [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 1000,
-                    'tax_amount' => 0,
-                ],
-                [
-                    'sub_account_id' => $salesSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 1000,
-                    'tax_amount' => 0,
-                ],
-            ],
-            $user
-        );
-
-        $fixedAsset = FixedAsset::factory()->create([
-            'business_unit_id' => $businessUnit->id,
-            'account_id' => $fixedAssetAccount->id,
-        ]);
+        $this->expectException(PhysicalDeletionNotAllowed::class);
+        $this->expectExceptionMessageMatches('/物理削除は許可されていません/');
 
         $user->delete();
-
-        $this->assertModelMissing($user);
-        $this->assertModelMissing($businessUnit);
-        $this->assertModelMissing($fiscalYear);
-        $this->assertModelMissing($transaction);
-        $this->assertModelMissing($fixedAsset);
     }
 }

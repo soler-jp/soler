@@ -79,23 +79,19 @@ class UsersTest extends TestCase
     }
 
     #[Test]
-    public function 管理者はユーザーを削除できる()
+    public function ユーザー管理画面はdelete_userメソッドを公開しない()
     {
+        // 監査ログ導入に伴い、User の物理削除は禁則になったため、
+        // 管理画面からも削除経路は撤去する。
         $admin = User::factory()->create(['is_admin' => true]);
         $this->actingAs($admin);
 
-        $user = User::factory()->create([
-            'name' => '削除対象ユーザー',
-            'email' => 'delete@example.com',
-        ]);
+        $component = Livewire::test('admin.users');
 
-        Livewire::test('admin.users')
-            ->call('deleteUser', $user->id);
-
-        $this->assertDatabaseMissing('users', [
-            'id' => $user->id,
-            'email' => 'delete@example.com',
-        ]);
+        $this->assertFalse(
+            method_exists($component->instance(), 'deleteUser'),
+            'admin.users Livewire コンポーネントに deleteUser メソッドが残っています',
+        );
     }
 
     #[Test]

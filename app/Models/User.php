@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Exceptions\PhysicalDeletionNotAllowed;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,10 +16,15 @@ class User extends Authenticatable
 
     protected static function booted(): void
     {
+        // User の物理削除は初期実装ではサポートしない。
+        // 監査ログ (actor_id) や会計データが長期保存対象になるため、
+        // 削除は「退会」「無効化」「匿名化」の別フローとして設計する必要がある。
+        // 現状はドメイン上の禁則として fail-closed で拒否する。
         static::deleting(function (User $user): void {
-            $user->businessUnits()->each(function (BusinessUnit $businessUnit): void {
-                $businessUnit->delete();
-            });
+            throw new PhysicalDeletionNotAllowed(
+                'User の物理削除は許可されていません。'
+                .'退会や無効化は将来の専用フローで扱います。',
+            );
         });
     }
 

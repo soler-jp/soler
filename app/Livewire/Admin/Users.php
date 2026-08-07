@@ -38,14 +38,6 @@ class Users extends Component
         ]);
     }
 
-    public function deleteUser(int $userId): void
-    {
-        $user = User::findOrFail($userId);
-
-        // 自分自身や管理者を削除する制限はこの段階では入れない
-        $user->delete();
-    }
-
     public function render()
     {
         return view('livewire.admin.users', [

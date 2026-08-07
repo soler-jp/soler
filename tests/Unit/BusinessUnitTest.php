@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Exceptions\PhysicalDeletionNotAllowed;
 use App\Models\Account;
 use App\Models\BusinessUnit;
 use App\Models\CreditCard;
@@ -505,45 +506,18 @@ class BusinessUnitTest extends TestCase
     }
 
     #[Test]
-    public function current_fiscal_yearを保持した事業体も関連取引ごと削除できる(): void
+    public function business_unitの物理削除はドメイン禁則で拒否される(): void
     {
+        // 監査ログを含む会計データが長期保存対象になるため、
+        // BusinessUnit の物理削除は初期実装ではサポートしない。
+        // 削除は将来の退会・匿名化フローで扱う。
         $user = User::factory()->create();
         $businessUnit = $user->createBusinessUnitWithDefaults(['name' => '削除テスト事業体']);
-        $fiscalYear = $businessUnit->createFiscalYear(2025, $user);
 
-        $cashSubAccount = $businessUnit->getAccountByName('現金')?->subAccounts()->firstOrFail();
-        $salesSubAccount = $businessUnit->getAccountByName('売上高')?->subAccounts()->firstOrFail();
-
-        $this->assertNotNull($cashSubAccount);
-        $this->assertNotNull($salesSubAccount);
-
-        $transaction = $fiscalYear->registerTransaction(
-            [
-                'date' => '2025-01-01',
-                'description' => '削除連鎖テスト',
-            ],
-            [
-                [
-                    'sub_account_id' => $cashSubAccount->id,
-                    'type' => 'debit',
-                    'net_amount' => 1000,
-                    'tax_amount' => 0,
-                ],
-                [
-                    'sub_account_id' => $salesSubAccount->id,
-                    'type' => 'credit',
-                    'net_amount' => 1000,
-                    'tax_amount' => 0,
-                ],
-            ],
-            $user
-        );
+        $this->expectException(PhysicalDeletionNotAllowed::class);
+        $this->expectExceptionMessageMatches('/物理削除は許可されていません/');
 
         $businessUnit->delete();
-
-        $this->assertModelMissing($businessUnit);
-        $this->assertModelMissing($fiscalYear);
-        $this->assertModelMissing($transaction);
     }
 
     #[Test]
