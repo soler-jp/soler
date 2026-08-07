@@ -22,53 +22,16 @@ class TransactionRevisor
     {
         $this->authorizeBusinessUnitAccess($transaction, $user, 'この取引を修正する権限がありません。');
 
-        $validated = Validator::make(
-            $data,
-            [
-                'transaction.revision_reason' => ['required', 'string', 'max:255'],
-                'journal_entries' => ['required', 'array', 'min:1'],
-            ],
-            [],
-            [
-                'transaction.revision_reason' => '修正理由',
-                'journal_entries' => '仕訳明細',
-            ]
-        )->validate();
+        $validated = $this->validateRevisionPayload($data);
+        $transactionOverrides = $validated['transaction'] ?? [];
 
-        return DB::transaction(function () use ($transaction, $user, $validated) {
-            $lockedTransaction = Transaction::query()
-                ->with('fiscalYear')
-                ->lockForUpdate()
-                ->findOrFail($transaction->getKey());
-
-            $this->ensureTransactionCanBeRevised($lockedTransaction);
-
-            if ($lockedTransaction->revision()->exists()) {
-                throw new \InvalidArgumentException('この取引はすでに修正されています。');
-            }
-
-            /** @var array<string, mixed> $revisedTransactionData */
-            $revisedTransactionData = [
-                'date' => $lockedTransaction->date?->toDateString(),
-                'description' => $lockedTransaction->description,
-                'remarks' => $lockedTransaction->remarks,
-                'is_opening_entry' => $lockedTransaction->is_opening_entry,
-                'counterparty_id' => $lockedTransaction->counterparty_id,
-                'created_by' => $user->id,
-                'revised_from_transaction_id' => $lockedTransaction->id,
-                'revision_reason' => $validated['transaction']['revision_reason'],
-            ];
-
-            $revisedTransaction = $this->transactionRegistrar->register(
-                $lockedTransaction->fiscalYear,
-                $revisedTransactionData,
-                $validated['journal_entries'],
+        return DB::transaction(function () use ($transaction, $user, $transactionOverrides, $validated) {
+            return $this->reviseLockedTransaction(
+                $this->lockTransactionForRevision($transaction),
                 $user,
+                $transactionOverrides,
+                $validated['journal_entries'],
             );
-
-            $lockedTransaction->deactivate($user, '修正による改訂');
-
-            return $revisedTransaction->fresh(['journalEntries', 'revisedFrom']);
         }, attempts: 5);
     }
 
@@ -79,49 +42,15 @@ class TransactionRevisor
         $validated = $this->validateSinglePairRevisionPayload($data);
 
         return DB::transaction(function () use ($transaction, $user, $validated) {
-            $lockedTransaction = Transaction::query()
-                ->with(['fiscalYear', 'journalEntries'])
-                ->lockForUpdate()
-                ->findOrFail($transaction->getKey());
-
-            $this->ensureTransactionCanBeRevised($lockedTransaction);
-
-            if ($lockedTransaction->revision()->exists()) {
-                throw new \InvalidArgumentException('この取引はすでに修正されています。');
-            }
-
+            $lockedTransaction = $this->lockTransactionForRevision($transaction);
             [$debitEntry, $creditEntry] = $this->resolveSinglePairEntries($lockedTransaction);
 
-            /** @var array<string, mixed> $revisedTransactionData */
-            $revisedTransactionData = [
-                'date' => $lockedTransaction->date?->toDateString(),
-                'description' => $lockedTransaction->description,
-                'remarks' => $lockedTransaction->remarks,
-                'is_opening_entry' => $lockedTransaction->is_opening_entry,
-                'counterparty_id' => $lockedTransaction->counterparty_id,
-                'created_by' => $user->id,
-                'revised_from_transaction_id' => $lockedTransaction->id,
-                'revision_reason' => $validated['revision_reason'],
-            ];
-
-            if (array_key_exists('date', $validated)) {
-                $revisedTransactionData['date'] = $validated['date'];
-            }
-
-            if (array_key_exists('description', $validated)) {
-                $revisedTransactionData['description'] = $validated['description'];
-            }
-
-            $revisedTransaction = $this->transactionRegistrar->register(
-                $lockedTransaction->fiscalYear,
-                $revisedTransactionData,
-                $this->buildSinglePairJournalEntries($debitEntry, $creditEntry, $validated),
+            return $this->reviseLockedTransaction(
+                $lockedTransaction,
                 $user,
+                $validated,
+                $this->buildSinglePairJournalEntries($debitEntry, $creditEntry, $validated),
             );
-
-            $lockedTransaction->deactivate($user, '修正による改訂');
-
-            return $revisedTransaction->fresh(['journalEntries', 'revisedFrom']);
         }, attempts: 5);
     }
 
@@ -156,6 +85,22 @@ class TransactionRevisor
                 'transaction' => ['決算済みの会計年度に属する取引は修正できません。'],
             ]);
         }
+    }
+
+    protected function validateRevisionPayload(array $data): array
+    {
+        return Validator::make(
+            $data,
+            [
+                'transaction.revision_reason' => ['required', 'string', 'max:255'],
+                'journal_entries' => ['required', 'array', 'min:1'],
+            ],
+            [],
+            [
+                'transaction.revision_reason' => '修正理由',
+                'journal_entries' => '仕訳明細',
+            ]
+        )->validate();
     }
 
     protected function validateSinglePairRevisionPayload(array $data): array
@@ -208,11 +153,76 @@ class TransactionRevisor
         return $validator->validate();
     }
 
+    protected function lockTransactionForRevision(Transaction $transaction): Transaction
+    {
+        return Transaction::query()
+            ->with('fiscalYear')
+            ->lockForUpdate()
+            ->findOrFail($transaction->getKey());
+    }
+
+    protected function reviseLockedTransaction(
+        Transaction $lockedTransaction,
+        User $user,
+        array $transactionOverrides,
+        array $journalEntries,
+    ): Transaction {
+        $this->ensureTransactionCanBeRevised($lockedTransaction);
+
+        if ($lockedTransaction->revision()->exists()) {
+            throw new \InvalidArgumentException('この取引はすでに修正されています。');
+        }
+
+        $revisedTransaction = $this->transactionRegistrar->register(
+            $lockedTransaction->fiscalYear,
+            $this->buildRevisedTransactionData($lockedTransaction, $user, $transactionOverrides),
+            $journalEntries,
+            $user,
+        );
+
+        $lockedTransaction->deactivate($user, '修正による改訂');
+
+        return $revisedTransaction->fresh(['journalEntries', 'revisedFrom']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $transactionOverrides
+     * @return array<string, mixed>
+     */
+    protected function buildRevisedTransactionData(
+        Transaction $transaction,
+        User $user,
+        array $transactionOverrides,
+    ): array {
+        $revisedTransactionData = [
+            'date' => $transaction->date?->toDateString(),
+            'description' => $transaction->description,
+            'remarks' => $transaction->remarks,
+            'is_opening_entry' => $transaction->is_opening_entry,
+            'counterparty_id' => $transaction->counterparty_id,
+            'created_by' => $user->id,
+            'revised_from_transaction_id' => $transaction->id,
+            'revision_reason' => $transactionOverrides['revision_reason'],
+        ];
+
+        if (array_key_exists('date', $transactionOverrides)) {
+            $revisedTransactionData['date'] = $transactionOverrides['date'];
+        }
+
+        if (array_key_exists('description', $transactionOverrides)) {
+            $revisedTransactionData['description'] = $transactionOverrides['description'];
+        }
+
+        return $revisedTransactionData;
+    }
+
     /**
      * @return array{0: JournalEntry, 1: JournalEntry}
      */
     protected function resolveSinglePairEntries(Transaction $transaction): array
     {
+        $transaction->loadMissing('journalEntries');
+
         $debitEntries = $transaction->journalEntries
             ->where('type', JournalEntry::TYPE_DEBIT)
             ->values();
