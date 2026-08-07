@@ -2,6 +2,7 @@
 
 namespace App\Auditing;
 
+use App\Models\JournalEntry;
 use App\Models\Transaction;
 
 /**
@@ -50,6 +51,35 @@ final class AuditChanges
             subject: [
                 'is_active' => [true, false],
                 'deactivated_at' => [null, self::formatTimestamp($transaction->deactivated_at)],
+            ],
+        );
+    }
+
+    public static function forTransactionRevised(Transaction $transaction): self
+    {
+        $transaction->loadMissing('journalEntries');
+
+        return new self(
+            subject: [
+                'revision_reason' => [null, $transaction->revision_reason],
+            ],
+            related: [
+                'journal_entries' => [
+                    'created' => $transaction->journalEntries
+                        ->map(fn (JournalEntry $entry): array => [
+                            'id' => $entry->getKey(),
+                            'attributes' => array_filter([
+                                'sub_account_id' => $entry->sub_account_id,
+                                'type' => $entry->type,
+                                'net_amount' => $entry->net_amount,
+                                'tax_amount' => $entry->tax_amount,
+                                'tax_type' => $entry->tax_type,
+                                'business_ratio' => $entry->business_ratio,
+                            ], fn (mixed $value): bool => $value !== null),
+                        ])
+                        ->values()
+                        ->all(),
+                ],
             ],
         );
     }

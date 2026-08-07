@@ -2,6 +2,11 @@
 
 namespace App\Services;
 
+use App\Auditing\AuditChanges;
+use App\Auditing\AuditContext;
+use App\Auditing\AuditEvent;
+use App\Auditing\AuditTarget;
+use App\Auditing\AuditTargetRole;
 use App\Concerns\AuthorizesBusinessUnitAccess;
 use App\Models\JournalEntry;
 use App\Models\Transaction;
@@ -173,16 +178,41 @@ class TransactionRevisor
             throw new \InvalidArgumentException('この取引はすでに修正されています。');
         }
 
-        $revisedTransaction = $this->transactionRegistrar->register(
-            $lockedTransaction->fiscalYear,
-            $this->buildRevisedTransactionData($lockedTransaction, $user, $transactionOverrides),
-            $journalEntries,
+        return AuditContext::within(AuditEvent::TransactionRevised, function () use (
+            $lockedTransaction,
             $user,
-        );
+            $transactionOverrides,
+            $journalEntries,
+        ): Transaction {
+            $revisedTransaction = $this->transactionRegistrar->register(
+                $lockedTransaction->fiscalYear,
+                $this->buildRevisedTransactionData($lockedTransaction, $user, $transactionOverrides),
+                $journalEntries,
+                $user,
+            );
 
-        $lockedTransaction->deactivate($user, '修正による改訂');
+            $lockedTransaction->forceFill([
+                'is_active' => false,
+                'deactivated_at' => now(),
+                'deactivated_by' => $user->id,
+                'deactivation_reason' => '修正による改訂',
+            ])->save();
 
-        return $revisedTransaction->fresh(['journalEntries', 'revisedFrom']);
+            $revisedTransaction = $revisedTransaction->fresh(['journalEntries', 'revisedFrom']);
+
+            app(AuditLogger::class)->record(
+                event: AuditEvent::TransactionRevised,
+                targets: [
+                    new AuditTarget(AuditTargetRole::Subject, $revisedTransaction),
+                    new AuditTarget(AuditTargetRole::Source, $lockedTransaction),
+                ],
+                actor: $user,
+                changes: AuditChanges::forTransactionRevised($revisedTransaction),
+                reason: $transactionOverrides['revision_reason'] ?? null,
+            );
+
+            return $revisedTransaction;
+        });
     }
 
     /**

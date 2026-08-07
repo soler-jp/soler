@@ -3,6 +3,7 @@
 namespace Tests\Unit\Auditing;
 
 use App\Auditing\AuditChanges;
+use App\Models\JournalEntry;
 use App\Models\Transaction;
 use Tests\TestCase;
 
@@ -83,5 +84,69 @@ class AuditChangesTest extends TestCase
             $changes->subject,
         );
         $this->assertSame([], $changes->related);
+    }
+
+    public function test_for_transaction_revised_shape_is_fixed(): void
+    {
+        $transaction = new Transaction;
+        $transaction->revision_reason = '金額入力ミスの修正';
+        $transaction->setRelation('journalEntries', collect([
+            new JournalEntry([
+                'sub_account_id' => 5,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 1000,
+                'tax_amount' => 100,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            ]),
+            new JournalEntry([
+                'sub_account_id' => 8,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 1100,
+                'tax_amount' => 0,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ]),
+        ]));
+
+        $transaction->journalEntries[0]->id = 100;
+        $transaction->journalEntries[1]->id = 101;
+
+        $changes = AuditChanges::forTransactionRevised($transaction);
+
+        $this->assertSame(1, $changes->payloadVersion);
+        $this->assertSame(
+            [
+                'revision_reason' => [null, '金額入力ミスの修正'],
+            ],
+            $changes->subject,
+        );
+        $this->assertSame(
+            [
+                'journal_entries' => [
+                    'created' => [
+                        [
+                            'id' => 100,
+                            'attributes' => [
+                                'sub_account_id' => 5,
+                                'type' => JournalEntry::TYPE_DEBIT,
+                                'net_amount' => 1000,
+                                'tax_amount' => 100,
+                                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+                            ],
+                        ],
+                        [
+                            'id' => 101,
+                            'attributes' => [
+                                'sub_account_id' => 8,
+                                'type' => JournalEntry::TYPE_CREDIT,
+                                'net_amount' => 1100,
+                                'tax_amount' => 0,
+                                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            $changes->related,
+        );
     }
 }

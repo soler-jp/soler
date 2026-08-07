@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Auditing\AuditEvent;
+use App\Auditing\AuditTargetRole;
+use App\Models\AuditLog;
 use App\Models\Counterparty;
 use App\Models\JournalEntry;
 use App\Models\RecurringTransactionPlan;
@@ -177,6 +180,42 @@ class TransactionRevisorTest extends TestCase
         $this->assertSame(2200, $creditEntry?->net_amount);
         $this->assertSame(0, $creditEntry?->tax_amount);
         $this->assertSame(JournalEntry::TAX_TYPE_OUT_OF_SCOPE, $creditEntry?->tax_type);
+    }
+
+    #[Test]
+    public function single_pair改訂でtransaction_revised監査ログを保存する(): void
+    {
+        $user = User::factory()->create();
+        $transaction = $this->createSinglePairTransaction($user, 'single pair audit');
+
+        $revised = app(TransactionRevisor::class)->reviseSinglePair($transaction, $user, [
+            'revision_reason' => 'single pair 監査ログ',
+            'gross_amount' => 2200,
+            'description' => 'single pair 監査ログ更新',
+        ]);
+
+        $this->assertSame(1, AuditLog::query()->where('event_type', AuditEvent::TransactionRevised->value)->count());
+        $this->assertSame(0, AuditLog::query()->where('event_type', AuditEvent::TransactionDeactivated->value)->count());
+
+        $auditLog = AuditLog::query()
+            ->with('targets')
+            ->where('event_type', AuditEvent::TransactionRevised->value)
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame($user->id, $auditLog->actor_id);
+        $this->assertSame('single pair 監査ログ', $auditLog->reason);
+        $this->assertSame([null, 'single pair 監査ログ'], $auditLog->changes['subject']['revision_reason'] ?? null);
+
+        $subjectTarget = $auditLog->targets->firstWhere('role', AuditTargetRole::Subject);
+        $sourceTarget = $auditLog->targets->firstWhere('role', AuditTargetRole::Source);
+
+        $this->assertNotNull($subjectTarget);
+        $this->assertNotNull($sourceTarget);
+        $this->assertSame($revised->getMorphClass(), $subjectTarget?->auditable_type);
+        $this->assertSame((string) $revised->getKey(), $subjectTarget?->auditable_id);
+        $this->assertSame($transaction->getMorphClass(), $sourceTarget?->auditable_type);
+        $this->assertSame((string) $transaction->getKey(), $sourceTarget?->auditable_id);
     }
 
     #[Test]
