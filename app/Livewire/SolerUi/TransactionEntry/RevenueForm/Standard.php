@@ -438,10 +438,11 @@ class Standard extends Component
 
         return $this->materializeSubAccounts(
             $account,
-            fn (SubAccount $sub) => $sub->system_purpose === null
-                && $sub->visibility !== SubAccount::VISIBILITY_HIDDEN
-                && ($sub->visibility === SubAccount::VISIBILITY_STANDARD
-                    || $sub->name === $account->name),
+            fn (SubAccount $sub) => $sub->name === $account->name
+                || (
+                    $sub->system_purpose === null
+                    && $sub->visibility === SubAccount::VISIBILITY_STANDARD
+                ),
         );
     }
 

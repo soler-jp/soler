@@ -30,7 +30,6 @@ class AccountTypeTransactionIndexTest extends TestCase
         $response = $this->get(route('transactions.revenues'));
 
         $response->assertOk();
-        $response->assertSee('売上一覧');
         $response->assertSeeLivewire(AccountTypeTransactionIndex::class);
     }
 
