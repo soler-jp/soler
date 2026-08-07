@@ -116,6 +116,8 @@ class TransactionRevisor
                 'revision_reason' => ['required', 'string', 'max:255'],
                 'date' => ['sometimes', 'nullable', 'date'],
                 'description' => ['sometimes', 'nullable', 'string', 'max:255'],
+                'counterparty_id' => ['sometimes', 'nullable', 'integer', 'exists:counterparties,id'],
+                'counterparty_name' => ['sometimes', 'nullable', 'string', 'max:255'],
                 'debit_sub_account_id' => ['sometimes', 'integer', 'exists:sub_accounts,id'],
                 'credit_sub_account_id' => ['sometimes', 'integer', 'exists:sub_accounts,id'],
                 'tax_type' => ['sometimes', 'nullable', 'in:'.implode(',', JournalEntry::TAX_TYPES)],
@@ -128,6 +130,8 @@ class TransactionRevisor
                 'revision_reason' => '修正理由',
                 'date' => '取引日',
                 'description' => '摘要',
+                'counterparty_id' => '取引先',
+                'counterparty_name' => '取引先名',
                 'debit_sub_account_id' => '借方補助科目',
                 'credit_sub_account_id' => '貸方補助科目',
                 'tax_type' => '消費税区分',
@@ -152,6 +156,10 @@ class TransactionRevisor
 
             if (! $hasGrossAmount && ($hasNetAmount xor $hasTaxAmount)) {
                 $validator->errors()->add('net_amount', '税抜金額と消費税額はセットで指定してください。');
+            }
+
+            if (array_key_exists('counterparty_id', $data) && array_key_exists('counterparty_name', $data)) {
+                $validator->errors()->add('counterparty_name', '取引先IDと取引先名は同時に指定できません。');
             }
         });
 
@@ -241,6 +249,15 @@ class TransactionRevisor
 
         if (array_key_exists('description', $transactionOverrides)) {
             $revisedTransactionData['description'] = $transactionOverrides['description'];
+        }
+
+        if (array_key_exists('counterparty_id', $transactionOverrides)) {
+            $revisedTransactionData['counterparty_id'] = $transactionOverrides['counterparty_id'];
+        }
+
+        if (array_key_exists('counterparty_name', $transactionOverrides)) {
+            unset($revisedTransactionData['counterparty_id']);
+            $revisedTransactionData['counterparty_name'] = $transactionOverrides['counterparty_name'];
         }
 
         return $revisedTransactionData;

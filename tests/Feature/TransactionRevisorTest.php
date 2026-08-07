@@ -219,6 +219,99 @@ class TransactionRevisorTest extends TestCase
     }
 
     #[Test]
+    public function single_pair取引を既存の取引先id指定で改訂できる(): void
+    {
+        $user = User::factory()->create();
+        $transaction = $this->createSinglePairTransaction($user, 'single pair counterparty id');
+        $unit = $transaction->fiscalYear->businessUnit;
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $unit->id,
+            'name' => '新しい取引先',
+        ]);
+
+        $revised = app(TransactionRevisor::class)->reviseSinglePair($transaction, $user, [
+            'revision_reason' => '取引先を既存IDで更新',
+            'gross_amount' => 2200,
+            'counterparty_id' => $counterparty->id,
+        ]);
+
+        $this->assertSame($counterparty->id, $revised->counterparty_id);
+    }
+
+    #[Test]
+    public function single_pair取引を取引先名指定で改訂すると取引先が自動作成される(): void
+    {
+        $user = User::factory()->create();
+        $transaction = $this->createSinglePairTransaction($user, 'single pair counterparty name');
+        $unit = $transaction->fiscalYear->businessUnit;
+
+        $revised = app(TransactionRevisor::class)->reviseSinglePair($transaction, $user, [
+            'revision_reason' => '取引先を名前で更新',
+            'gross_amount' => 2200,
+            'counterparty_name' => '新規取引先',
+        ]);
+
+        $counterparty = $unit->counterparties()->where('name', '新規取引先')->first();
+
+        $this->assertNotNull($counterparty);
+        $this->assertSame($counterparty?->id, $revised->counterparty_id);
+    }
+
+    #[Test]
+    public function single_pair取引でcounterparty_nameにnullを指定すると取引先を解除できる(): void
+    {
+        $user = User::factory()->create();
+        $transaction = $this->createSinglePairTransaction($user, 'single pair counterparty clear');
+        $unit = $transaction->fiscalYear->businessUnit;
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $unit->id,
+            'name' => '解除対象',
+        ]);
+
+        $transaction->forceFill([
+            'counterparty_id' => $counterparty->id,
+        ])->save();
+
+        $revised = app(TransactionRevisor::class)->reviseSinglePair($transaction->fresh(), $user, [
+            'revision_reason' => '取引先解除',
+            'gross_amount' => 2200,
+            'counterparty_name' => null,
+        ]);
+
+        $this->assertNull($revised->counterparty_id);
+    }
+
+    #[Test]
+    public function single_pair改訂では取引先idと取引先名を同時に指定できない(): void
+    {
+        $user = User::factory()->create();
+        $transaction = $this->createSinglePairTransaction($user, 'single pair counterparty conflict');
+        $unit = $transaction->fiscalYear->businessUnit;
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $unit->id,
+            'name' => '競合取引先',
+        ]);
+
+        $this->expectException(ValidationException::class);
+
+        try {
+            app(TransactionRevisor::class)->reviseSinglePair($transaction, $user, [
+                'revision_reason' => '取引先指定競合',
+                'gross_amount' => 2200,
+                'counterparty_id' => $counterparty->id,
+                'counterparty_name' => '別名',
+            ]);
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                ['取引先IDと取引先名は同時に指定できません。'],
+                $exception->errors()['counterparty_name'] ?? []
+            );
+
+            throw $exception;
+        }
+    }
+
+    #[Test]
     public function single_pair取引をnet_tax指定で改訂できる(): void
     {
         $user = User::factory()->create();
