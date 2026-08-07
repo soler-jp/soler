@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Counterparty;
 use App\Models\JournalEntry;
 use App\Models\RecurringTransactionPlan;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionRegistrar;
 use App\Services\TransactionRevisor;
@@ -17,6 +18,38 @@ use Tests\TestCase;
 class TransactionRevisorTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function createSinglePairTransaction(
+        User $user,
+        string $unitName = 'single pair 改訂テスト',
+        bool $isTaxable = true,
+    ): Transaction {
+        $unit = $user->createBusinessUnitWithDefaults(['name' => $unitName]);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+        $fiscalYear->forceFill(['is_taxable' => $isTaxable])->save();
+
+        $expense = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+
+        return app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '既存の単一仕訳',
+            'created_by' => $user->id,
+        ], [
+            [
+                'sub_account_id' => $expense->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $user);
+    }
 
     #[Test]
     public function 通常取引を改訂できる(): void
@@ -105,6 +138,147 @@ class TransactionRevisorTest extends TestCase
         $this->assertSame(2000, $revised->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT)?->net_amount);
         $this->assertSame($revisedCredit->id, $revised->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT)?->sub_account_id);
         $this->assertSame(2200, $revised->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT)?->net_amount);
+    }
+
+    #[Test]
+    public function single_pair取引をgross指定で改訂できる(): void
+    {
+        $user = User::factory()->create();
+        $transaction = $this->createSinglePairTransaction($user, 'single pair gross');
+        $unit = $transaction->fiscalYear->businessUnit;
+        $newDebit = $unit->getAccountByName('通信費')->subAccounts()->firstOrFail();
+        $newCredit = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+
+        $revised = app(TransactionRevisor::class)->reviseSinglePair($transaction, $user, [
+            'revision_reason' => 'single pair gross 改訂',
+            'gross_amount' => 2200,
+            'debit_sub_account_id' => $newDebit->id,
+            'credit_sub_account_id' => $newCredit->id,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8,
+            'date' => '2025-04-02',
+            'description' => 'single pair gross 更新',
+        ]);
+
+        $revised->load('journalEntries');
+
+        $this->assertSame('2025-04-02', $revised->date?->toDateString());
+        $this->assertSame('single pair gross 更新', $revised->description);
+        $this->assertSame($transaction->id, $revised->revised_from_transaction_id);
+
+        $debitEntry = $revised->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+        $creditEntry = $revised->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+
+        $this->assertSame($newDebit->id, $debitEntry?->sub_account_id);
+        $this->assertSame(2037, $debitEntry?->net_amount);
+        $this->assertSame(163, $debitEntry?->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8, $debitEntry?->tax_type);
+
+        $this->assertSame($newCredit->id, $creditEntry?->sub_account_id);
+        $this->assertSame(2200, $creditEntry?->net_amount);
+        $this->assertSame(0, $creditEntry?->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_OUT_OF_SCOPE, $creditEntry?->tax_type);
+    }
+
+    #[Test]
+    public function single_pair取引をnet_tax指定で改訂できる(): void
+    {
+        $user = User::factory()->create();
+        $transaction = $this->createSinglePairTransaction($user, 'single pair net tax');
+        $unit = $transaction->fiscalYear->businessUnit;
+        $newDebit = $unit->getAccountByName('通信費')->subAccounts()->firstOrFail();
+
+        $revised = app(TransactionRevisor::class)->reviseSinglePair($transaction, $user, [
+            'revision_reason' => 'single pair net tax 改訂',
+            'net_amount' => 1500,
+            'tax_amount' => 150,
+            'debit_sub_account_id' => $newDebit->id,
+            'description' => 'single pair net tax 更新',
+        ]);
+
+        $revised->load('journalEntries');
+
+        $debitEntry = $revised->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+        $creditEntry = $revised->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+
+        $this->assertSame('single pair net tax 更新', $revised->description);
+        $this->assertSame($newDebit->id, $debitEntry?->sub_account_id);
+        $this->assertSame(1500, $debitEntry?->net_amount);
+        $this->assertSame(150, $debitEntry?->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10, $debitEntry?->tax_type);
+        $this->assertSame(1650, $creditEntry?->net_amount);
+        $this->assertSame(0, $creditEntry?->tax_amount);
+    }
+
+    #[Test]
+    public function single_pair改訂ではgross指定とnet_tax指定を同時に使えない(): void
+    {
+        $user = User::factory()->create();
+        $transaction = $this->createSinglePairTransaction($user, 'single pair validation');
+
+        $this->expectException(ValidationException::class);
+
+        try {
+            app(TransactionRevisor::class)->reviseSinglePair($transaction, $user, [
+                'revision_reason' => '不正な指定',
+                'gross_amount' => 2200,
+                'net_amount' => 2000,
+                'tax_amount' => 200,
+            ]);
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                ['税込金額指定と税抜金額/消費税額指定は同時に指定できません。'],
+                $exception->errors()['gross_amount'] ?? []
+            );
+
+            throw $exception;
+        }
+    }
+
+    #[Test]
+    public function single_pair改訂は借方1行貸方1行以外では利用できない(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'single pair 不可']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+        $expense = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+        $communication = $unit->getAccountByName('通信費')->subAccounts()->firstOrFail();
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+
+        $transaction = app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '複数借方取引',
+            'created_by' => $user->id,
+        ], [
+            [
+                'sub_account_id' => $expense->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 500,
+                'tax_amount' => 50,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            ],
+            [
+                'sub_account_id' => $communication->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'net_amount' => 500,
+                'tax_amount' => 50,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => 1100,
+                'tax_amount' => 0,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $user);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('single pair 改訂は借方1行・貸方1行の取引でのみ利用できます。');
+
+        app(TransactionRevisor::class)->reviseSinglePair($transaction, $user, [
+            'revision_reason' => 'single pair 対象外',
+            'gross_amount' => 2200,
+        ]);
     }
 
     #[Test]

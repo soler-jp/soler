@@ -243,6 +243,101 @@ app(TransactionRegistrar::class)->register(
 );
 ```
 
+## 1debit/1credit の取引を修正する
+
+既存の単純な 2 行仕訳を修正する場合は、`TransactionRevisor::reviseSinglePair()` を使えます。
+
+この API が対象にするのは、次の条件を満たす取引だけです。
+
+- active な取引であること
+- 借方 1 行、貸方 1 行であること
+- 予定取引、決算整理仕訳、減価償却仕訳などの対象外取引ではないこと
+
+更新できる主な項目:
+
+- `revision_reason`
+- `date`
+- `description`
+- `debit_sub_account_id`
+- `credit_sub_account_id`
+- `tax_type`
+- `gross_amount`
+- `net_amount`
+- `tax_amount`
+
+金額指定は次のどちらか一方だけを使います。
+
+- `gross_amount` を指定する
+- `net_amount` と `tax_amount` をセットで指定する
+
+`gross_amount` と `net_amount` / `tax_amount` の混在はできません。
+
+### `gross_amount` で修正する
+
+`gross_amount` を指定すると、借方行は `gross_amount` と `tax_type` から内部的に `net_amount` / `tax_amount` へ分解されます。  
+貸方行は常に総額そのままで `tax_type = out_of_scope` として作り直されます。
+
+```php
+use App\Models\JournalEntry;
+use App\Services\TransactionRevisor;
+
+$transaction = Transaction::findOrFail($transactionId);
+$businessUnit = $transaction->fiscalYear->businessUnit;
+
+$newDebit = $businessUnit->getSubAccountByName('通信費', '通信費');
+$newCredit = $businessUnit->getSubAccountByName('事業主借', '事業主借');
+
+app(TransactionRevisor::class)->reviseSinglePair(
+    $transaction,
+    auth()->user(),
+    [
+        'revision_reason' => '勘定科目と金額を修正',
+        'date' => '2025-04-02',
+        'description' => 'モバイル通信費',
+        'debit_sub_account_id' => $newDebit->id,
+        'credit_sub_account_id' => $newCredit->id,
+        'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+        'gross_amount' => 2_200,
+    ],
+);
+```
+
+### `net_amount` / `tax_amount` で修正する
+
+税抜金額と消費税額を明示したい場合は、`net_amount` と `tax_amount` をセットで渡します。  
+この場合、借方行は指定値をそのまま使い、貸方行は `net_amount + tax_amount` を総額として作り直します。
+
+```php
+use App\Models\JournalEntry;
+use App\Services\TransactionRevisor;
+
+$transaction = Transaction::findOrFail($transactionId);
+$businessUnit = $transaction->fiscalYear->businessUnit;
+
+$newDebit = $businessUnit->getSubAccountByName('通信費', '通信費');
+
+app(TransactionRevisor::class)->reviseSinglePair(
+    $transaction,
+    auth()->user(),
+    [
+        'revision_reason' => '税抜金額で修正',
+        'description' => 'モバイル通信費',
+        'debit_sub_account_id' => $newDebit->id,
+        'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+        'net_amount' => 2_000,
+        'tax_amount' => 200,
+    ],
+);
+```
+
+### 修正後の扱い
+
+`reviseSinglePair()` は既存取引を直接更新しません。
+
+- 元の取引は `is_active = false` になります
+- 修正後の新版取引が新規作成されます
+- 監査ログには `transaction.revised` が 1 件保存されます
+
 ### 課税業者の経費
 
 課税業者では、借方の経費科目に課税仕入の税区分を指定します。
