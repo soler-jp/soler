@@ -15,6 +15,8 @@ class AccountTypeTransactionIndex extends Component
      */
     private const COST_OF_GOODS_SOLD_ACCOUNT_NAMES = ['期首商品（棚卸高）', '仕入金額', '期末商品（棚卸高）'];
 
+    public const YEARLY_PERIOD = 'yearly';
+
     public string $kind;
 
     public string $title;
@@ -30,6 +32,10 @@ class AccountTypeTransactionIndex extends Component
     public bool $groupByMonth = true;
 
     public ?int $editingTransactionId = null;
+
+    public int $fiscalYearYear;
+
+    public string $selectedPeriod = self::YEARLY_PERIOD;
 
     /**
      * @var array<int, string>
@@ -75,20 +81,30 @@ class AccountTypeTransactionIndex extends Component
      *     year_month: string,
      *     label: string,
      *     amount: int,
-     *     transactions: array<int, array{
-     *         id: int,
-     *         date: string,
-     *         amount: int,
-     *         description: string,
-     *         allocation_note: string,
-     *         debit_label: string,
-     *         credit_label: string,
-     *         tax_type_label: string,
-     *         counterparty_name: string
-     *     }>
+     *     transaction_count: int
      * }>
      */
     public array $months = [];
+
+    /**
+     * @var array<string, array<int, array{
+     *     id: int,
+     *     date: string,
+     *     amount: int,
+     *     payment_amount: int,
+     *     description: string,
+     *     allocation_note: string,
+     *     debit_label: string,
+     *     debit_badge_class: string,
+     *     credit_label: string,
+     *     credit_badge_class: string,
+     *     tax_type_label: string,
+     *     tax_type_badge_class: string,
+     *     counterparty_name: string,
+     *     is_single_pair: bool
+     * }>
+     */
+    public array $monthTransactions = [];
 
     public function mount(string $kind): void
     {
@@ -104,6 +120,7 @@ class AccountTypeTransactionIndex extends Component
         $this->excludedAccountNames = $config['excluded_account_names'];
 
         $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
+        $this->fiscalYearYear = $fiscalYear?->year ?? now()->year;
         $this->showTaxTypeColumn = (bool) $fiscalYear?->is_taxable;
         $this->availableAccountCounts = $this->resolveAvailableAccountCounts();
         $this->availableAccountNames = array_keys($this->availableAccountCounts);
@@ -176,22 +193,22 @@ class AccountTypeTransactionIndex extends Component
     {
         return match ($this->variant) {
             Account::TYPE_EXPENSE => [
-                'panel' => 'border-red-200 bg-red-50/80',
-                'title' => 'text-red-700',
-                'amount' => 'text-red-600',
-                'tableWrap' => 'border-red-100',
-                'tableHead' => 'bg-white text-gray-600 border-b border-gray-200',
-                'monthCard' => 'border-red-100 bg-white',
-                'monthHeader' => 'border-red-100 bg-red-50 text-red-900',
+                'amount' => 'text-content',
+                'tableWrap' => 'border-line rounded-card',
+                'tableHead' => 'bg-surface-muted text-content-muted border-b border-line',
+                'tabActive' => 'border-line border-b-surface border-t-brand bg-surface text-content -mb-px shadow-card',
+                'tabInactive' => 'border-l border-y border-r-0 border-line bg-surface-muted text-content-muted hover:bg-surface hover:text-content last:border-r last:border-line',
+                'tabCountActive' => 'bg-brand text-content-onbrand',
+                'tabCountInactive' => 'bg-surface text-content-muted',
             ],
             default => [
-                'panel' => 'border-blue-200 bg-blue-50/80',
-                'title' => 'text-blue-700',
-                'amount' => 'text-blue-600',
-                'tableWrap' => 'border-blue-100',
-                'tableHead' => 'bg-white text-gray-600 border-b border-gray-200',
-                'monthCard' => 'border-blue-100 bg-white',
-                'monthHeader' => 'border-blue-100 bg-blue-50 text-blue-900',
+                'amount' => 'text-content',
+                'tableWrap' => 'border-line rounded-card',
+                'tableHead' => 'bg-surface-muted text-content-muted border-b border-line',
+                'tabActive' => 'border-line border-b-surface border-t-brand bg-surface text-content -mb-px shadow-card',
+                'tabInactive' => 'border-l border-y border-r-0 border-line bg-surface-muted text-content-muted hover:bg-surface hover:text-content last:border-r last:border-line',
+                'tabCountActive' => 'bg-brand text-content-onbrand',
+                'tabCountInactive' => 'bg-surface text-content-muted',
             ],
         };
     }
@@ -232,6 +249,80 @@ class AccountTypeTransactionIndex extends Component
     public function selectedTotalAmount(): int
     {
         return collect($this->transactions)->sum('amount');
+    }
+
+    /**
+     * @return array<int, array{year_month: string, label: string, amount: int, transaction_count: int}>
+     */
+    public function monthTabs(): array
+    {
+        return $this->months;
+    }
+
+    public function selectPeriod(string $period): void
+    {
+        if (! $this->groupByMonth || ! $this->isValidPeriod($period)) {
+            return;
+        }
+
+        $this->selectedPeriod = $period;
+        $this->editingTransactionId = null;
+    }
+
+    /**
+     * @return array<int, array{
+     *     id: int,
+     *     date: string,
+     *     amount: int,
+     *     payment_amount: int,
+     *     description: string,
+     *     allocation_note: string,
+     *     debit_label: string,
+     *     debit_badge_class: string,
+     *     credit_label: string,
+     *     credit_badge_class: string,
+     *     tax_type_label: string,
+     *     tax_type_badge_class: string,
+     *     counterparty_name: string,
+     *     is_single_pair: bool
+     * }>
+     */
+    public function visibleTransactions(): array
+    {
+        if (! $this->groupByMonth || $this->selectedPeriod === self::YEARLY_PERIOD) {
+            return $this->transactions;
+        }
+
+        return $this->monthTransactions[$this->selectedPeriod] ?? [];
+    }
+
+    public function visibleTransactionCount(): int
+    {
+        return count($this->visibleTransactions());
+    }
+
+    public function visibleTotalAmount(): int
+    {
+        return (int) collect($this->visibleTransactions())->sum('amount');
+    }
+
+    public function activePeriodLabel(): string
+    {
+        if (! $this->groupByMonth || $this->selectedPeriod === self::YEARLY_PERIOD) {
+            return __('transactions.index.tabs.yearly');
+        }
+
+        return collect($this->months)
+            ->firstWhere('year_month', $this->selectedPeriod)['label'] ?? __('transactions.index.tabs.yearly');
+    }
+
+    public function periodEmptyMessage(): string
+    {
+        if (! $this->groupByMonth || $this->selectedPeriod === self::YEARLY_PERIOD) {
+            return __('transactions.index.empty.yearly');
+        }
+
+        return __('transactions.index.empty.monthly');
     }
 
     public function selectAllAccountNames(): void
@@ -311,12 +402,35 @@ class AccountTypeTransactionIndex extends Component
         $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
 
         if ($this->groupByMonth) {
-            $this->months = $fiscalYear?->monthlyAccountTypeTransactionGroups(
+            $groupedMonths = $fiscalYear?->monthlyAccountTypeTransactionGroups(
                 $this->accountType,
                 $this->accountNames,
                 $this->excludedAccountNames,
             ) ?? [];
-            $this->transactions = [];
+            $monthsByYearMonth = collect($groupedMonths)->keyBy('year_month');
+            $this->months = collect(range(1, 12))
+                ->map(function (int $month) use ($monthsByYearMonth): array {
+                    $yearMonth = sprintf('%04d-%02d', $this->fiscalYearYear, $month);
+                    $monthGroup = $monthsByYearMonth->get($yearMonth);
+
+                    return [
+                        'year_month' => $yearMonth,
+                        'label' => $month.'月',
+                        'amount' => (int) ($monthGroup['amount'] ?? 0),
+                        'transaction_count' => count($monthGroup['transactions'] ?? []),
+                    ];
+                })
+                ->all();
+            $this->monthTransactions = collect($this->months)
+                ->mapWithKeys(fn (array $month): array => [
+                    $month['year_month'] => $monthsByYearMonth->get($month['year_month'])['transactions'] ?? [],
+                ])
+                ->all();
+            $this->transactions = $fiscalYear?->accountTypeTransactions(
+                $this->accountType,
+                $this->accountNames,
+                $this->excludedAccountNames,
+            ) ?? [];
 
             return;
         }
@@ -324,6 +438,7 @@ class AccountTypeTransactionIndex extends Component
         if ($this->accountNames === []) {
             $this->transactions = [];
             $this->months = [];
+            $this->monthTransactions = [];
 
             return;
         }
@@ -334,6 +449,7 @@ class AccountTypeTransactionIndex extends Component
             $this->excludedAccountNames,
         ) ?? [];
         $this->months = [];
+        $this->monthTransactions = [];
     }
 
     /**
@@ -372,5 +488,14 @@ class AccountTypeTransactionIndex extends Component
     public function render()
     {
         return view('livewire.pages.account-type-transaction-index');
+    }
+
+    private function isValidPeriod(string $period): bool
+    {
+        if ($period === self::YEARLY_PERIOD) {
+            return true;
+        }
+
+        return collect($this->months)->contains(fn (array $month): bool => $month['year_month'] === $period);
     }
 }

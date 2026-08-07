@@ -199,4 +199,19 @@ return [
             'invalid_transfer_account' => '選択できない勘定科目です。',
         ],
     ],
+
+    'index' => [
+        'tabs' => [
+            'yearly' => '全年',
+        ],
+        'summary' => [
+            'period' => '表示範囲',
+            'count' => '件数',
+            'amount' => '合計',
+        ],
+        'empty' => [
+            'monthly' => 'この月の対象取引はありません。',
+            'yearly' => '対象の取引はまだありません。',
+        ],
+    ],
 ];

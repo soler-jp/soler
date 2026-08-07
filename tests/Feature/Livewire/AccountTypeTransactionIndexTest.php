@@ -251,8 +251,71 @@ class AccountTypeTransactionIndexTest extends TestCase
 
         $months = $component->get('months');
 
+        $this->assertCount(12, $months);
         $this->assertSame('2025-01', $months[0]['year_month']);
         $this->assertSame('2025-02', $months[1]['year_month']);
+        $this->assertSame('2025-12', $months[11]['year_month']);
+    }
+
+    #[Test]
+    public function 売上一覧は月タブと前年タブを切り替えられる(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $sales = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+
+        $registrar = new TransactionRegistrar;
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-01-10',
+            'description' => '1月売上',
+        ], [
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'net_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $sales->id,
+                'type' => 'credit',
+                'net_amount' => 1000,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $user);
+
+        $registrar->register($fiscalYear, [
+            'date' => '2025-02-20',
+            'description' => '2月売上',
+        ], [
+            [
+                'sub_account_id' => $cash->id,
+                'type' => 'debit',
+                'net_amount' => 2000,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+            [
+                'sub_account_id' => $sales->id,
+                'type' => 'credit',
+                'net_amount' => 2000,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $user);
+
+        Livewire::actingAs($user)
+            ->test(AccountTypeTransactionIndex::class, ['kind' => 'revenue'])
+            ->assertSet('selectedPeriod', AccountTypeTransactionIndex::YEARLY_PERIOD)
+            ->assertSee('全年')
+            ->assertSee('1月売上')
+            ->assertSee('2月売上')
+            ->call('selectPeriod', '2025-02')
+            ->assertSet('selectedPeriod', '2025-02')
+            ->assertSee('2月売上')
+            ->assertDontSee('1月売上')
+            ->call('selectPeriod', AccountTypeTransactionIndex::YEARLY_PERIOD)
+            ->assertSee('1月売上')
+            ->assertSee('2月売上');
     }
 
     #[Test]
