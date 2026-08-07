@@ -39,30 +39,23 @@
                             <thead class="bg-surface-muted">
                                 <tr class="text-left text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">
                                     <th class="px-4 py-3">{{ __('audit_logs.columns.recorded_at') }}</th>
-                                    <th class="px-4 py-3">{{ __('audit_logs.columns.event') }}</th>
                                     <th class="px-4 py-3">{{ __('audit_logs.columns.actor') }}</th>
-                                    <th class="px-4 py-3">{{ __('audit_logs.transaction.fields.voucher_number') }}</th>
                                     <th class="px-4 py-3">{{ __('audit_logs.transaction.fields.date') }}</th>
                                     <th class="px-4 py-3">{{ __('audit_logs.transaction.fields.description') }}</th>
                                     <th class="px-4 py-3 text-right">{{ __('audit_logs.transaction.fields.amount') }}</th>
-                                    <th class="px-4 py-3">{{ __('audit_logs.columns.reason') }}</th>
+                                    <th class="px-4 py-3">{{ __('audit_logs.columns.detail') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-line bg-surface">
                                 @forelse ($this->logs as $log)
                                     @php($sourceTransaction = $this->sourceTransactionRow($log))
+                                    @php($detailLines = $this->detailLines($log))
                                     <tr wire:key="audit-log-{{ $log->id }}" class="align-top">
                                         <td class="whitespace-nowrap px-4 py-3 text-sm text-content-muted">
                                             {{ $log->recorded_at?->format('Y-m-d H:i:s') }}
                                         </td>
-                                        <td class="px-4 py-3 text-sm font-semibold text-content">
-                                            {{ $this->eventLabel($log) }}
-                                        </td>
                                         <td class="px-4 py-3 text-sm text-content">
                                             {{ $this->actorLabel($log) }}
-                                        </td>
-                                        <td class="whitespace-nowrap px-4 py-3 text-sm text-content">
-                                            {{ $sourceTransaction['voucher_number'] ?? '-' }}
                                         </td>
                                         <td class="whitespace-nowrap px-4 py-3 text-sm text-content">
                                             {{ $sourceTransaction['date'] ?? '-' }}
@@ -74,12 +67,16 @@
                                             {{ $sourceTransaction['amount'] ?? '-' }}
                                         </td>
                                         <td class="px-4 py-3 text-sm text-content-muted">
-                                            {{ $this->reasonLabel($log) }}
+                                            <div class="space-y-1">
+                                                @foreach ($detailLines as $detailLine)
+                                                    <p>{{ $detailLine }}</p>
+                                                @endforeach
+                                            </div>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="px-4 py-10 text-center text-sm text-content-muted">
+                                        <td colspan="6" class="px-4 py-10 text-center text-sm text-content-muted">
                                             {{ __('audit_logs.empty') }}
                                         </td>
                                     </tr>

@@ -8,8 +8,11 @@ use App\Models\AuditLog;
 use App\Models\AuditLogTarget;
 use App\Models\BusinessUnit;
 use App\Models\FiscalYear;
+use App\Models\JournalEntry;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\TransactionRegistrar;
+use App\Services\TransactionRevisor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;
@@ -39,14 +42,15 @@ class AuditLogPageTest extends TestCase
         $response->assertSee(__('audit_logs.title'));
         $response->assertSee('2025年度');
         $response->assertSee('取引を無効化');
-        $response->assertSee('利用者による削除');
-        $response->assertSee($transaction->display_number);
-        $response->assertSee('伝票番号');
         $response->assertSee('日付');
         $response->assertSee('摘要');
         $response->assertSee('金額');
+        $response->assertSee('内容');
         $response->assertSee('監査ログ表示用の取引');
         $response->assertSee('0円');
+        $response->assertDontSee('理由');
+        $response->assertDontSee('イベント');
+        $response->assertDontSee('伝票番号');
     }
 
     #[Test]
@@ -87,12 +91,52 @@ class AuditLogPageTest extends TestCase
         $response = $this->actingAs($user)->get(route('audit-logs.index'));
 
         $response->assertOk();
-        $response->assertSee('当年度のログ');
-        $response->assertDontSee('前年度のログ');
-        $response->assertDontSee('他事業体のログ');
+        $response->assertSee('取引を無効化');
         $response->assertSee('当年度の対象');
         $response->assertDontSee('前年度の対象');
         $response->assertDontSee('他事業体の対象');
+    }
+
+    #[Test]
+    public function 改訂イベントはイベント名の代わりにdiffを表示する(): void
+    {
+        [$user, $unit, $fiscalYear] = $this->createInitializedUser();
+        $expense = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+
+        $transaction = app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-04-01',
+            'description' => '改訂前の摘要',
+            'created_by' => $user->id,
+        ], [
+            [
+                'sub_account_id' => $expense->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $user);
+
+        app(TransactionRevisor::class)->reviseSinglePair($transaction, $user, [
+            'revision_reason' => '監査ログ差分表示',
+            'gross_amount' => 2200,
+            'description' => '改訂後の摘要',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('audit-logs.index'));
+
+        $response->assertOk();
+        $response->assertSee('摘要: 改訂前の摘要 -> 改訂後の摘要');
+        $response->assertSee('金額: 1,100円 -> 2,200円');
+        $response->assertDontSee('借方変更: 消耗品費 1,100円 -> 消耗品費 2,200円');
+        $response->assertDontSee('貸方変更: 現金 1,100円 -> 現金 2,200円');
+        $response->assertDontSee('取引を改訂');
     }
 
     /**

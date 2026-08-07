@@ -2,10 +2,14 @@
 
 namespace App\Livewire\Pages;
 
+use App\Auditing\AuditEvent;
 use App\Auditing\AuditTargetRole;
 use App\Models\AuditLog;
 use App\Models\FiscalYear;
 use App\Models\Transaction;
+use App\Models\User;
+use App\Services\TransactionDiffer;
+use App\Support\AuditLogTransactionDiffFormatter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -41,7 +45,7 @@ class AuditLogIndex extends Component
                 'actor:id,name',
                 'targets.auditable' => function (MorphTo $morphTo): void {
                     $morphTo->constrain([
-                        Transaction::class => fn ($query) => $query->with(['fiscalYear', 'journalEntries']),
+                        Transaction::class => fn ($query) => $query->with(['fiscalYear', 'journalEntries.subAccount.account']),
                     ]);
                 },
             ])
@@ -63,11 +67,6 @@ class AuditLogIndex extends Component
         return $log->actor_label
             ?? $log->actor?->name
             ?? __('audit_logs.actor_system');
-    }
-
-    public function reasonLabel(AuditLog $log): string
-    {
-        return $log->reason ?: __('audit_logs.reason_none');
     }
 
     /**
@@ -94,6 +93,29 @@ class AuditLogIndex extends Component
         return view('livewire.pages.audit-log-index');
     }
 
+    /**
+     * @return list<string>
+     */
+    public function detailLines(AuditLog $log): array
+    {
+        if ($log->event_type !== AuditEvent::TransactionRevised) {
+            return [$this->eventLabel($log)];
+        }
+
+        $sourceTransaction = $this->sourceTransaction($log);
+        $subjectTransaction = $this->subjectTransaction($log);
+        $actor = auth()->user();
+
+        if (! $sourceTransaction instanceof Transaction || ! $subjectTransaction instanceof Transaction || ! $actor instanceof User) {
+            return [$this->eventLabel($log)];
+        }
+
+        $diff = app(TransactionDiffer::class)->diff($sourceTransaction, $subjectTransaction, $actor);
+        $lines = app(AuditLogTransactionDiffFormatter::class)->format($sourceTransaction, $subjectTransaction, $diff);
+
+        return $lines !== [] ? $lines : [$this->eventLabel($log)];
+    }
+
     private function sourceTransaction(AuditLog $log): ?Transaction
     {
         $prioritizedTarget = $log->targets
@@ -104,6 +126,16 @@ class AuditLogIndex extends Component
 
         return $prioritizedTarget?->auditable instanceof Transaction
             ? $prioritizedTarget->auditable
+            : null;
+    }
+
+    private function subjectTransaction(AuditLog $log): ?Transaction
+    {
+        $subjectTarget = $log->targets
+            ->first(fn ($target): bool => $target->role === AuditTargetRole::Subject && $target->auditable instanceof Transaction);
+
+        return $subjectTarget?->auditable instanceof Transaction
+            ? $subjectTarget->auditable
             : null;
     }
 }
