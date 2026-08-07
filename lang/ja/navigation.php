@@ -1,17 +1,17 @@
 <?php
 
 return [
-    'revenue' => '売上を登録',
-    'expense' => '経費を登録',
-    'fixed_expenses' => '固定費を登録',
-    'purchase' => '仕入を登録',
+    'revenue' => '売上の登録・確認',
+    'expense' => '経費の登録・確認',
+    'purchase' => '仕入の登録・確認',
 
     'section_review' => '確認する',
-    'expense_monthly' => '経費の月別一覧',
     'expense_by_type' => '経費の種類別一覧',
     'journal' => '仕訳帳一覧',
     'account_summary' => '勘定科目集計',
     'audit_logs' => 'ログを確認',
+
+    'fixed_expenses' => '固定費を登録',
 
     'section_other' => 'その他',
     'fixed_assets' => '固定資産',

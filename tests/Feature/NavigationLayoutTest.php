@@ -24,7 +24,6 @@ class NavigationLayoutTest extends TestCase
         $response->assertSee(__('navigation.expense'));
         $response->assertSee(__('navigation.fixed_expenses'));
         $response->assertSee(__('navigation.purchase'));
-        $response->assertSee(__('navigation.expense_monthly'));
         $response->assertSee(__('navigation.account_summary'));
         $response->assertSee(__('navigation.audit_logs'));
         $response->assertSee(__('navigation.fiscal_years'));

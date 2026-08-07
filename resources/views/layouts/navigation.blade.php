@@ -3,20 +3,22 @@
         [
             'items' => [
                 ['label' => __('Dashboard'), 'route' => 'dashboard'],
+            ],
+        ],
+        [
+            'items' => [
                 ['label' => __('navigation.revenue'), 'route' => 'transactions.revenues'],
                 ['label' => __('navigation.expense'), 'route' => 'transactions.expenses'],
-                ['label' => __('navigation.fixed_expenses'), 'route' => 'fixed-expenses'],
                 ['label' => __('navigation.purchase'), 'route' => 'transactions.purchases'],
             ],
         ],
         [
             'header' => __('navigation.section_review'),
             'items' => [
-                ['label' => __('navigation.expense_monthly'), 'route' => 'transactions.expenses'],
                 ['label' => __('navigation.expense_by_type'), 'route' => 'transactions.expense-types'],
                 ['label' => __('navigation.journal'), 'route' => 'transactions.journal'],
                 ['label' => __('navigation.account_summary'), 'route' => 'accounts.summary'],
-                ['label' => __('navigation.audit_logs'), 'route' => 'audit-logs.index'],
+                ['label' => __('navigation.fixed_expenses'), 'route' => 'fixed-expenses'],
             ],
         ],
         [
@@ -24,6 +26,7 @@
             'items' => [
                 ['label' => __('navigation.fixed_assets'), 'route' => 'fixed-assets.index'],
                 ['label' => __('navigation.blue_return_pdf'), 'route' => 'blue-return-statement.pdf.show'],
+                ['label' => __('navigation.audit_logs'), 'route' => 'audit-logs.index'],
             ],
         ],
         [
