@@ -300,7 +300,17 @@ class TransactionRevisor
     ): array {
         $debitSubAccountId = (int) ($validated['debit_sub_account_id'] ?? $debitEntry->sub_account_id);
         $creditSubAccountId = (int) ($validated['credit_sub_account_id'] ?? $creditEntry->sub_account_id);
-        $debitTaxType = $validated['tax_type'] ?? $debitEntry->tax_type;
+
+        $providedTaxType = $validated['tax_type'] ?? null;
+        $taxOnCredit = $this->shouldPlaceTaxTypeOnCredit($providedTaxType, $debitEntry, $creditEntry);
+
+        if ($taxOnCredit) {
+            $creditTaxType = $providedTaxType ?? $creditEntry->tax_type;
+            $debitTaxType = JournalEntry::TAX_TYPE_OUT_OF_SCOPE;
+        } else {
+            $debitTaxType = $providedTaxType ?? $debitEntry->tax_type;
+            $creditTaxType = JournalEntry::TAX_TYPE_OUT_OF_SCOPE;
+        }
 
         if (array_key_exists('gross_amount', $validated)) {
             $debitRevisionEntry = [
@@ -320,13 +330,32 @@ class TransactionRevisor
                     'sub_account_id' => $creditSubAccountId,
                     'type' => JournalEntry::TYPE_CREDIT,
                     'gross_amount' => (int) $validated['gross_amount'],
-                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+                    'tax_type' => $creditTaxType ?? JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                 ],
             ];
         }
 
         $netAmount = (int) $validated['net_amount'];
         $taxAmount = (int) $validated['tax_amount'];
+
+        if ($taxOnCredit) {
+            return [
+                [
+                    'sub_account_id' => $debitSubAccountId,
+                    'type' => JournalEntry::TYPE_DEBIT,
+                    'net_amount' => $netAmount + $taxAmount,
+                    'tax_amount' => 0,
+                    'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+                ],
+                [
+                    'sub_account_id' => $creditSubAccountId,
+                    'type' => JournalEntry::TYPE_CREDIT,
+                    'net_amount' => $netAmount,
+                    'tax_amount' => $taxAmount,
+                    'tax_type' => $creditTaxType,
+                ],
+            ];
+        }
 
         return [
             [
@@ -344,5 +373,39 @@ class TransactionRevisor
                 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
             ],
         ];
+    }
+
+    protected function shouldPlaceTaxTypeOnCredit(
+        ?string $taxType,
+        JournalEntry $debitEntry,
+        JournalEntry $creditEntry,
+    ): bool {
+        $salesTaxTypes = [
+            JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+            JournalEntry::TAX_TYPE_TAXABLE_SALES_8,
+            JournalEntry::TAX_TYPE_DEEMED_TAXABLE_SALES_10,
+        ];
+
+        $purchaseTaxTypes = [
+            JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_10,
+            JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8,
+            JournalEntry::TAX_TYPE_DEEMED_TAXABLE_PURCHASES_10,
+        ];
+
+        if (in_array($taxType, $salesTaxTypes, true)) {
+            return true;
+        }
+
+        if (in_array($taxType, $purchaseTaxTypes, true)) {
+            return false;
+        }
+
+        // 中立的な区分 (exempt/out_of_scope/zero_rated/null) は元取引の税区分配置を踏襲する。
+        $creditHadTax = $creditEntry->tax_type !== null
+            && $creditEntry->tax_type !== JournalEntry::TAX_TYPE_OUT_OF_SCOPE;
+        $debitHadTax = $debitEntry->tax_type !== null
+            && $debitEntry->tax_type !== JournalEntry::TAX_TYPE_OUT_OF_SCOPE;
+
+        return $creditHadTax && ! $debitHadTax;
     }
 }

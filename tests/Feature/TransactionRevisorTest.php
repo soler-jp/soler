@@ -342,6 +342,62 @@ class TransactionRevisorTest extends TestCase
     }
 
     #[Test]
+    public function single_pair取引を売上税区分で改訂すると税区分が貸方に載る(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'single pair sales']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+        $fiscalYear->forceFill(['is_taxable' => true])->save();
+
+        $revenue = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+
+        $transaction = app(TransactionRegistrar::class)->register($fiscalYear, [
+            'date' => '2025-05-01',
+            'description' => '売上',
+            'created_by' => $user->id,
+        ], [
+            [
+                'sub_account_id' => $revenue->id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+            ],
+            [
+                'sub_account_id' => $cash->id,
+                'type' => JournalEntry::TYPE_DEBIT,
+                'gross_amount' => 1100,
+                'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
+            ],
+        ], $user);
+
+        $receivable = $unit->getSubAccountByName('売掛金', '売掛金');
+
+        $revised = app(TransactionRevisor::class)->reviseSinglePair($transaction, $user, [
+            'revision_reason' => '売上税区分での改訂',
+            'gross_amount' => 2200,
+            'debit_sub_account_id' => $receivable->id,
+            'credit_sub_account_id' => $revenue->id,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+        ]);
+
+        $revised->load('journalEntries');
+
+        $debitEntry = $revised->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+        $creditEntry = $revised->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+
+        $this->assertSame($receivable->id, $debitEntry?->sub_account_id);
+        $this->assertSame(2200, $debitEntry?->net_amount);
+        $this->assertSame(0, $debitEntry?->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_OUT_OF_SCOPE, $debitEntry?->tax_type);
+
+        $this->assertSame($revenue->id, $creditEntry?->sub_account_id);
+        $this->assertSame(2000, $creditEntry?->net_amount);
+        $this->assertSame(200, $creditEntry?->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_SALES_10, $creditEntry?->tax_type);
+    }
+
+    #[Test]
     public function single_pair改訂ではgross指定とnet_tax指定を同時に使えない(): void
     {
         $user = User::factory()->create();
