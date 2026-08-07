@@ -4,7 +4,7 @@
     <div class="mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
         @if ($kind === 'revenue')
             <livewire:soler-ui.transaction-entry.revenue-form.standard />
-        @elseif ($kind === 'expense' || $kind === 'expense_type')
+        @elseif ($kind === 'expense')
             <livewire:soler-ui.transaction-entry.expense-form.standard />
         @elseif ($kind === 'purchase')
             <livewire:soler-ui.transaction-entry.purchase-form.standard />
