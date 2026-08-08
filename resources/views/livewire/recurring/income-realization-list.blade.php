@@ -1,7 +1,25 @@
 <div>
     <x-ui.card>
         <x-ui.card-header>
-            {{ __('recurring_income_realizations.title') }}
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span>{{ __('recurring_income_realizations.title') }}</span>
+                <div class="grid w-full max-w-sm grid-cols-2 gap-0 overflow-hidden rounded-control border border-line bg-surface-muted sm:w-auto">
+                    @foreach (['gross' => __('recurring_income_realizations.options.input_mode.gross_full'), 'net_tax' => __('recurring_income_realizations.options.input_mode.net_tax_full')] as $inputMode => $label)
+                        <button
+                            type="button"
+                            wire:click="$set('inputMode', '{{ $inputMode }}')"
+                            @class([
+                                'px-3 py-1.5 text-xs font-semibold transition',
+                                'bg-surface text-content shadow-card' => $inputMode === $this->inputMode,
+                                'bg-surface-muted text-content-muted hover:bg-surface hover:text-content' => $inputMode !== $this->inputMode,
+                                'border-l border-line' => $inputMode === 'net_tax',
+                            ])
+                        >
+                            {{ $label }}
+                        </button>
+                    @endforeach
+                </div>
+            </div>
         </x-ui.card-header>
 
         <div class="space-y-4 px-4 py-4">
@@ -22,7 +40,7 @@
                     {{ __('recurring_income_realizations.empty_plans') }}
                 </p>
             @else
-                <x-ui.tab-list variant="connected" class="w-full overflow-x-auto">
+                <x-ui.tab-list variant="connected" class="w-full">
                     @foreach ($plans as $plan)
                         <x-ui.tab
                             variant="connected"
@@ -54,7 +72,7 @@
                                 <div class="px-4 py-4">
                                     @if ($transaction->is_planned)
                                         <form wire:submit.prevent="realize({{ $transaction->id }})" class="space-y-4">
-                                            <div class="grid gap-4 lg:grid-cols-[minmax(11rem,14rem)_minmax(10rem,12rem)_minmax(9rem,10rem)_minmax(10rem,12rem)]">
+                                            <div class="grid gap-4 lg:grid-cols-[minmax(11rem,14rem)_minmax(10rem,12rem)_minmax(10rem,12rem)_minmax(9rem,10rem)_minmax(10rem,12rem)]">
                                                 <div>
                                                     <label class="mb-1 block text-sm font-semibold text-content">
                                                         {{ __('recurring_income_realizations.fields.receipt_date') }}
@@ -68,22 +86,54 @@
                                                     @enderror
                                                 </div>
 
-                                                <div>
-                                                    <label class="mb-1 block text-sm font-semibold text-content">
-                                                        {{ __('recurring_income_realizations.fields.amount') }}
-                                                    </label>
-                                                    <x-ui.input
-                                                        type="text"
-                                                        inputmode="numeric"
-                                                        pattern="\d*"
-                                                        wire:model.live="inputs.{{ $transaction->id }}.amount"
-                                                    />
-                                                    @error("inputs.{$transaction->id}.amount")
-                                                        <p class="mt-1 text-xs text-status-danger-fg">{{ $message }}</p>
-                                                    @enderror
-                                                </div>
+                                                @if ($this->inputMode === 'gross')
+                                                    <div>
+                                                        <label class="mb-1 block text-sm font-semibold text-content">
+                                                            {{ __('recurring_income_realizations.fields.amount') }}
+                                                        </label>
+                                                        <x-ui.input
+                                                            type="text"
+                                                            inputmode="numeric"
+                                                            pattern="\d*"
+                                                            wire:model.live="inputs.{{ $transaction->id }}.amount"
+                                                        />
+                                                        @error("inputs.{$transaction->id}.amount")
+                                                            <p class="mt-1 text-xs text-status-danger-fg">{{ $message }}</p>
+                                                        @enderror
+                                                    </div>
+                                                @else
+                                                    <div>
+                                                        <label class="mb-1 block text-sm font-semibold text-content">
+                                                            {{ __('recurring_income_realizations.fields.net_amount') }}
+                                                        </label>
+                                                        <x-ui.input
+                                                            type="text"
+                                                            inputmode="numeric"
+                                                            pattern="\d*"
+                                                            wire:model.live="inputs.{{ $transaction->id }}.net_amount"
+                                                        />
+                                                        @error("inputs.{$transaction->id}.net_amount")
+                                                            <p class="mt-1 text-xs text-status-danger-fg">{{ $message }}</p>
+                                                        @enderror
+                                                    </div>
 
-                                                @if (auth()->user()->selectedBusinessUnitOrFail()->currentFiscalYear?->is_taxable)
+                                                    <div>
+                                                        <label class="mb-1 block text-sm font-semibold text-content">
+                                                            {{ __('recurring_income_realizations.fields.tax_amount') }}
+                                                        </label>
+                                                        <x-ui.input
+                                                            type="text"
+                                                            inputmode="numeric"
+                                                            pattern="\d*"
+                                                            wire:model.live="inputs.{{ $transaction->id }}.tax_amount"
+                                                        />
+                                                        @error("inputs.{$transaction->id}.tax_amount")
+                                                            <p class="mt-1 text-xs text-status-danger-fg">{{ $message }}</p>
+                                                        @enderror
+                                                    </div>
+                                                @endif
+
+                                                @if (auth()->user()->selectedBusinessUnitOrFail()->currentFiscalYear?->is_taxable && $this->inputMode === 'gross')
                                                     <div>
                                                         <label class="mb-1 block text-sm font-semibold text-content">
                                                             {{ __('recurring_income_realizations.fields.tax_rate') }}
@@ -161,7 +211,13 @@
                                                 @enderror
                                             </div>
 
-                                            @if (! empty($previewMessages[$transaction->id] ?? []))
+                                            @if (($previewErrorMessages[$transaction->id] ?? null) !== null)
+                                                <div class="rounded-card border border-status-danger-border bg-status-danger px-4 py-3">
+                                                    <p class="text-sm text-status-danger-fg">
+                                                        {{ $previewErrorMessages[$transaction->id] }}
+                                                    </p>
+                                                </div>
+                                            @elseif (! empty($previewMessages[$transaction->id] ?? []))
                                                 <div class="rounded-card border border-status-info-border bg-status-info px-4 py-3">
                                                     @foreach ($previewMessages[$transaction->id] as $message)
                                                         <p class="text-sm text-status-info-fg">

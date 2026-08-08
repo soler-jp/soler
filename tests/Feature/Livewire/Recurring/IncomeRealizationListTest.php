@@ -32,6 +32,8 @@ class IncomeRealizationListTest extends TestCase
             Livewire::test(IncomeRealizationList::class)
                 ->assertSee('受取日・入金日')
                 ->assertSee('売上金額(税込)')
+                ->assertSee('税込価格で入力')
+                ->assertSee('税抜+消費税で入力')
                 ->assertSee('源泉徴収額')
                 ->set("inputs.{$plannedTransaction->id}.amount", 110000)
                 ->set("inputs.{$plannedTransaction->id}.withholding_tax_amount", 10210)
@@ -86,6 +88,106 @@ class IncomeRealizationListTest extends TestCase
                 ->set("inputs.{$plannedTransaction->id}.receipt_date", '2026-08-25')
                 ->set("inputs.{$plannedTransaction->id}.receipt_sub_account_id", $depositSubAccount->id)
                 ->assertSee('7月分のインストラクター業務委託 108,000円のうち、消費税(8%)は8,000円です。');
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    #[Test]
+    public function 税抜と消費税入力モードでプレビュー文を表示できる(): void
+    {
+        Carbon::setTestNow('2026-08-08 10:00:00');
+
+        try {
+            [$user, $plannedTransaction, $depositSubAccount] = $this->createMonthlyIncomePlannedTransaction('2026-07-25');
+
+            $this->actingAs($user);
+
+            Livewire::test(IncomeRealizationList::class)
+                ->assertSee('税抜+消費税で入力')
+                ->set('inputMode', 'net_tax')
+                ->set("inputs.{$plannedTransaction->id}.net_amount", 493812)
+                ->set("inputs.{$plannedTransaction->id}.tax_amount", 49381)
+                ->set("inputs.{$plannedTransaction->id}.withholding_tax_amount", 10210)
+                ->set("inputs.{$plannedTransaction->id}.receipt_date", '2026-08-25')
+                ->set("inputs.{$plannedTransaction->id}.receipt_sub_account_id", $depositSubAccount->id)
+                ->assertSee('7月分のインストラクター業務委託の代金は、493,812円 + 消費税(10%) 49,381円の、合計543,193円です。')
+                ->assertSee('源泉徴収の10,210円を差し引いて532,983円が8/25にその他の預金に振り込まれる予定です。');
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    #[Test]
+    public function 税抜と消費税入力で税率を判定できない場合はエラーにする(): void
+    {
+        Carbon::setTestNow('2026-08-08 10:00:00');
+
+        try {
+            [$user, $plannedTransaction, $depositSubAccount] = $this->createMonthlyIncomePlannedTransaction('2026-07-25');
+
+            $this->actingAs($user);
+
+            Livewire::test(IncomeRealizationList::class)
+                ->set('inputMode', 'net_tax')
+                ->set("inputs.{$plannedTransaction->id}.net_amount", 493812)
+                ->set("inputs.{$plannedTransaction->id}.tax_amount", 49383)
+                ->set("inputs.{$plannedTransaction->id}.withholding_tax_amount", 10210)
+                ->set("inputs.{$plannedTransaction->id}.receipt_date", '2026-08-25')
+                ->set("inputs.{$plannedTransaction->id}.receipt_sub_account_id", $depositSubAccount->id)
+                ->call('realize', $plannedTransaction->id)
+                ->assertHasErrors([
+                    "inputs.{$plannedTransaction->id}.tax_amount" => [
+                        __('recurring_income_realizations.validation.net_tax_invalid_rate'),
+                    ],
+                ]);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    #[Test]
+    public function 税抜と消費税入力で1円差まではプレビュー文を表示できる(): void
+    {
+        Carbon::setTestNow('2026-08-08 10:00:00');
+
+        try {
+            [$user, $plannedTransaction, $depositSubAccount] = $this->createMonthlyIncomePlannedTransaction('2026-07-25');
+
+            $this->actingAs($user);
+
+            Livewire::test(IncomeRealizationList::class)
+                ->set('inputMode', 'net_tax')
+                ->set("inputs.{$plannedTransaction->id}.net_amount", 493812)
+                ->set("inputs.{$plannedTransaction->id}.tax_amount", 49382)
+                ->set("inputs.{$plannedTransaction->id}.withholding_tax_amount", 10210)
+                ->set("inputs.{$plannedTransaction->id}.receipt_date", '2026-08-25')
+                ->set("inputs.{$plannedTransaction->id}.receipt_sub_account_id", $depositSubAccount->id)
+                ->assertSee('7月分のインストラクター業務委託の代金は、493,812円 + 消費税(10%) 49,382円の、合計543,194円です。')
+                ->assertSee('源泉徴収の10,210円を差し引いて532,984円が8/25にその他の預金に振り込まれる予定です。');
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    #[Test]
+    public function 税抜と消費税入力で税率を判定できない場合は確認エリアに即時エラーを表示する(): void
+    {
+        Carbon::setTestNow('2026-08-08 10:00:00');
+
+        try {
+            [$user, $plannedTransaction, $depositSubAccount] = $this->createMonthlyIncomePlannedTransaction('2026-07-25');
+
+            $this->actingAs($user);
+
+            Livewire::test(IncomeRealizationList::class)
+                ->set('inputMode', 'net_tax')
+                ->set("inputs.{$plannedTransaction->id}.net_amount", 493812)
+                ->set("inputs.{$plannedTransaction->id}.tax_amount", 49383)
+                ->set("inputs.{$plannedTransaction->id}.withholding_tax_amount", 10210)
+                ->set("inputs.{$plannedTransaction->id}.receipt_date", '2026-08-25')
+                ->set("inputs.{$plannedTransaction->id}.receipt_sub_account_id", $depositSubAccount->id)
+                ->assertSee('入力した税抜金額と消費税額は、8%/10% のどちらの明細とも一致しません。');
         } finally {
             Carbon::setTestNow();
         }
@@ -172,7 +274,7 @@ class IncomeRealizationListTest extends TestCase
         ], $user);
 
         $plannedTransaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)
-            ->firstWhere('date', $plannedDateCarbon);
+            ->first(fn (Transaction $transaction): bool => $transaction->date?->toDateString() === $plannedDateCarbon->toDateString());
 
         $this->assertNotNull($plannedTransaction);
 

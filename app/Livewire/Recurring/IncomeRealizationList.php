@@ -19,6 +19,8 @@ class IncomeRealizationList extends Component
 {
     public ?int $selectedPlanId = null;
 
+    public string $inputMode = 'gross';
+
     /**
      * @var array<int, array<string, mixed>>
      */
@@ -81,15 +83,42 @@ class IncomeRealizationList extends Component
 
         $actor = $this->currentUser();
         $unit = $actor->selectedBusinessUnitOrFail();
-        $data = $this->inputs[$transactionId] ?? [];
+        $data = $this->normalizeInputNumbers($this->inputs[$transactionId] ?? []);
+        $data['input_mode'] = $this->inputMode;
 
-        $validated = validator($data, [
-            'amount' => ['required', 'integer', 'min:1'],
+        $validator = validator($data, [
+            'input_mode' => ['required', 'in:gross,net_tax'],
+            'amount' => ['nullable', 'integer', 'min:1'],
+            'net_amount' => ['nullable', 'integer', 'min:1'],
+            'tax_amount' => ['nullable', 'integer', 'min:0'],
             'withholding_tax_amount' => ['nullable', 'integer', 'min:0'],
             'receipt_date' => ['required', 'date'],
             'receipt_sub_account_id' => ['required', $unit->subAccountExistsRule()],
-            'tax_option' => [(bool) $unit->currentFiscalYear?->is_taxable ? 'required' : 'nullable', 'in:8,10'],
-        ])->validate();
+            'tax_option' => ['nullable', 'in:8,10'],
+        ]);
+
+        $validator->sometimes('amount', ['required', 'integer', 'min:1'], fn ($input): bool => $input->input_mode === 'gross');
+        $validator->sometimes('net_amount', ['required', 'integer', 'min:1'], fn ($input): bool => $input->input_mode === 'net_tax');
+        $validator->sometimes('tax_amount', ['required', 'integer', 'min:0'], fn ($input): bool => $input->input_mode === 'net_tax');
+        $validator->sometimes('tax_option', ['required', 'in:8,10'], fn ($input): bool => (bool) $unit->currentFiscalYear?->is_taxable && $input->input_mode === 'gross');
+
+        $validated = $validator->validate();
+
+        if (($validated['input_mode'] ?? 'gross') === 'net_tax' && $unit->currentFiscalYear?->is_taxable) {
+            $detectedTaxOption = RecurringIncomeRealizationService::detectTaxOptionFromNetTax(
+                (int) ($validated['net_amount'] ?? 0),
+                (int) ($validated['tax_amount'] ?? 0),
+            );
+
+            if ($detectedTaxOption === null) {
+                $this->addError("inputs.$transactionId.tax_amount", __('recurring_income_realizations.validation.net_tax_invalid_rate'));
+
+                return;
+            }
+
+            $validated['tax_option'] = $detectedTaxOption;
+            $this->inputs[$transactionId]['tax_option'] = $detectedTaxOption;
+        }
 
         $transaction = Transaction::query()
             ->with('recurringTransactionPlan')
@@ -180,6 +209,11 @@ class IncomeRealizationList extends Component
                     $transaction->id => $this->previewLines($selectedPlan, $transaction),
                 ])
                 ->all(),
+            'previewErrorMessages' => $transactions
+                ->mapWithKeys(fn (Transaction $transaction): array => [
+                    $transaction->id => $this->previewErrorMessage($transaction),
+                ])
+                ->all(),
         ]);
     }
 
@@ -196,6 +230,8 @@ class IncomeRealizationList extends Component
         $this->inputs[$transaction->id]['amount'] ??= $creditEntry !== null
             ? (int) $creditEntry->net_amount + (int) $creditEntry->tax_amount
             : 0;
+        $this->inputs[$transaction->id]['net_amount'] ??= (int) ($creditEntry?->net_amount ?? 0);
+        $this->inputs[$transaction->id]['tax_amount'] ??= (int) ($creditEntry?->tax_amount ?? 0);
         $this->inputs[$transaction->id]['tax_option'] ??= $this->taxOptionFromTaxType($creditEntry?->tax_type);
         $this->inputs[$transaction->id]['withholding_tax_amount'] ??= (int) ($plan?->withholding_tax_amount ?? 0);
         $this->inputs[$transaction->id]['receipt_date'] ??= $transaction->date?->toDateString();
@@ -243,11 +279,17 @@ class IncomeRealizationList extends Component
             return [];
         }
 
-        $input = $this->inputs[$transaction->id] ?? [];
+        $input = $this->normalizeInputNumbers($this->inputs[$transaction->id] ?? []);
         $receiptDate = isset($input['receipt_date']) && $input['receipt_date'] !== ''
             ? Carbon::parse($input['receipt_date'])
             : null;
-        $grossAmount = (int) ($input['amount'] ?? 0);
+        $inputMode = $this->inputMode;
+        $grossAmount = $inputMode === 'net_tax'
+            ? (int) ($input['net_amount'] ?? 0) + (int) ($input['tax_amount'] ?? 0)
+            : (int) ($input['amount'] ?? 0);
+        $netAmount = $inputMode === 'net_tax'
+            ? (int) ($input['net_amount'] ?? 0)
+            : max(0, $grossAmount - (int) ($input['tax_amount'] ?? 0));
         $withholdingTaxAmount = (int) ($input['withholding_tax_amount'] ?? 0);
         $receiptSubAccount = isset($input['receipt_sub_account_id'])
             ? $this->findReceiptSubAccount((int) $input['receipt_sub_account_id'])
@@ -258,8 +300,15 @@ class IncomeRealizationList extends Component
         }
 
         $creditEntry = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
-        $taxOption = (string) ($input['tax_option'] ?? $this->taxOptionFromTaxType($creditEntry?->tax_type));
-        $taxAmount = $this->taxAmountForPreview($grossAmount, $taxOption);
+        $taxOption = $inputMode === 'net_tax'
+            ? RecurringIncomeRealizationService::detectTaxOptionFromNetTax(
+                (int) ($input['net_amount'] ?? 0),
+                (int) ($input['tax_amount'] ?? 0),
+            )
+            : (string) ($input['tax_option'] ?? $this->taxOptionFromTaxType($creditEntry?->tax_type));
+        $taxAmount = $inputMode === 'net_tax'
+            ? (int) ($input['tax_amount'] ?? 0)
+            : $this->taxAmountForPreview($grossAmount, $taxOption);
         $netReceiptAmount = max(0, $grossAmount - $withholdingTaxAmount);
         $periodLabel = $this->periodLabel($plan, $transaction);
         $planName = $plan?->name ?? '';
@@ -267,15 +316,30 @@ class IncomeRealizationList extends Component
         $lines = [];
 
         if ($this->currentUser()->selectedBusinessUnitOrFail()->currentFiscalYear?->is_taxable) {
+            if ($taxOption === null) {
+                return [];
+            }
+
             $taxRateLabel = $this->taxRateLabelForPreview($taxOption);
 
-            $lines[] = __('recurring_income_realizations.preview.taxable_summary', [
-                'period' => $periodLabel,
-                'name' => $planName,
-                'gross' => number_format($grossAmount),
-                'tax_rate' => $taxRateLabel,
-                'tax' => number_format($taxAmount),
-            ]);
+            if ($inputMode === 'net_tax') {
+                $lines[] = __('recurring_income_realizations.preview.taxable_net_tax_summary', [
+                    'period' => $periodLabel,
+                    'name' => $planName,
+                    'net' => number_format($netAmount),
+                    'tax_rate' => $taxRateLabel,
+                    'tax' => number_format($taxAmount),
+                    'gross' => number_format($grossAmount),
+                ]);
+            } else {
+                $lines[] = __('recurring_income_realizations.preview.taxable_summary', [
+                    'period' => $periodLabel,
+                    'name' => $planName,
+                    'gross' => number_format($grossAmount),
+                    'tax_rate' => $taxRateLabel,
+                    'tax' => number_format($taxAmount),
+                ]);
+            }
         } else {
             $lines[] = __('recurring_income_realizations.preview.non_taxable_summary', [
                 'period' => $periodLabel,
@@ -302,6 +366,29 @@ class IncomeRealizationList extends Component
         }
 
         return $lines;
+    }
+
+    private function previewErrorMessage(Transaction $transaction): ?string
+    {
+        if (! $transaction->is_planned || $this->inputMode !== 'net_tax') {
+            return null;
+        }
+
+        if (! $this->currentUser()->selectedBusinessUnitOrFail()->currentFiscalYear?->is_taxable) {
+            return null;
+        }
+
+        $input = $this->normalizeInputNumbers($this->inputs[$transaction->id] ?? []);
+        $netAmount = (int) ($input['net_amount'] ?? 0);
+        $taxAmount = (int) ($input['tax_amount'] ?? 0);
+
+        if ($netAmount <= 0 && $taxAmount <= 0) {
+            return null;
+        }
+
+        return RecurringIncomeRealizationService::detectTaxOptionFromNetTax($netAmount, $taxAmount) === null
+            ? __('recurring_income_realizations.validation.net_tax_invalid_rate')
+            : null;
     }
 
     private function periodLabel(?RecurringTransactionPlan $plan, Transaction $transaction): string
@@ -396,6 +483,30 @@ class IncomeRealizationList extends Component
             JournalEntry::TAX_TYPE_TAXABLE_PURCHASES_8 => '8',
             default => '10',
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function normalizeInputNumbers(array $input): array
+    {
+        foreach (['amount', 'net_amount', 'tax_amount', 'withholding_tax_amount'] as $field) {
+            if (! array_key_exists($field, $input)) {
+                continue;
+            }
+
+            if ($input[$field] === null || $input[$field] === '') {
+                $input[$field] = null;
+
+                continue;
+            }
+
+            $normalized = preg_replace('/\D+/', '', (string) $input[$field]);
+            $input[$field] = $normalized === null || $normalized === '' ? null : (int) $normalized;
+        }
+
+        return $input;
     }
 
     /**
