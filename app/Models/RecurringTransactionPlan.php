@@ -332,7 +332,7 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
         return [
             'transaction' => [
                 'date' => $date->toDateString(),
-                'description' => $this->name,
+                'description' => $this->plannedTransactionDescription($date),
                 'remarks' => null,
                 'is_planned' => true,
                 'recurring_transaction_plan_id' => $this->id,
@@ -340,6 +340,19 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
             ],
             'entries' => $entries,
         ];
+    }
+
+    public function plannedTransactionDescription(Carbon $date): string
+    {
+        if ($this->type !== self::TYPE_INCOME) {
+            return $this->name;
+        }
+
+        if ($this->interval === 'yearly') {
+            return sprintf('%d年分 %s', $date->year, $this->name);
+        }
+
+        return sprintf('%d月分 %s', $date->month, $this->name);
     }
 
     public function confirmTransaction(int $transactionId, array $attributes, User $actor): ?Transaction

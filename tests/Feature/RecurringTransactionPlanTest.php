@@ -184,6 +184,47 @@ class RecurringTransactionPlanTest extends TestCase
     }
 
     #[Test]
+    public function monthlyの収入プランは指定した日に予定取引が生成される()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '月初収入テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $depositSubAccount = $unit->getSubAccountByName('その他の預金', 'その他の預金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => '月次報酬',
+            'interval' => 'monthly',
+            'day_of_month' => 15,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'debit_sub_account_id' => $depositSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 10000,
+            'tax_amount' => 0,
+        ], $user);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
+        $dates = $transactions->pluck('date')->sort()->values()->map(fn ($date) => $date->toDateString());
+
+        $this->assertCount(12, $transactions);
+        $this->assertSame([
+            '2025-01-15',
+            '2025-02-15',
+            '2025-03-15',
+            '2025-04-15',
+            '2025-05-15',
+            '2025-06-15',
+            '2025-07-15',
+            '2025-08-15',
+            '2025-09-15',
+            '2025-10-15',
+            '2025-11-15',
+            '2025-12-15',
+        ], $dates->toArray());
+    }
+
+    #[Test]
     public function yearlyの収入プランでは年に1件の予定取引が生成される()
     {
         $user = User::factory()->create();
@@ -209,6 +250,55 @@ class RecurringTransactionPlanTest extends TestCase
 
         $this->assertCount(1, $transactions);
         $this->assertSame('2025-06-20', $transactions->firstOrFail()->date->toDateString());
+        $this->assertSame('2025年分 年次報酬', $transactions->firstOrFail()->description);
+    }
+
+    #[Test]
+    public function b株式会社の_h_p保守費用年払い収入プランから年1件の予定取引を生成できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '年払い保守収入テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $unit->id,
+            'name' => 'B株式会社',
+        ]);
+
+        $depositSubAccount = $unit->getSubAccountByName('その他の預金', 'その他の預金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => 'HP保守費用',
+            'interval' => 'yearly',
+            'month_of_year' => 4,
+            'day_of_month' => 30,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'counterparty_id' => $counterparty->id,
+            'debit_sub_account_id' => $depositSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 240000,
+            'tax_amount' => 24000,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+        ], $user);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
+
+        $this->assertCount(1, $transactions);
+
+        $transaction = $transactions->firstOrFail()->fresh('journalEntries');
+        $debitEntry = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_DEBIT);
+        $creditEntry = $transaction->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+
+        $this->assertSame('2025-04-30', $transaction->date->toDateString());
+        $this->assertSame('2025年分 HP保守費用', $transaction->description);
+        $this->assertTrue($transaction->is_planned);
+        $this->assertSame($counterparty->id, $transaction->counterparty_id);
+        $this->assertSame(264000, $debitEntry?->net_amount);
+        $this->assertSame($depositSubAccount->id, $debitEntry?->sub_account_id);
+        $this->assertSame(240000, $creditEntry?->net_amount);
+        $this->assertSame(24000, $creditEntry?->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_SALES_10, $creditEntry?->tax_type);
     }
 
     #[Test]
@@ -248,6 +338,75 @@ class RecurringTransactionPlanTest extends TestCase
         $this->assertSame($withholdingSubAccount->id, $debitEntries[1]->sub_account_id);
         $this->assertSame(100000, $creditEntry?->net_amount);
         $this->assertSame(0, $creditEntry?->tax_amount);
+    }
+
+    #[Test]
+    public function aスポーツクラブの月次業務委託収入プランから1年分の予定取引を生成できる()
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '月次委託収入テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $unit->id,
+            'name' => 'Aスポーツクラブ',
+        ]);
+
+        $depositSubAccount = $unit->getSubAccountByName('その他の預金', 'その他の預金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+        $withholdingSubAccount = $unit->getSubAccountByName('事業主貸', RecurringTransactionPlan::WITHHOLDING_SUB_ACCOUNT_NAME);
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => 'インストラクター業務委託',
+            'interval' => 'monthly',
+            'day_of_month' => 25,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'counterparty_id' => $counterparty->id,
+            'is_withholding' => true,
+            'debit_sub_account_id' => $depositSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 100000,
+            'tax_amount' => 10000,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+            'withholding_tax_amount' => 10210,
+            'withholding_sub_account_id' => $withholdingSubAccount->id,
+        ], $user);
+
+        $transactions = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user);
+
+        $this->assertCount(12, $transactions);
+        $this->assertSame('2025-01-25', $transactions->firstOrFail()->date->toDateString());
+        $this->assertTrue($transactions->every(fn ($transaction) => $transaction->is_planned));
+        $this->assertTrue($transactions->every(fn ($transaction) => $transaction->counterparty_id === $counterparty->id));
+        $this->assertSame([
+            '1月分 インストラクター業務委託',
+            '2月分 インストラクター業務委託',
+            '3月分 インストラクター業務委託',
+            '4月分 インストラクター業務委託',
+            '5月分 インストラクター業務委託',
+            '6月分 インストラクター業務委託',
+            '7月分 インストラクター業務委託',
+            '8月分 インストラクター業務委託',
+            '9月分 インストラクター業務委託',
+            '10月分 インストラクター業務委託',
+            '11月分 インストラクター業務委託',
+            '12月分 インストラクター業務委託',
+        ], $transactions->pluck('description')->all());
+
+        $firstTransaction = $transactions->firstOrFail()->fresh('journalEntries');
+        $debitEntries = $firstTransaction->journalEntries
+            ->where('type', JournalEntry::TYPE_DEBIT)
+            ->values();
+        $creditEntry = $firstTransaction->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+
+        $this->assertCount(2, $debitEntries);
+        $this->assertSame(99790, $debitEntries[0]->net_amount);
+        $this->assertSame($depositSubAccount->id, $debitEntries[0]->sub_account_id);
+        $this->assertSame(10210, $debitEntries[1]->net_amount);
+        $this->assertSame($withholdingSubAccount->id, $debitEntries[1]->sub_account_id);
+        $this->assertSame(100000, $creditEntry?->net_amount);
+        $this->assertSame(10000, $creditEntry?->tax_amount);
+        $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_SALES_10, $creditEntry?->tax_type);
     }
 
     #[Test]
