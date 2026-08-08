@@ -536,6 +536,116 @@ class AccountTypeTransactionIndexTest extends TestCase
         $this->assertTrue(Transaction::find($otherTransaction->id)->is_active);
     }
 
+    #[Test]
+    public function お金の動き一覧ページを表示できる(): void
+    {
+        [$user] = $this->createInitializedUser();
+
+        $this->actingAs($user);
+
+        $response = $this->get(route('transactions.others'));
+
+        $response->assertOk();
+        $response->assertSee('お金の移動の登録・確認');
+        $response->assertSeeLivewire(AccountTypeTransactionIndex::class);
+    }
+
+    #[Test]
+    public function お金の動き一覧は損益科目を含む取引を除外する(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $bank = $unit->getAccountByName('当座預金')->subAccounts()->firstOrFail();
+        $ownerDrawings = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+        $sales = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+        $supplies = $unit->getAccountByName('消耗品費')->subAccounts()->firstOrFail();
+        $purchase = $unit->getAccountByName('仕入金額')->subAccounts()->firstOrFail();
+        $endingInventory = $unit->getAccountByName('期末商品（棚卸高）')->subAccounts()->firstOrFail();
+        $inventoryAsset = $unit->getAccountByName('棚卸資産')->subAccounts()->firstOrFail();
+
+        $registrar = new TransactionRegistrar;
+
+        // 除外される: 売上
+        $registrar->register($fiscalYear, [
+            'date' => '2025-01-05',
+            'description' => '売上入金',
+        ], [
+            ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 5000, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+            ['sub_account_id' => $sales->id, 'type' => 'credit', 'net_amount' => 5000, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+        ], $user);
+
+        // 除外される: 経費
+        $registrar->register($fiscalYear, [
+            'date' => '2025-01-06',
+            'description' => '文具購入',
+        ], [
+            ['sub_account_id' => $supplies->id, 'type' => 'debit', 'net_amount' => 300, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+            ['sub_account_id' => $cash->id, 'type' => 'credit', 'net_amount' => 300, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+        ], $user);
+
+        // 除外される: 仕入
+        $registrar->register($fiscalYear, [
+            'date' => '2025-01-07',
+            'description' => '商品仕入',
+        ], [
+            ['sub_account_id' => $purchase->id, 'type' => 'debit', 'net_amount' => 1200, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+            ['sub_account_id' => $cash->id, 'type' => 'credit', 'net_amount' => 1200, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+        ], $user);
+
+        // 除外される: 期末棚卸 (期末商品（棚卸高）は損益科目)
+        $registrar->register($fiscalYear, [
+            'date' => '2025-12-31',
+            'description' => '期末棚卸',
+        ], [
+            ['sub_account_id' => $inventoryAsset->id, 'type' => 'debit', 'net_amount' => 800, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+            ['sub_account_id' => $endingInventory->id, 'type' => 'credit', 'net_amount' => 800, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+        ], $user);
+
+        // 含まれる: 資産↔資産の振替
+        $registrar->register($fiscalYear, [
+            'date' => '2025-02-10',
+            'description' => '当座預金から現金へ引き出し',
+        ], [
+            ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 10000, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+            ['sub_account_id' => $bank->id, 'type' => 'credit', 'net_amount' => 10000, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+        ], $user);
+
+        // 含まれる: 資本→資産（自己資金投入）
+        $registrar->register($fiscalYear, [
+            'date' => '2025-03-01',
+            'description' => '自己資金投入',
+        ], [
+            ['sub_account_id' => $bank->id, 'type' => 'debit', 'net_amount' => 20000, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+            ['sub_account_id' => $ownerDrawings->id, 'type' => 'credit', 'net_amount' => 20000, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+        ], $user);
+
+        $component = Livewire::actingAs($user)
+            ->test(AccountTypeTransactionIndex::class, ['kind' => AccountTypeTransactionIndex::KIND_OTHER]);
+
+        $component
+            ->assertSee('お金の移動の登録・確認')
+            ->assertSee('当座預金から現金へ引き出し')
+            ->assertSee('自己資金投入')
+            ->assertDontSee('売上入金')
+            ->assertDontSee('文具購入')
+            ->assertDontSee('商品仕入')
+            ->assertDontSee('期末棚卸');
+
+        $transactions = $component->get('transactions');
+
+        $this->assertCount(2, $transactions);
+        $this->assertSame('2025-02-10', $transactions[0]['date']);
+        $this->assertSame(10000, $transactions[0]['amount']);
+        $this->assertSame('現金', $transactions[0]['debit_label']);
+        $this->assertSame('当座預金', $transactions[0]['credit_label']);
+        $this->assertSame('2025-03-01', $transactions[1]['date']);
+        $this->assertSame(20000, $transactions[1]['amount']);
+        $this->assertSame('当座預金', $transactions[1]['debit_label']);
+        $this->assertSame('事業主借', $transactions[1]['credit_label']);
+    }
+
     /**
      * @return array{0: User, 1: BusinessUnit}
      */

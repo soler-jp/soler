@@ -8,6 +8,8 @@
             <livewire:soler-ui.transaction-entry.expense-form.standard />
         @elseif ($kind === 'purchase')
             <livewire:soler-ui.transaction-entry.purchase-form.standard />
+        @elseif ($kind === \App\Livewire\Pages\AccountTypeTransactionIndex::KIND_OTHER)
+            <livewire:soler-ui.transaction-entry.transfer-form.standard />
         @endif
 
         <section class="space-y-4">
@@ -124,6 +126,8 @@
                             :edit-action="$this->editAction()"
                             :edit-livewire-component="$this->editLivewireComponent()"
                             :editing-transaction-id="$editingTransactionId"
+                            :expense-debit-header="$this->debitHeader()"
+                            :expense-credit-header="$this->creditHeader()"
                         />
                     </div>
                 </div>

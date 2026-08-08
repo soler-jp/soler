@@ -17,13 +17,15 @@ class AccountTypeTransactionIndex extends Component
 
     public const YEARLY_PERIOD = 'yearly';
 
+    public const KIND_OTHER = 'other';
+
     public string $kind;
 
     public string $title;
 
     public string $description;
 
-    public string $accountType;
+    public string $accountType = '';
 
     public string $variant;
 
@@ -113,7 +115,7 @@ class AccountTypeTransactionIndex extends Component
         $this->kind = $kind;
         $this->title = $config['title'];
         $this->description = $config['description'];
-        $this->accountType = $config['account_type'];
+        $this->accountType = $config['account_type'] ?? '';
         $this->variant = $config['variant'];
         $this->groupByMonth = $config['group_by_month'];
         $this->accountNames = $config['account_names'];
@@ -136,7 +138,7 @@ class AccountTypeTransactionIndex extends Component
      * @return array{
      *     title: string,
      *     description: string,
-     *     account_type: string,
+     *     account_type: ?string,
      *     variant: string,
      *     group_by_month: bool,
      *     account_names: array<int, string>,
@@ -182,6 +184,15 @@ class AccountTypeTransactionIndex extends Component
                 'account_names' => self::COST_OF_GOODS_SOLD_ACCOUNT_NAMES,
                 'excluded_account_names' => [],
             ],
+            self::KIND_OTHER => [
+                'title' => 'お金の移動の登録・確認',
+                'description' => '売上・経費・仕入以外の、資産・負債・資本のあいだのお金の移動を月ごとに確認できます。',
+                'account_type' => null,
+                'variant' => self::KIND_OTHER,
+                'group_by_month' => true,
+                'account_names' => [],
+                'excluded_account_names' => [],
+            ],
             default => throw new InvalidArgumentException('Unsupported kind.'),
         };
     }
@@ -213,9 +224,19 @@ class AccountTypeTransactionIndex extends Component
         };
     }
 
+    public function debitHeader(): string
+    {
+        return $this->kind === self::KIND_OTHER ? '入金先' : '種類';
+    }
+
+    public function creditHeader(): string
+    {
+        return $this->kind === self::KIND_OTHER ? '出金元' : '支払い元';
+    }
+
     public function emptyStateColspan(): int
     {
-        return ($this->accountType === Account::TYPE_EXPENSE ? 4 : 3)
+        return ($this->accountType === Account::TYPE_REVENUE ? 3 : 4)
             + ($this->showTaxTypeColumn ? 1 : 0)
             + 2;
     }
@@ -402,11 +423,13 @@ class AccountTypeTransactionIndex extends Component
         $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
 
         if ($this->groupByMonth) {
-            $groupedMonths = $fiscalYear?->monthlyAccountTypeTransactionGroups(
-                $this->accountType,
-                $this->accountNames,
-                $this->excludedAccountNames,
-            ) ?? [];
+            $groupedMonths = $this->kind === self::KIND_OTHER
+                ? ($fiscalYear?->monthlyOtherTransactionGroups() ?? [])
+                : ($fiscalYear?->monthlyAccountTypeTransactionGroups(
+                    $this->accountType,
+                    $this->accountNames,
+                    $this->excludedAccountNames,
+                ) ?? []);
             $monthsByYearMonth = collect($groupedMonths)->keyBy('year_month');
             $this->months = collect(range(1, 12))
                 ->map(function (int $month) use ($monthsByYearMonth): array {
@@ -426,11 +449,13 @@ class AccountTypeTransactionIndex extends Component
                     $month['year_month'] => $monthsByYearMonth->get($month['year_month'])['transactions'] ?? [],
                 ])
                 ->all();
-            $this->transactions = $fiscalYear?->accountTypeTransactions(
-                $this->accountType,
-                $this->accountNames,
-                $this->excludedAccountNames,
-            ) ?? [];
+            $this->transactions = $this->kind === self::KIND_OTHER
+                ? ($fiscalYear?->otherTransactions() ?? [])
+                : ($fiscalYear?->accountTypeTransactions(
+                    $this->accountType,
+                    $this->accountNames,
+                    $this->excludedAccountNames,
+                ) ?? []);
 
             return;
         }
@@ -465,7 +490,7 @@ class AccountTypeTransactionIndex extends Component
      */
     private function resolveAvailableAccountCounts(): array
     {
-        if ($this->accountType !== Account::TYPE_EXPENSE || $this->groupByMonth) {
+        if ($this->kind === self::KIND_OTHER || $this->accountType !== Account::TYPE_EXPENSE || $this->groupByMonth) {
             return [];
         }
 

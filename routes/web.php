@@ -45,6 +45,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/transactions/purchases', [PortalController::class, 'transactionIndex'])
         ->defaults('kind', 'purchase')
         ->name('transactions.purchases');
+    Route::get('/transactions/others', [PortalController::class, 'transactionIndex'])
+        ->defaults('kind', 'other')
+        ->name('transactions.others');
     Route::get('/transactions/journal', [PortalController::class, 'transactionJournal'])
         ->name('transactions.journal');
 

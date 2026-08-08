@@ -10,6 +10,7 @@
                 ['label' => __('navigation.revenue'), 'route' => 'transactions.revenues'],
                 ['label' => __('navigation.expense'), 'route' => 'transactions.expenses'],
                 ['label' => __('navigation.purchase'), 'route' => 'transactions.purchases'],
+                ['label' => __('navigation.other'), 'route' => 'transactions.others'],
             ],
         ],
         [

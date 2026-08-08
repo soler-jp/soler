@@ -765,6 +765,144 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
             ->all();
     }
 
+    /**
+     * @return array<int, array{
+     *     year_month: string,
+     *     label: string,
+     *     amount: int,
+     *     transactions: array<int, array{
+     *         id: int,
+     *         date: string,
+     *         amount: int,
+     *         payment_amount: int,
+     *         description: string,
+     *         allocation_note: string,
+     *         debit_label: string,
+     *         debit_badge_class: string,
+     *         credit_label: string,
+     *         credit_badge_class: string,
+     *         tax_type_label: string,
+     *         tax_type_badge_class: string,
+     *         counterparty_name: string,
+     *         is_single_pair: bool
+     *     }>
+     * }>
+     */
+    public function monthlyOtherTransactionGroups(): array
+    {
+        $transactions = $this->loadOtherTransactions();
+
+        return $transactions
+            ->groupBy(fn (Transaction $transaction): string => $transaction->date->format('Y-m'))
+            ->map(fn (Collection $group, string $yearMonth): array => [
+                'year_month' => $yearMonth,
+                'label' => CarbonImmutable::createFromFormat('!Y-m', $yearMonth)->isoFormat('YYYY年M月'),
+                'amount' => (int) $group->sum(fn (Transaction $transaction): int => $this->otherTransactionAmount($transaction)),
+                'transactions' => $group
+                    ->map(fn (Transaction $transaction): array => $this->buildOtherTransactionRow($transaction))
+                    ->values()
+                    ->all(),
+            ])
+            ->sortBy('year_month')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{
+     *     id: int,
+     *     date: string,
+     *     amount: int,
+     *     payment_amount: int,
+     *     description: string,
+     *     allocation_note: string,
+     *     debit_label: string,
+     *     debit_badge_class: string,
+     *     credit_label: string,
+     *     credit_badge_class: string,
+     *     tax_type_label: string,
+     *     tax_type_badge_class: string,
+     *     counterparty_name: string,
+     *     is_single_pair: bool
+     * }>
+     */
+    public function otherTransactions(): array
+    {
+        return $this->loadOtherTransactions()
+            ->map(fn (Transaction $transaction): array => $this->buildOtherTransactionRow($transaction))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return Collection<int, Transaction>
+     */
+    private function loadOtherTransactions(): Collection
+    {
+        return Transaction::query()
+            ->with([
+                'counterparty:id,name',
+                'journalEntries.subAccount.account:id,name,type',
+            ])
+            ->whereBelongsTo($this)
+            ->where('is_active', true)
+            ->where('is_planned', false)
+            ->whereDoesntHave('journalEntries.subAccount.account', fn (Builder $query) => $query
+                ->whereIn('type', [Account::TYPE_REVENUE, Account::TYPE_EXPENSE]))
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * @return array{
+     *     id: int,
+     *     date: string,
+     *     amount: int,
+     *     payment_amount: int,
+     *     description: string,
+     *     allocation_note: string,
+     *     debit_label: string,
+     *     debit_badge_class: string,
+     *     credit_label: string,
+     *     credit_badge_class: string,
+     *     tax_type_label: string,
+     *     tax_type_badge_class: string,
+     *     counterparty_name: string,
+     *     is_single_pair: bool
+     * }
+     */
+    private function buildOtherTransactionRow(Transaction $transaction): array
+    {
+        $amount = $this->otherTransactionAmount($transaction);
+        $debitLabel = $this->monthlyEntryLabels($transaction->journalEntries->where('type', JournalEntry::TYPE_DEBIT));
+        $creditLabel = $this->monthlyEntryLabels($transaction->journalEntries->where('type', JournalEntry::TYPE_CREDIT));
+
+        return [
+            'id' => $transaction->id,
+            'date' => $transaction->date->format('Y-m-d'),
+            'amount' => $amount,
+            'payment_amount' => $amount,
+            'description' => $this->monthlyTransactionDescription($transaction),
+            'allocation_note' => '',
+            'debit_label' => $debitLabel,
+            'debit_badge_class' => $this->monthlyBadgeClassForAccount($debitLabel),
+            'credit_label' => $creditLabel,
+            'credit_badge_class' => $this->monthlyBadgeClassForAccount($creditLabel),
+            'tax_type_label' => $this->monthlyTaxTypeLabel($transaction->journalEntries),
+            'tax_type_badge_class' => $this->monthlyTaxTypeBadgeClass($transaction->journalEntries),
+            'counterparty_name' => $transaction->counterparty?->name ?? '',
+            'is_single_pair' => $transaction->is_single_pair,
+        ];
+    }
+
+    private function otherTransactionAmount(Transaction $transaction): int
+    {
+        return (int) $transaction->journalEntries
+            ->where('type', JournalEntry::TYPE_CREDIT)
+            ->sum(fn (JournalEntry $entry): int => $entry->gross_amount);
+    }
+
     public function searchTransactionsForJournal(TransactionSearchFilters $filters): LengthAwarePaginator
     {
         $query = $this->transactionJournalQuery($filters)

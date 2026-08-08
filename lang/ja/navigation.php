@@ -4,6 +4,7 @@ return [
     'revenue' => '売上の登録・確認',
     'expense' => '経費の登録・確認',
     'purchase' => '仕入の登録・確認',
+    'other' => 'お金の移動の登録・確認',
 
     'section_review' => '確認する',
     'expense_by_type' => '経費の種類別一覧',
