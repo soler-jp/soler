@@ -88,6 +88,60 @@ class RecurringIncomeRealizationServiceTest extends TestCase
     }
 
     #[Test]
+    public function aスポーツクラブの1月分予定売上は実現時に消費税率を8パーセントへ変更できる(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '月次委託収入税率変更テスト']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+        $fiscalYear->forceFill(['is_taxable' => true])->save();
+
+        $counterparty = Counterparty::factory()->create([
+            'business_unit_id' => $unit->id,
+            'name' => 'Aスポーツクラブ',
+        ]);
+
+        $depositSubAccount = $unit->getSubAccountByName('その他の預金', 'その他の預金');
+        $salesSubAccount = $unit->getSubAccountByName('売上高', '売上高');
+        $withholdingSubAccount = $unit->getSubAccountByName('事業主貸', RecurringTransactionPlan::WITHHOLDING_SUB_ACCOUNT_NAME);
+
+        $plan = $unit->createRecurringTransactionPlan([
+            'name' => 'インストラクター業務委託',
+            'interval' => 'monthly',
+            'day_of_month' => 25,
+            'type' => RecurringTransactionPlan::TYPE_INCOME,
+            'counterparty_id' => $counterparty->id,
+            'is_withholding' => true,
+            'debit_sub_account_id' => $depositSubAccount->id,
+            'credit_sub_account_id' => $salesSubAccount->id,
+            'amount' => 100000,
+            'tax_amount' => 10000,
+            'tax_type' => JournalEntry::TAX_TYPE_TAXABLE_SALES_10,
+            'withholding_tax_amount' => 10210,
+            'withholding_sub_account_id' => $withholdingSubAccount->id,
+        ], $user);
+
+        $plannedTransaction = $unit->generatePlannedTransactionsForPlan($plan, $fiscalYear, $user)->firstOrFail();
+
+        $realizedTransaction = app(RecurringIncomeRealizationService::class)->realize(
+            $plannedTransaction,
+            [
+                'amount' => 108000,
+                'tax_option' => '8',
+                'withholding_tax_amount' => 10210,
+                'receipt_date' => '2025-01-25',
+                'receipt_sub_account_id' => $depositSubAccount->id,
+            ],
+            $user,
+        )->firstOrFail()->fresh('journalEntries');
+
+        $creditEntry = $realizedTransaction->journalEntries->firstWhere('type', JournalEntry::TYPE_CREDIT);
+
+        $this->assertSame(JournalEntry::TAX_TYPE_TAXABLE_SALES_8, $creditEntry?->tax_type);
+        $this->assertSame(100000, $creditEntry?->net_amount);
+        $this->assertSame(8000, $creditEntry?->tax_amount);
+    }
+
+    #[Test]
     public function aスポーツクラブの1月分予定売上を翌月入金で売掛金経由に実現できる(): void
     {
         $user = User::factory()->create();

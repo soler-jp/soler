@@ -213,7 +213,7 @@ class TransactionRegistrar
             'sub_account_id' => $creditEntry->sub_account_id,
             'type' => JournalEntry::TYPE_CREDIT,
             'gross_amount' => $grossAmount,
-            'tax_type' => $creditEntry->tax_type,
+            'tax_type' => $overrides['tax_type'] ?? $creditEntry->tax_type,
         ];
 
         return $entries;

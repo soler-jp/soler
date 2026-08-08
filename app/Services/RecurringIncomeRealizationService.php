@@ -50,6 +50,7 @@ class RecurringIncomeRealizationService
             'withholding_tax_amount' => ['nullable', 'integer', 'min:0'],
             'receipt_date' => ['required', 'date'],
             'receipt_sub_account_id' => ['required', $plan->businessUnit->subAccountExistsRule()],
+            'tax_option' => ['nullable', 'in:8,10'],
         ])->validate();
 
         $receiptDate = Carbon::parse($validated['receipt_date']);
@@ -81,11 +82,14 @@ class RecurringIncomeRealizationService
             ]);
         }
 
+        $taxType = $this->resolveTaxType($plan, $validated['tax_option'] ?? null);
+
         if ($plan->interval === 'yearly') {
             $confirmed = $plan->confirmTransaction($plannedTransaction->id, [
                 'date' => $receiptDate->toDateString(),
                 'amount' => (int) $validated['amount'],
                 'debit_sub_account_id' => (int) $validated['receipt_sub_account_id'],
+                'tax_type' => $taxType,
             ], $actor);
 
             if ($confirmed === null) {
@@ -114,6 +118,7 @@ class RecurringIncomeRealizationService
             'date' => $receiptDate->toDateString(),
             'amount' => (int) $validated['amount'],
             'debit_sub_account_id' => (int) $validated['receipt_sub_account_id'],
+            'tax_type' => $taxType,
         ], $actor);
 
         if ($confirmed === null) {
@@ -149,6 +154,7 @@ class RecurringIncomeRealizationService
 
             $plannedGrossAmount = (int) $validated['amount'];
             $withholdingTaxAmount = (int) ($validated['withholding_tax_amount'] ?? 0);
+            $taxType = $this->resolveTaxType($plan, $validated['tax_option'] ?? null);
 
             $confirmedSalesTransaction = $this->plannedTransactionConfirmer->confirm(
                 $plannedTransaction,
@@ -165,7 +171,7 @@ class RecurringIncomeRealizationService
                         'sub_account_id' => $plan->credit_sub_account_id,
                         'type' => 'credit',
                         'gross_amount' => $plannedGrossAmount,
-                        'tax_type' => $plan->defaultTaxType(),
+                        'tax_type' => $taxType,
                     ],
                 ],
             );
@@ -214,5 +220,18 @@ class RecurringIncomeRealizationService
                 $settlementTransaction,
             ]);
         }, attempts: 5);
+    }
+
+    private function resolveTaxType(RecurringTransactionPlan $plan, ?string $taxOption): string
+    {
+        if ($taxOption === '8') {
+            return JournalEntry::TAX_TYPE_TAXABLE_SALES_8;
+        }
+
+        if ($taxOption === '10') {
+            return JournalEntry::TAX_TYPE_TAXABLE_SALES_10;
+        }
+
+        return $plan->defaultTaxType();
     }
 }
