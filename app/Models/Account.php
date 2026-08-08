@@ -32,6 +32,14 @@ class Account extends Model implements ResolvesBusinessUnit
         self::TYPE_EXPENSE,
     ];
 
+    public const TYPE_LABELS = [
+        self::TYPE_ASSET => '資産',
+        self::TYPE_LIABILITY => '負債',
+        self::TYPE_EQUITY => '資本',
+        self::TYPE_REVENUE => '収益',
+        self::TYPE_EXPENSE => '費用',
+    ];
+
     protected $fillable = [
         'business_unit_id',
         'name',

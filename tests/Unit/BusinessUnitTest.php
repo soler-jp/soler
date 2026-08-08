@@ -1078,4 +1078,110 @@ class BusinessUnitTest extends TestCase
         $this->assertSame('XX銀行', $bankSource['label']);
         $this->assertFalse($sources->contains(fn (array $source): bool => $source['label'] === 'その他の預金'));
     }
+
+    #[Test]
+    public function selectable_sub_accounts_grouped_by_typeは_type別かつ_account順に_sub_accountを返す(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+
+        $grouped = $unit->selectableSubAccountsGroupedByType();
+
+        $this->assertEqualsCanonicalizing(
+            [Account::TYPE_ASSET, Account::TYPE_LIABILITY, Account::TYPE_EQUITY, Account::TYPE_REVENUE, Account::TYPE_EXPENSE],
+            $grouped->keys()->all(),
+        );
+
+        // expense グループには標準・拡張の Account が Account.id 順（既定シード登録順）で並ぶ
+        $expenseAccountNames = $grouped[Account::TYPE_EXPENSE]->pluck('name')->all();
+        $expectedOrderPrefix = ['租税公課', '荷造運賃', '水道光熱費'];
+        $this->assertSame($expectedOrderPrefix, array_slice($expenseAccountNames, 0, count($expectedOrderPrefix)));
+    }
+
+    #[Test]
+    public function selectable_sub_accounts_grouped_by_typeはhidden_sub_accountを除外する(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+
+        // 「現金」配下は既定で hidden（$hiddenDefaultSubAccounts）に含まれる
+        $grouped = $unit->selectableSubAccountsGroupedByType();
+
+        $cashAccountEntry = $grouped[Account::TYPE_ASSET]->firstWhere('name', '現金');
+        $this->assertNull($cashAccountEntry, '現金 は SubAccount がすべて hidden なのでグループから除外される想定');
+
+        foreach ($grouped as $accounts) {
+            foreach ($accounts as $account) {
+                foreach ($account->subAccounts as $sub) {
+                    $this->assertNotSame(SubAccount::VISIBILITY_HIDDEN, $sub->visibility);
+                }
+            }
+        }
+    }
+
+    #[Test]
+    public function selectable_sub_accounts_grouped_by_typeは_sub_accountをsort_order順に並べる(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+
+        $account = $unit->getAccountByName('雑費');
+        $this->assertNotNull($account);
+
+        // 明示的に sort_order を持たない SubAccount を追加
+        $account->addCustomSubAccount('追加補助A', $user);
+
+        $grouped = $unit->selectableSubAccountsGroupedByType();
+        $entry = $grouped[Account::TYPE_EXPENSE]->firstWhere('name', '雑費');
+        $this->assertNotNull($entry);
+
+        $subOrder = $entry->subAccounts->pluck('name')->all();
+        // 既定 '雑費' が prioritized なので先頭、追加分は SORT_ORDER_DEFAULT で後ろ
+        $this->assertSame('雑費', $subOrder[0]);
+        $this->assertContains('追加補助A', $subOrder);
+    }
+
+    #[Test]
+    public function selectable_sub_account_exists_ruleは_hidden_sub_accountを弾く(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => 'テスト事業体']);
+
+        $cashAccount = $unit->getAccountByName('現金');
+        $hiddenSub = $cashAccount->subAccounts()->first();
+        $this->assertSame(SubAccount::VISIBILITY_HIDDEN, $hiddenSub->visibility);
+
+        $visibleSub = $unit->getAccountByName('消耗品費')->subAccounts()->first();
+
+        $rule = $unit->selectableSubAccountExistsRule();
+
+        $passing = Validator::make(
+            ['sub_account_id' => $visibleSub->id],
+            ['sub_account_id' => [$rule]],
+        );
+        $this->assertTrue($passing->passes());
+
+        $failing = Validator::make(
+            ['sub_account_id' => $hiddenSub->id],
+            ['sub_account_id' => [$rule]],
+        );
+        $this->assertTrue($failing->fails());
+    }
+
+    #[Test]
+    public function selectable_sub_account_exists_ruleは他事業体のsub_accountを弾く(): void
+    {
+        $user = User::factory()->create();
+        $unitA = $user->createBusinessUnitWithDefaults(['name' => 'A']);
+        $unitB = $user->createBusinessUnitWithDefaults(['name' => 'B']);
+
+        $foreignSub = $unitB->getAccountByName('消耗品費')->subAccounts()->first();
+
+        $failing = Validator::make(
+            ['sub_account_id' => $foreignSub->id],
+            ['sub_account_id' => [$unitA->selectableSubAccountExistsRule()]],
+        );
+
+        $this->assertTrue($failing->fails());
+    }
 }

@@ -731,6 +731,37 @@ class BusinessUnit extends Model implements ResolvesBusinessUnit
             ->where(fn ($query) => $query->whereIn('account_id', $this->accounts()->select('id')));
     }
 
+    /**
+     * UI で選択させる SubAccount 群を Account type ごとにグループ化して返す。
+     * visibility が hidden の SubAccount は除外する。
+     * Account は id 順（＝既定シードの登録順）で並び、その配下の SubAccount も relation 定義の
+     * sort_order, id 順で並ぶ。SubAccount が空の Account は含めない。
+     *
+     * @return Collection<string, Collection<int, Account>>
+     */
+    public function selectableSubAccountsGroupedByType(): Collection
+    {
+        return $this->accounts()
+            ->with(['subAccounts' => fn ($query) => $query->where('visibility', '!=', SubAccount::VISIBILITY_HIDDEN)])
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (Account $account): bool => $account->subAccounts->isNotEmpty())
+            ->groupBy('type');
+    }
+
+    /**
+     * UI が受け付ける SubAccount 用の exists ルール。
+     * subAccountExistsRule() と異なり、visibility が hidden の SubAccount を除外する。
+     * ドメイン層（TransactionRegistrar）は hidden も受理してよいので、これは form 用途限定。
+     */
+    public function selectableSubAccountExistsRule(): Exists
+    {
+        return Rule::exists('sub_accounts', 'id')
+            ->where(fn ($query) => $query
+                ->whereIn('account_id', $this->accounts()->select('id'))
+                ->where('visibility', '!=', SubAccount::VISIBILITY_HIDDEN));
+    }
+
     public function currentFiscalYear(): BelongsTo
     {
         return $this->belongsTo(FiscalYear::class, 'current_fiscal_year_id');

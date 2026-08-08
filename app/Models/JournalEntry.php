@@ -76,6 +76,20 @@ class JournalEntry extends Model implements ResolvesBusinessUnit
         self::TAX_TYPE_ZERO_RATED,
     ];
 
+    /**
+     * ユーザーがフォームで直接選択できる税区分。
+     * DEEMED_* は免税事業者に対して TransactionRegistrar が自動付与する内部区分なので除外する。
+     */
+    public const USER_SELECTABLE_TAX_TYPES = [
+        self::TAX_TYPE_TAXABLE_SALES_10,
+        self::TAX_TYPE_TAXABLE_SALES_8,
+        self::TAX_TYPE_TAXABLE_PURCHASES_10,
+        self::TAX_TYPE_TAXABLE_PURCHASES_8,
+        self::TAX_TYPE_EXEMPT,
+        self::TAX_TYPE_OUT_OF_SCOPE,
+        self::TAX_TYPE_ZERO_RATED,
+    ];
+
     public const TAX_AMOUNT_SOURCE_USER_INPUT = 'user_input';
 
     public const TAX_AMOUNT_SOURCE_DEFAULTED = 'defaulted';
