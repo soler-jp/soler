@@ -252,6 +252,92 @@ $confirmed = $plan->confirmTransaction($transaction->id, [
 この場合も、借方 2 行は維持されます。  
 また、確定時に `amount` を変更する場合でも、`amount` は `withholding_tax_amount` より大きい必要があります。
 
+## 定期収入の予定取引を実現する
+
+定期収入は、単純な `confirmTransaction()` だけでなく `RecurringIncomeRealizationService` を使って実現できます。
+
+このサービスは、入金日が予定日と同じ月か、翌月以降かで処理を分けます。
+
+- 同じ月の受取
+  - 受取日をそのまま売上日として確定します
+- 別の月の受取
+  - 予定日で売上を確定し、受取日に売掛金回収の取引を追加します
+- 年払い
+  - 受取日をそのまま売上日として確定します
+
+### 同月受取の例
+
+```php
+use App\Services\RecurringIncomeRealizationService;
+
+$plannedTransaction = $plan->transactions()
+    ->where('is_planned', true)
+    ->whereDate('date', '2025-01-25')
+    ->firstOrFail();
+
+$realizedTransactions = app(RecurringIncomeRealizationService::class)->realize(
+    $plannedTransaction,
+    [
+        'amount' => 110_000,
+        'withholding_tax_amount' => 10_210,
+        'receipt_date' => '2025-01-31',
+        'receipt_sub_account_id' => $depositSubAccount->id,
+    ],
+    $actor,
+);
+```
+
+この場合は 1 件の取引だけが返り、`receipt_date` がそのまま売上日になります。
+
+### 翌月入金の例
+
+```php
+use App\Services\RecurringIncomeRealizationService;
+
+$plannedTransaction = $plan->transactions()
+    ->where('is_planned', true)
+    ->whereDate('date', '2025-01-25')
+    ->firstOrFail();
+
+$realizedTransactions = app(RecurringIncomeRealizationService::class)->realize(
+    $plannedTransaction,
+    [
+        'amount' => 110_000,
+        'withholding_tax_amount' => 10_210,
+        'receipt_date' => '2025-02-10',
+        'receipt_sub_account_id' => $depositSubAccount->id,
+    ],
+    $actor,
+);
+```
+
+この場合は 2 件の取引が返ります。
+
+- 1 件目
+  - 予定日で売上を確定した取引
+  - 借方は `売掛金`
+- 2 件目
+  - 受取日に売掛金を回収する取引
+  - `settled_transaction_id` に 1 件目の取引 ID が入ります
+
+### 入力項目
+
+- `amount`
+  - 実際の税込受取額
+- `withholding_tax_amount`
+  - 源泉徴収税額
+  - 現時点では計画どおりの金額だけ実現できます
+- `receipt_date`
+  - 実際の受取日または入金日
+- `receipt_sub_account_id`
+  - 入金先・受取先の補助科目
+
+### 注意
+
+- `receipt_date` が別の月で、かつ予定日より前の日付は実現できません
+- 将来日を指定して翌月回収にした場合、回収側の取引は `is_planned = true` の予定取引として残ります
+- 売掛経由の実現は 1 つの DB トランザクションで処理されるため、回収取引の登録に失敗した場合は売上確定もロールバックされます
+
 ## 補足
 
 - `is_active = false` の計画は予定取引を生成しません
