@@ -24,6 +24,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/fixed-expenses', [PortalController::class, 'fixedExpenses'])
         ->name('fixed-expenses');
+    Route::get('/recurring-incomes', [PortalController::class, 'recurringIncomes'])
+        ->name('recurring-incomes');
 
     Route::get('/fixed-assets', [PortalController::class, 'fixedAssets'])
         ->name('fixed-assets.index');

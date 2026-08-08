@@ -13,6 +13,7 @@ return [
     'audit_logs' => 'ログを確認',
 
     'fixed_expenses' => '固定費を登録',
+    'recurring_incomes' => '定期収入を管理',
 
     'section_other' => 'その他',
     'fixed_assets' => '固定資産',

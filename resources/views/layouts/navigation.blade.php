@@ -20,6 +20,7 @@
                 ['label' => __('navigation.journal'), 'route' => 'transactions.journal'],
                 ['label' => __('navigation.account_summary'), 'route' => 'accounts.summary'],
                 ['label' => __('navigation.fixed_expenses'), 'route' => 'fixed-expenses'],
+                ['label' => __('navigation.recurring_incomes'), 'route' => 'recurring-incomes'],
             ],
         ],
         [

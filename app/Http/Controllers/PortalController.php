@@ -67,6 +67,30 @@ class PortalController extends Controller
         ]);
     }
 
+    public function recurringIncomes(Request $request)
+    {
+        $user = $request->user();
+
+        $unit = $user->selectedBusinessUnit;
+
+        if ($unit === null) {
+            return redirect()->route('initialize');
+        }
+
+        abort_unless($unit->canAccess($user), 403);
+
+        if (! $unit->currentFiscalYear) {
+            return redirect()->route('initialize');
+        }
+
+        $fiscalYear = $unit->currentFiscalYear;
+
+        return view('recurring-incomes.index', [
+            'unit' => $unit,
+            'fiscalYear' => $fiscalYear,
+        ]);
+    }
+
     public function fixedAssets(Request $request)
     {
         $user = $request->user();
