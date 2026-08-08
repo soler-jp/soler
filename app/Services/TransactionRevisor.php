@@ -61,48 +61,47 @@ class TransactionRevisor
 
     protected function ensureTransactionCanBeRevised(Transaction $transaction): void
     {
-        if (! $transaction->is_active) {
-            throw new \InvalidArgumentException('無効化済みの取引は修正できません。');
+        $reason = $transaction->revisionBlockedReason();
+
+        if ($reason === null) {
+            return;
         }
 
-        if ($transaction->is_planned) {
-            throw new \InvalidArgumentException('予定取引はこの修正機能の対象外です。');
-        }
-
-        if ($transaction->is_adjusting_entry) {
-            throw new \InvalidArgumentException('決算整理仕訳はこの修正機能の対象外です。');
-        }
-
-        if ($transaction->recurring_transaction_plan_id !== null) {
-            throw new \InvalidArgumentException('定期取引計画由来の取引はこの修正機能の対象外です。');
-        }
-
-        if ($transaction->credit_card_import_batch_id !== null) {
-            throw new \InvalidArgumentException('クレジットカード取込由来の取引はこの修正機能の対象外です。');
-        }
-
-        if ($transaction->depreciationEntries()->exists()) {
-            throw new \InvalidArgumentException('減価償却仕訳はこの修正機能の対象外です。');
-        }
-
-        if ($transaction->fiscalYear->is_closed) {
+        // 決算済み年度はフォームに載せたいので ValidationException、
+        // それ以外はドメイン禁則として InvalidArgumentException を投げる。
+        if ($transaction->fiscalYear?->is_closed) {
             throw ValidationException::withMessages([
-                'transaction' => ['決算済みの会計年度に属する取引は修正できません。'],
+                'transaction' => [$reason],
             ]);
         }
+
+        throw new \InvalidArgumentException($reason);
     }
 
     protected function validateRevisionPayload(array $data): array
     {
+        // Validator::validate() は「ルールを設定したキー」しか返さないため、
+        // buildRevisedTransactionData() に渡したい override 系フィールドは
+        // sometimes で明示的にホワイトリスト化する必要がある。
+        // journal_entries の各行は Registrar 側で個別に validate されるので
+        // ここでは配列であることのみ担保する。
         return Validator::make(
             $data,
             [
                 'transaction.revision_reason' => ['required', 'string', 'max:255'],
+                'transaction.date' => ['sometimes', 'nullable', 'date'],
+                'transaction.description' => ['sometimes', 'nullable', 'string', 'max:255'],
+                'transaction.counterparty_id' => ['sometimes', 'nullable', 'integer'],
+                'transaction.counterparty_name' => ['sometimes', 'nullable', 'string', 'max:255'],
                 'journal_entries' => ['required', 'array', 'min:1'],
             ],
             [],
             [
                 'transaction.revision_reason' => '修正理由',
+                'transaction.date' => '取引日',
+                'transaction.description' => '摘要',
+                'transaction.counterparty_id' => '取引先',
+                'transaction.counterparty_name' => '取引先名',
                 'journal_entries' => '仕訳明細',
             ]
         )->validate();

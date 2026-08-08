@@ -211,6 +211,7 @@ return [
 
     'journal_form' => [
         'title' => '仕訳の入力',
+        'edit_title' => '仕訳の修正',
         'sides' => [
             'debit' => '借方',
             'credit' => '貸方',
@@ -222,6 +223,7 @@ return [
             'sub_account' => '補助科目',
             'gross_amount' => '金額（税込）',
             'tax_type' => '消費税区分',
+            'revision_reason' => '修正理由',
         ],
         'placeholders' => [
             'date' => 'MMDD',
@@ -229,9 +231,12 @@ return [
             'counterparty_name' => '株式会社△△ / ◯◯さん',
             'sub_account' => '補助科目を選択',
             'tax_type' => '消費税区分を選択',
+            'revision_reason' => '例: 金額を訂正 / 勘定科目を修正',
         ],
         'actions' => [
             'submit' => '仕訳を登録する',
+            'submit_revise' => '修正を保存する',
+            'cancel' => 'キャンセル',
             'add_debit' => '借方に行を追加',
             'add_credit' => '貸方に行を追加',
             'remove_entry' => '削除',
@@ -261,9 +266,11 @@ return [
         ],
         'messages' => [
             'registered' => '仕訳を登録しました',
+            'revised' => '仕訳を修正しました',
         ],
         'errors' => [
             'registration_failed' => '仕訳の登録に失敗しました',
+            'revision_failed' => '仕訳の修正に失敗しました',
             'invalid_date' => '日付が正しくありません。MMDD形式で入力してください。',
             'unbalanced' => '借方と貸方の金額が一致していません。',
             'need_debit_and_credit' => '借方と貸方それぞれ1行以上必要です。',

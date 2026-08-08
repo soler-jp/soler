@@ -176,6 +176,7 @@
                                     <span class="text-[10px]">{{ $this->sortIndicator('counterparty') }}</span>
                                 </button>
                             </th>
+                            <th class="w-16 border-l border-slate-700 px-3 py-3 text-center font-semibold">操作</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200">
@@ -236,10 +237,37 @@
                                 <td class="border-l border-slate-200 px-3 py-2.5 text-slate-700">
                                     {{ $transaction->counterparty?->name ?? '-' }}
                                 </td>
+                                <td class="border-l border-slate-200 px-3 py-2.5 text-center">
+                                    @if ($transaction->isRevisable())
+                                        @if ($editingTransactionId === $transaction->id)
+                                            <button type="button" wire:click="closeEdit"
+                                                class="rounded border border-slate-300 bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-200">
+                                                閉じる
+                                            </button>
+                                        @else
+                                            <button type="button" wire:click="edit({{ $transaction->id }})"
+                                                class="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900">
+                                                編集
+                                            </button>
+                                        @endif
+                                    @else
+                                        <span class="text-[10px] text-slate-400" title="{{ $transaction->revisionBlockedReason() }}">-</span>
+                                    @endif
+                                </td>
                             </tr>
+                            @if ($editingTransactionId === $transaction->id)
+                                {{-- 編集フォームを対象行の直下に inline で展開する --}}
+                                <tr wire:key="edit-row-{{ $transaction->id }}">
+                                    <td colspan="9" class="border-t border-slate-200 bg-slate-50 px-3 py-4">
+                                        <livewire:soler-ui.transaction-entry.journal-form.edit
+                                            :transactionId="$editingTransactionId"
+                                            :key="'edit-form-'.$editingTransactionId" />
+                                    </td>
+                                </tr>
+                            @endif
                         @empty
                             <tr>
-                                <td colspan="8" class="px-3 py-8 text-center text-sm text-slate-500">
+                                <td colspan="9" class="px-3 py-8 text-center text-sm text-slate-500">
                                     条件に一致する取引はありません。
                                 </td>
                             </tr>

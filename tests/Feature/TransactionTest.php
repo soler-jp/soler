@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Validators\TransactionValidator;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
@@ -407,5 +408,86 @@ class TransactionTest extends TestCase
             'fiscal_year_id' => $fiscalYear->id,
             'created_by' => $user->id,
         ]);
+    }
+
+    #[Test]
+    public function is_revisableは通常のactive_transactionでtrueを返す(): void
+    {
+        $user = User::factory()->create();
+        $transaction = $this->createTransactionForUser($user);
+
+        $this->assertTrue($transaction->isRevisable());
+        $this->assertNull($transaction->revisionBlockedReason());
+    }
+
+    #[Test]
+    public function is_revisableはinactiveな_transactionでfalse(): void
+    {
+        $user = User::factory()->create();
+        $transaction = $this->createTransactionForUser($user);
+
+        $transaction->forceFill(['is_active' => false])->save();
+
+        $this->assertFalse($transaction->isRevisable());
+        $this->assertSame('無効化済みの取引は修正できません。', $transaction->revisionBlockedReason());
+    }
+
+    #[Test]
+    public function is_revisableは_is_plannedでfalse(): void
+    {
+        $user = User::factory()->create();
+        $transaction = $this->createTransactionForUser($user);
+
+        $transaction->forceFill(['is_planned' => true])->save();
+
+        $this->assertFalse($transaction->isRevisable());
+        $this->assertSame('予定取引はこの修正機能の対象外です。', $transaction->revisionBlockedReason());
+    }
+
+    #[Test]
+    public function is_revisableは決算整理仕訳でfalse(): void
+    {
+        $user = User::factory()->create();
+        $transaction = $this->createTransactionForUser($user);
+
+        $transaction->forceFill(['is_adjusting_entry' => true])->save();
+
+        $this->assertFalse($transaction->isRevisable());
+        $this->assertSame('決算整理仕訳はこの修正機能の対象外です。', $transaction->revisionBlockedReason());
+    }
+
+    #[Test]
+    public function is_revisableは定期取引由来やカード取込由来でfalse(): void
+    {
+        // 実データを組み立てなくても、判定はモデルインスタンスの属性で完結するので
+        // インメモリ Transaction にフィールドを乗せて直接検証する（DB 保存は不要）。
+        $recurring = new Transaction(['recurring_transaction_plan_id' => 1]);
+        $recurring->exists = true;
+        $recurring->is_active = true;
+        $this->assertFalse($recurring->isRevisable());
+        $this->assertSame('定期取引計画由来の取引はこの修正機能の対象外です。', $recurring->revisionBlockedReason());
+
+        $cardImport = new Transaction(['credit_card_import_batch_id' => 1]);
+        $cardImport->exists = true;
+        $cardImport->is_active = true;
+        $this->assertFalse($cardImport->isRevisable());
+        $this->assertSame('クレジットカード取込由来の取引はこの修正機能の対象外です。', $cardImport->revisionBlockedReason());
+    }
+
+    #[Test]
+    public function is_revisableは決算済み年度でfalse(): void
+    {
+        $user = User::factory()->create();
+        $unit = $user->createBusinessUnitWithDefaults(['name' => '決算済みテスト']);
+        $fiscalYear = $unit->createFiscalYear(2025, $user);
+        $transaction = Transaction::factory()->create([
+            'fiscal_year_id' => $fiscalYear->id,
+            'created_by' => $user->id,
+        ]);
+
+        $fiscalYear->update(['is_closed' => true]);
+
+        $this->assertFalse($transaction->fresh()->isRevisable());
+        $this->assertSame('決算済みの会計年度に属する取引は修正できません。', $transaction->fresh()->revisionBlockedReason());
     }
 }

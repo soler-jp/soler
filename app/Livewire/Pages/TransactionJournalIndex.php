@@ -61,6 +61,11 @@ class TransactionJournalIndex extends Component
      */
     public array $availableCreditAccountCounts = [];
 
+    /**
+     * 現在編集中の Transaction ID。null なら編集フォーム非表示。
+     */
+    public ?int $editingTransactionId = null;
+
     public function mount(): void
     {
         $this->refreshAvailableAccountCounts();
@@ -71,6 +76,24 @@ class TransactionJournalIndex extends Component
     {
         $this->refreshAvailableAccountCounts();
         $this->resetPage();
+    }
+
+    public function edit(int $transactionId): void
+    {
+        $this->editingTransactionId = $transactionId;
+    }
+
+    #[On('journal-form-edit-cancelled')]
+    public function closeEdit(): void
+    {
+        $this->editingTransactionId = null;
+    }
+
+    #[On('journal-form-edit-saved')]
+    public function onEditSaved(): void
+    {
+        $this->editingTransactionId = null;
+        $this->refreshList();
     }
 
     protected function refreshAvailableAccountCounts(): void

@@ -126,6 +126,56 @@ class TransactionJournalIndexTest extends TestCase
             ->assertSet('creditAccountOptionCounts', ['売上高' => 1]);
     }
 
+    #[Test]
+    public function editアクションでediting_transaction_idが設定される(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $sales = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-01-10',
+            'description' => '売上入金',
+        ], [
+            ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 10000],
+            ['sub_account_id' => $sales->id, 'type' => 'credit', 'net_amount' => 10000],
+        ], $user);
+
+        Livewire::actingAs($user)
+            ->test(TransactionJournalIndex::class)
+            ->assertSet('editingTransactionId', null)
+            ->call('edit', $transaction->id)
+            ->assertSet('editingTransactionId', $transaction->id)
+            ->call('closeEdit')
+            ->assertSet('editingTransactionId', null);
+    }
+
+    #[Test]
+    public function 編集保存イベントでモーダルが閉じ一覧が再取得される(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $cash = $unit->getAccountByName('現金')->subAccounts()->firstOrFail();
+        $sales = $unit->getAccountByName('売上高')->subAccounts()->firstOrFail();
+
+        $transaction = (new TransactionRegistrar)->register($fiscalYear, [
+            'date' => '2025-01-10',
+            'description' => '売上入金',
+        ], [
+            ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 10000],
+            ['sub_account_id' => $sales->id, 'type' => 'credit', 'net_amount' => 10000],
+        ], $user);
+
+        Livewire::actingAs($user)
+            ->test(TransactionJournalIndex::class)
+            ->call('edit', $transaction->id)
+            ->dispatch('journal-form-edit-saved')
+            ->assertSet('editingTransactionId', null);
+    }
+
     /**
      * @return array{0: User, 1: BusinessUnit}
      */

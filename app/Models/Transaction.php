@@ -240,6 +240,56 @@ class Transaction extends Model implements ResolvesBusinessUnit
         return self::BUSINESS_RATIO_STATE_MIXED;
     }
 
+    /**
+     * この Transaction が TransactionRevisor::revise() で修正できる状態か。
+     * UI（一覧の編集ボタンの出し分け等）と Service の判定で共通して使う。
+     * 詳細な理由は revisionBlockedReason() を参照。
+     */
+    public function isRevisable(): bool
+    {
+        return $this->revisionBlockedReason() === null;
+    }
+
+    /**
+     * 修正がブロックされる場合、その理由を返す。修正できる場合は null。
+     * UI の tooltip や Service 側の throw メッセージの source of truth。
+     */
+    public function revisionBlockedReason(): ?string
+    {
+        if (! $this->is_active) {
+            return '無効化済みの取引は修正できません。';
+        }
+
+        if ($this->is_planned) {
+            return '予定取引はこの修正機能の対象外です。';
+        }
+
+        if ($this->is_adjusting_entry) {
+            return '決算整理仕訳はこの修正機能の対象外です。';
+        }
+
+        if ($this->recurring_transaction_plan_id !== null) {
+            return '定期取引計画由来の取引はこの修正機能の対象外です。';
+        }
+
+        if ($this->credit_card_import_batch_id !== null) {
+            return 'クレジットカード取込由来の取引はこの修正機能の対象外です。';
+        }
+
+        if ($this->depreciationEntries()->exists()) {
+            return '減価償却仕訳はこの修正機能の対象外です。';
+        }
+
+        if ($this->fiscalYear?->is_closed) {
+            return '決算済みの会計年度に属する取引は修正できません。';
+        }
+
+        // 「すでに修正されている」ケースは修正時点で is_active=false になっているので、
+        // 上の is_active チェックで捕捉される。ここでは重ねて判定しない。
+
+        return null;
+    }
+
     public function deactivate(User $actor, ?string $reason = null): void
     {
         $this->authorizeBusinessUnitAccess($this, $actor, 'この取引を無効化する権限がありません。');
