@@ -47,103 +47,37 @@ class StandardTest extends TestCase
     }
 
     #[Test]
-    public function 借方の初期行はbusiness_ratio100をデフォルトに持つ(): void
+    public function entryの構造にbusiness_ratioは含まれない(): void
     {
-        $user = User::factory()->create();
-        $this->initializeUnit($user);
-
-        Livewire::actingAs($user)
-            ->test(Standard::class)
-            ->assertSet('entries.0.business_ratio', '100')
-            ->call('addDebit')
-            ->assertSet('entries.2.business_ratio', '100');
-    }
-
-    #[Test]
-    public function 貸方の行はbusiness_ratioフィールドを持たない(): void
-    {
+        // JournalForm は raw な journal_entry を扱う。家事按分（business_ratio）は
+        // ExpenseForm 側の抽象で、この画面では auto-magic なしで利用者が
+        // 事業主貸 の行を手で追加する運用にする。
         $user = User::factory()->create();
         $this->initializeUnit($user);
 
         $component = Livewire::actingAs($user)
             ->test(Standard::class)
+            ->call('addDebit')
             ->call('addCredit');
 
-        $entries = $component->get('entries');
-        $this->assertArrayNotHasKey('business_ratio', $entries[1]);
-        $this->assertArrayNotHasKey('business_ratio', $entries[2]);
+        foreach ($component->get('entries') as $entry) {
+            $this->assertArrayNotHasKey('business_ratio', $entry);
+        }
     }
 
     #[Test]
-    public function 貸方行はbusiness_ratio入力欄が描画されない(): void
+    public function business_ratio入力欄はどの行にも描画されない(): void
     {
         $user = User::factory()->create();
         $this->initializeUnit($user);
 
         $html = Livewire::actingAs($user)
             ->test(Standard::class)
+            ->call('addDebit')
+            ->call('addCredit')
             ->html();
 
-        // 借方 (index 0) には ratio 入力が存在するが、貸方 (index 1) には存在しない
-        $this->assertStringContainsString('entries.0.business_ratio', $html);
-        $this->assertStringNotContainsString('entries.1.business_ratio', $html);
-    }
-
-    #[Test]
-    public function 借方の費用以外の科目でbusiness_ratio_100以外を指定するとバリデーションエラー(): void
-    {
-        $user = User::factory()->create();
-        $unit = $this->initializeUnit($user);
-
-        // debit を「事業主借」（=資本科目）にしてratioを60に設定 → 費用ではないので拒否される
-        $debitNonExpense = $unit->getAccountByName('事業主借')->subAccounts()->first();
-        $creditSub = $unit->getAccountByName('消耗品費')->subAccounts()->first();
-
-        Livewire::actingAs($user)
-            ->test(Standard::class)
-            ->set('date_input', '0510')
-            ->set('entries.0.sub_account_id', $debitNonExpense->id)
-            ->set('entries.0.gross_amount', 1000)
-            ->set('entries.0.tax_type', JournalEntry::TAX_TYPE_OUT_OF_SCOPE)
-            ->set('entries.0.business_ratio', 60)
-            ->set('entries.1.sub_account_id', $creditSub->id)
-            ->set('entries.1.gross_amount', 1000)
-            ->set('entries.1.tax_type', JournalEntry::TAX_TYPE_OUT_OF_SCOPE)
-            ->call('submit')
-            ->assertHasErrors('entries.0.business_ratio');
-
-        $this->assertDatabaseCount('transactions', 0);
-    }
-
-    #[Test]
-    public function 借方の費用以外の科目でbusiness_ratio_100は素通りする(): void
-    {
-        // 費用以外の借方でも「100」（デフォルト）は無視されるだけで登録は通る
-        $user = User::factory()->create();
-        $unit = $this->initializeUnit($user);
-
-        $debitNonExpense = $unit->getAccountByName('事業主貸')->subAccounts()->first();
-        $creditSub = $unit->getAccountByName('事業主借')->subAccounts()->first();
-
-        Livewire::actingAs($user)
-            ->test(Standard::class)
-            ->set('date_input', '0511')
-            ->set('description', 'default100テスト')
-            ->set('entries.0.sub_account_id', $debitNonExpense->id)
-            ->set('entries.0.gross_amount', 1000)
-            ->set('entries.0.tax_type', JournalEntry::TAX_TYPE_OUT_OF_SCOPE)
-            // business_ratio はデフォルトの '100' のまま
-            ->set('entries.1.sub_account_id', $creditSub->id)
-            ->set('entries.1.gross_amount', 1000)
-            ->set('entries.1.tax_type', JournalEntry::TAX_TYPE_OUT_OF_SCOPE)
-            ->call('submit')
-            ->assertHasNoErrors();
-
-        $transaction = Transaction::where('description', 'default100テスト')->firstOrFail();
-        $debitEntry = $transaction->journalEntries()
-            ->where('sub_account_id', $debitNonExpense->id)
-            ->firstOrFail();
-        $this->assertNull($debitEntry->business_ratio);
+        $this->assertStringNotContainsString('business_ratio', $html);
     }
 
     #[Test]
@@ -272,6 +206,55 @@ class StandardTest extends TestCase
     }
 
     #[Test]
+    public function 家事按分を手で書き下ろした複合仕訳を登録できてauto行は生成されない(): void
+    {
+        // ratio auto-magic はもうこの画面にない。家事按分したい利用者は
+        // 事業主貸 の借方行を明示的に足す。DB には利用者が書いたN行が
+        // そのまま入る（自動追加行なし）。
+        $user = User::factory()->create();
+        $unit = $this->initializeUnit($user);
+
+        $expenseSub = $unit->getAccountByName('消耗品費')->subAccounts()->first();
+        $ownerDrawSub = $unit->getAccountByName('事業主貸')->subAccounts()->first();
+        $creditSub = $unit->getAccountByName('事業主借')->subAccounts()->first();
+
+        Livewire::actingAs($user)
+            ->test(Standard::class)
+            ->set('date_input', '0610')
+            ->set('description', '手動按分テスト')
+            ->call('addDebit')
+            ->set('entries.0.sub_account_id', $expenseSub->id)
+            ->set('entries.0.gross_amount', 600)
+            ->set('entries.0.tax_type', JournalEntry::TAX_TYPE_OUT_OF_SCOPE)
+            ->set('entries.1.sub_account_id', $creditSub->id)
+            ->set('entries.1.gross_amount', 1000)
+            ->set('entries.1.tax_type', JournalEntry::TAX_TYPE_OUT_OF_SCOPE)
+            ->set('entries.2.sub_account_id', $ownerDrawSub->id)
+            ->set('entries.2.gross_amount', 400)
+            ->set('entries.2.tax_type', JournalEntry::TAX_TYPE_OUT_OF_SCOPE)
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        $transaction = Transaction::where('description', '手動按分テスト')->firstOrFail();
+
+        // 利用者が書いた3行がそのまま入る。フォームが auto-magic で追加する行はない。
+        $this->assertSame(3, $transaction->journalEntries()->count());
+
+        // 利用者が書いた 事業主貸 行はそのまま保存されている
+        $householdEntry = $transaction->journalEntries()
+            ->where('sub_account_id', $ownerDrawSub->id)
+            ->firstOrFail();
+        $this->assertSame(400, (int) $householdEntry->net_amount);
+        $this->assertSame(JournalEntry::TYPE_DEBIT, $householdEntry->type);
+
+        // 費用行は allocation_group_id を持たない（グループ扱いされていない）
+        $expenseEntry = $transaction->journalEntries()
+            ->where('sub_account_id', $expenseSub->id)
+            ->firstOrFail();
+        $this->assertNull($expenseEntry->allocation_group_id);
+    }
+
+    #[Test]
     public function 借方と貸方の合計が一致しない場合は登録されない(): void
     {
         $user = User::factory()->create();
@@ -320,47 +303,6 @@ class StandardTest extends TestCase
             ->assertHasErrors('entries.0.sub_account_id');
 
         $this->assertDatabaseCount('transactions', 0);
-    }
-
-    #[Test]
-    public function business_ratioを指定すると家事按分行が生成される(): void
-    {
-        $user = User::factory()->create();
-        $unit = $this->initializeUnit($user);
-
-        $expenseSub = $unit->getAccountByName('消耗品費')->subAccounts()->first();
-        $creditSub = $unit->getAccountByName('事業主借')->subAccounts()->first();
-
-        Livewire::actingAs($user)
-            ->test(Standard::class)
-            ->set('date_input', '0610')
-            ->set('description', '家事按分テスト')
-            ->set('entries.0.sub_account_id', $expenseSub->id)
-            ->set('entries.0.gross_amount', 1000)
-            ->set('entries.0.tax_type', JournalEntry::TAX_TYPE_OUT_OF_SCOPE)
-            ->set('entries.0.business_ratio', 60)
-            ->set('entries.1.sub_account_id', $creditSub->id)
-            ->set('entries.1.gross_amount', 1000)
-            ->set('entries.1.tax_type', JournalEntry::TAX_TYPE_OUT_OF_SCOPE)
-            ->call('submit')
-            ->assertHasNoErrors();
-
-        $transaction = Transaction::where('description', '家事按分テスト')->firstOrFail();
-
-        $businessEntry = $transaction->journalEntries()
-            ->where('sub_account_id', $expenseSub->id)
-            ->firstOrFail();
-        $this->assertSame(600, (int) $businessEntry->net_amount);
-        $this->assertSame(60, (int) $businessEntry->business_ratio);
-
-        // 家事按分行が追加されている
-        $householdSub = $unit->getSubAccountByName('事業主貸', '家事按分');
-        $this->assertNotNull($householdSub);
-        $this->assertDatabaseHas('journal_entries', [
-            'transaction_id' => $transaction->id,
-            'sub_account_id' => $householdSub->id,
-            'net_amount' => 400,
-        ]);
     }
 
     #[Test]

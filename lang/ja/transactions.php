@@ -222,7 +222,6 @@ return [
             'sub_account' => '補助科目',
             'gross_amount' => '金額（税込）',
             'tax_type' => '消費税区分',
-            'business_ratio' => '事業割合',
         ],
         'placeholders' => [
             'date' => 'MMDD',
@@ -268,7 +267,6 @@ return [
             'invalid_date' => '日付が正しくありません。MMDD形式で入力してください。',
             'unbalanced' => '借方と貸方の金額が一致していません。',
             'need_debit_and_credit' => '借方と貸方それぞれ1行以上必要です。',
-            'ratio_only_on_expense_debit' => '事業割合は借方の費用科目でのみ指定できます。',
         ],
     ],
 

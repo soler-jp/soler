@@ -129,22 +129,6 @@
                                             </select>
                                         </div>
 
-                                        {{-- 事業割合（借方のみ。家事按分は貸方では意味を持たない） --}}
-                                        @if ($side === \App\Models\JournalEntry::TYPE_DEBIT)
-                                            <div class="w-16">
-                                                <label class="block text-xs font-semibold text-content-muted mb-1 whitespace-nowrap">
-                                                    {{ __('transactions.journal_form.fields.business_ratio') }}
-                                                </label>
-                                                <div class="relative">
-                                                    <input type="text"
-                                                        wire:model.defer="entries.{{ $index }}.business_ratio"
-                                                        inputmode="numeric" pattern="\d*" autocomplete="off" maxlength="3"
-                                                        class="block w-full pl-2 pr-5 py-1.5 text-sm text-right tabular-nums bg-surface text-content border border-line rounded-control focus:outline-none focus:ring-2 focus:ring-focus">
-                                                    <span class="pointer-events-none absolute inset-y-0 right-1.5 flex items-center text-xs text-content-muted">%</span>
-                                                </div>
-                                            </div>
-                                        @endif
-
                                         {{-- 削除ボタン --}}
                                         <button type="button" wire:click="removeEntry({{ $index }})"
                                             class="shrink-0 px-2 py-1.5 text-xs text-status-danger-fg hover:underline">
@@ -159,9 +143,6 @@
                                         <div class="text-xs text-status-danger-fg">{{ $message }}</div>
                                     @enderror
                                     @error('entries.' . $index . '.tax_type')
-                                        <div class="text-xs text-status-danger-fg">{{ $message }}</div>
-                                    @enderror
-                                    @error('entries.' . $index . '.business_ratio')
                                         <div class="text-xs text-status-danger-fg">{{ $message }}</div>
                                     @enderror
                                 </div>
