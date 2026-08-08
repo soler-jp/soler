@@ -45,6 +45,7 @@ class Transaction extends Model implements ResolvesBusinessUnit
         'is_planned',
         'recurring_transaction_plan_id',
         'counterparty_id',
+        'settled_transaction_id',
         'created_by',
         'credit_card_import_batch_id',
         'revised_from_transaction_id',
@@ -106,6 +107,11 @@ class Transaction extends Model implements ResolvesBusinessUnit
         return $this->belongsTo(Counterparty::class);
     }
 
+    public function settledTransaction(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'settled_transaction_id');
+    }
+
     /**
      * この取引に属する仕訳明細
      */
@@ -127,6 +133,11 @@ class Transaction extends Model implements ResolvesBusinessUnit
     public function recurringTransactionPlan(): BelongsTo
     {
         return $this->belongsTo(RecurringTransactionPlan::class);
+    }
+
+    public function settlementTransactions(): HasMany
+    {
+        return $this->hasMany(self::class, 'settled_transaction_id');
     }
 
     public function revisedFrom(): BelongsTo

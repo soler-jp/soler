@@ -399,12 +399,12 @@ class TransactionTest extends TestCase
         return $transaction->fresh(['journalEntries']);
     }
 
-    private function createTransactionForUser(User $user): Transaction
+    private function createTransactionForUser(User $user, array $attributes = []): Transaction
     {
         $unit = $user->createBusinessUnitWithDefaults(['name' => 'Transaction無効化テスト事業体']);
         $fiscalYear = $unit->createFiscalYear(2025, $user);
 
-        return Transaction::factory()->create([
+        return Transaction::factory()->create($attributes + [
             'fiscal_year_id' => $fiscalYear->id,
             'created_by' => $user->id,
         ]);
@@ -472,6 +472,21 @@ class TransactionTest extends TestCase
         $cardImport->is_active = true;
         $this->assertFalse($cardImport->isRevisable());
         $this->assertSame('クレジットカード取込由来の取引はこの修正機能の対象外です。', $cardImport->revisionBlockedReason());
+    }
+
+    #[Test]
+    public function settled_transaction_idで回収仕訳の親子関係を辿れる(): void
+    {
+        $user = User::factory()->create();
+        $salesTransaction = $this->createTransactionForUser($user);
+        $settlementTransaction = $this->createTransactionForUser($user, [
+            'settled_transaction_id' => $salesTransaction->id,
+        ]);
+
+        $this->assertSame($salesTransaction->id, $settlementTransaction->settledTransaction?->id);
+        $this->assertTrue($salesTransaction->settlementTransactions->contains(
+            fn (Transaction $transaction): bool => $transaction->id === $settlementTransaction->id
+        ));
     }
 
     #[Test]
