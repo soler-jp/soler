@@ -6,7 +6,7 @@
             <div class="space-y-3 p-3 sm:p-4">
             <div class="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
                 <div class="space-y-1">
-                    <h1 class="text-base font-semibold text-slate-900">仕訳帳一覧</h1>
+                    <h1 class="text-base font-semibold text-slate-900">仕訳一覧</h1>
                     <p class="text-xs text-slate-500">Transaction 単位で借方・貸方を横並び表示します。</p>
                 </div>
 
@@ -138,11 +138,9 @@
                 </section>
             </div>
             </div>
-        </section>
 
-        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div class="overflow-x-auto">
-                <table class="min-w-[1240px] table-fixed text-xs text-slate-800">
+            <div class="overflow-x-auto border-t border-slate-200 p-3 sm:p-4">
+                <table class="min-w-[1240px] table-fixed overflow-hidden rounded-lg border border-slate-200 text-xs text-slate-800">
                     <thead class="bg-slate-800 text-slate-100">
                         <tr>
                             <th class="w-24 px-3 py-3 text-left font-semibold">
@@ -250,7 +248,7 @@
                 </table>
             </div>
 
-            <div class="border-t border-slate-200 px-4 py-3">
+            <div class="p-3 sm:p-4">
                 {{ $this->transactions->links() }}
             </div>
         </section>
