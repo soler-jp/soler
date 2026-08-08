@@ -646,6 +646,46 @@ class AccountTypeTransactionIndexTest extends TestCase
         $this->assertSame('事業主借', $transactions[1]['credit_label']);
     }
 
+    #[Test]
+    public function お金の移動一覧は許可科目のみ編集可能とする(): void
+    {
+        [$user, $unit] = $this->createInitializedUser();
+        $fiscalYear = $unit->currentFiscalYear;
+
+        $cash = $unit->getAccountByName('現金')->addCustomSubAccount('レジ', $user);
+        $bank = $unit->getAccountByName('その他の預金')->addCustomSubAccount('メイン口座', $user);
+        $inventoryAsset = $unit->getAccountByName('棚卸資産')->subAccounts()->firstOrFail();
+        $owner = $unit->getAccountByName('事業主借')->subAccounts()->firstOrFail();
+
+        $registrar = new TransactionRegistrar;
+
+        $editableTransaction = $registrar->register($fiscalYear, [
+            'date' => '2025-02-10',
+            'description' => '預金から現金へ引き出し',
+        ], [
+            ['sub_account_id' => $cash->id, 'type' => 'debit', 'net_amount' => 10000, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+            ['sub_account_id' => $bank->id, 'type' => 'credit', 'net_amount' => 10000, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+        ], $user);
+
+        $nonEditableTransaction = $registrar->register($fiscalYear, [
+            'date' => '2025-02-11',
+            'description' => '棚卸資産を現金購入',
+        ], [
+            ['sub_account_id' => $inventoryAsset->id, 'type' => 'debit', 'net_amount' => 5000, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+            ['sub_account_id' => $owner->id, 'type' => 'credit', 'net_amount' => 5000, 'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE],
+        ], $user);
+
+        $transactions = Livewire::actingAs($user)
+            ->test(AccountTypeTransactionIndex::class, ['kind' => AccountTypeTransactionIndex::KIND_OTHER])
+            ->get('transactions');
+
+        $editableRow = collect($transactions)->firstWhere('id', $editableTransaction->id);
+        $nonEditableRow = collect($transactions)->firstWhere('id', $nonEditableTransaction->id);
+
+        $this->assertTrue($editableRow['is_single_pair']);
+        $this->assertFalse($nonEditableRow['is_single_pair']);
+    }
+
     /**
      * @return array{0: User, 1: BusinessUnit}
      */

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Contracts\ResolvesBusinessUnit;
 use App\Data\TransactionSearchFilters;
+use App\Livewire\SolerUi\TransactionEntry\TransferForm\Standard;
 use App\Services\BlueReturnInputRegistrar;
 use App\Services\BlueReturnPdf\BlueReturnStatementPdfGenerator;
 use App\Services\BlueReturnStatementCalculator;
@@ -892,8 +893,28 @@ class FiscalYear extends Model implements ResolvesBusinessUnit
             'tax_type_label' => $this->monthlyTaxTypeLabel($transaction->journalEntries),
             'tax_type_badge_class' => $this->monthlyTaxTypeBadgeClass($transaction->journalEntries),
             'counterparty_name' => $transaction->counterparty?->name ?? '',
-            'is_single_pair' => $transaction->is_single_pair,
+            // TODO: Model から Livewire 層を参照している。allowedTransferAccountNames は
+            // 「振替フォームで扱う口座」の業務概念なので、いずれ BusinessUnit などドメイン側の
+            // 定数へ移して逆参照を解消する。
+            'is_single_pair' => $transaction->is_single_pair && $this->transactionAccountsWithinAllowList(
+                $transaction,
+                Standard::allowedTransferAccountNames(),
+            ),
         ];
+    }
+
+    /**
+     * @param  list<string>  $allowedAccountNames
+     */
+    private function transactionAccountsWithinAllowList(Transaction $transaction, array $allowedAccountNames): bool
+    {
+        return $transaction->journalEntries->every(
+            fn (JournalEntry $entry): bool => in_array(
+                $entry->subAccount->account->name,
+                $allowedAccountNames,
+                true,
+            ) && $entry->subAccount->visibility !== SubAccount::VISIBILITY_HIDDEN,
+        );
     }
 
     private function otherTransactionAmount(Transaction $transaction): int

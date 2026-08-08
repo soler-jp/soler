@@ -390,6 +390,7 @@ class AccountTypeTransactionIndex extends Component
             'expense', 'expense_type' => 'soler-ui.transaction-entry.expense-form.edit',
             'revenue' => 'soler-ui.transaction-entry.revenue-form.edit',
             'purchase' => 'soler-ui.transaction-entry.purchase-form.edit',
+            self::KIND_OTHER => 'soler-ui.transaction-entry.transfer-form.edit',
             default => null,
         };
     }

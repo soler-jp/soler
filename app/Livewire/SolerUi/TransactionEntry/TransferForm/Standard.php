@@ -279,7 +279,7 @@ class Standard extends Component
     /**
      * @return list<string>
      */
-    protected function allowedTransferAccountNames(): array
+    public static function allowedTransferAccountNames(): array
     {
         return ['現金', '普通預金', 'その他の預金', '事業主借', '事業主貸'];
     }

@@ -175,6 +175,9 @@ return [
 
     'transfer_form' => [
         'title' => 'お金の移動',
+        'edit' => [
+            'title' => 'お金の移動を修正',
+        ],
         'fields' => [
             'date' => '日付',
             'amount' => '金額',
@@ -188,12 +191,18 @@ return [
         ],
         'actions' => [
             'submit' => '登録する',
+            'update' => '更新する',
+            'update_suffix' => 'で更新する',
+            'cancel' => 'キャンセル',
         ],
         'messages' => [
             'registered' => 'お金の移動を登録しました',
+            'updated' => 'お金の移動を更新しました',
+            'revision_reason' => 'お金の移動フォームから修正',
         ],
         'errors' => [
             'registration_failed' => 'お金の移動の登録に失敗しました',
+            'update_failed' => 'お金の移動の更新に失敗しました',
             'invalid_date' => '日付が正しくありません。MMDD形式で入力してください。',
             'same_account' => '移動元と移動先には別の口座を選んでください。',
             'invalid_transfer_account' => '選択できない勘定科目です。',
