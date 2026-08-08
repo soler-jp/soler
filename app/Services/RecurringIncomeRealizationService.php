@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Concerns\AuthorizesBusinessUnitAccess;
+use App\Concerns\SkipActorGuard;
 use App\Models\JournalEntry;
 use App\Models\RecurringTransactionPlan;
 use App\Models\Transaction;
@@ -308,6 +309,7 @@ class RecurringIncomeRealizationService
         ];
     }
 
+    #[SkipActorGuard('純額+税額から税率オプションを推定する純粋関数。認可対象のリソースを引数に持たない。')]
     public static function detectTaxOptionFromNetTax(int $netAmount, int $taxAmount): ?string
     {
         $candidates = collect(['8', '10'])
