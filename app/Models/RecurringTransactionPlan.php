@@ -387,6 +387,14 @@ class RecurringTransactionPlan extends Model implements ResolvesBusinessUnit
             $overrides['tax_type'] = $attributes['tax_type'];
         }
 
+        if (array_key_exists('credit_net_amount', $attributes) && $attributes['credit_net_amount'] !== null) {
+            $overrides['credit_net_amount'] = (int) $attributes['credit_net_amount'];
+        }
+
+        if (array_key_exists('credit_tax_amount', $attributes) && $attributes['credit_tax_amount'] !== null) {
+            $overrides['credit_tax_amount'] = (int) $attributes['credit_tax_amount'];
+        }
+
         if ($this->type === self::TYPE_EXPENSE) {
             $debitEntry = $transaction->journalEntries->first(function ($entry): bool {
                 return $entry->type === JournalEntry::TYPE_DEBIT && $entry->business_ratio !== null;

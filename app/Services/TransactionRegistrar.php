@@ -209,12 +209,22 @@ class TransactionRegistrar
             ];
         }
 
-        $entries[] = [
-            'sub_account_id' => $creditEntry->sub_account_id,
-            'type' => JournalEntry::TYPE_CREDIT,
-            'gross_amount' => $grossAmount,
-            'tax_type' => $overrides['tax_type'] ?? $creditEntry->tax_type,
-        ];
+        if (array_key_exists('credit_net_amount', $overrides) && array_key_exists('credit_tax_amount', $overrides)) {
+            $entries[] = [
+                'sub_account_id' => $creditEntry->sub_account_id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'net_amount' => (int) $overrides['credit_net_amount'],
+                'tax_amount' => (int) $overrides['credit_tax_amount'],
+                'tax_type' => $overrides['tax_type'] ?? $creditEntry->tax_type,
+            ];
+        } else {
+            $entries[] = [
+                'sub_account_id' => $creditEntry->sub_account_id,
+                'type' => JournalEntry::TYPE_CREDIT,
+                'gross_amount' => $grossAmount,
+                'tax_type' => $overrides['tax_type'] ?? $creditEntry->tax_type,
+            ];
+        }
 
         return $entries;
     }

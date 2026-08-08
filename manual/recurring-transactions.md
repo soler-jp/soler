@@ -320,10 +320,50 @@ $realizedTransactions = app(RecurringIncomeRealizationService::class)->realize(
   - 受取日に売掛金を回収する取引
   - `settled_transaction_id` に 1 件目の取引 ID が入ります
 
+### 税抜金額と消費税額で入力する
+
+税込金額（`amount`）の代わりに、税抜金額と消費税額を分けて入力できます。請求書に記載された税抜金額・消費税額を、そのまま貸方の売上仕訳に反映したいときに使います。
+
+```php
+use App\Services\RecurringIncomeRealizationService;
+
+$realizedTransactions = app(RecurringIncomeRealizationService::class)->realize(
+    $plannedTransaction,
+    [
+        'input_mode' => 'net_tax',
+        'net_amount' => 493_812,
+        'tax_amount' => 49_381,
+        'withholding_tax_amount' => 10_210,
+        'receipt_date' => '2025-01-25',
+        'receipt_sub_account_id' => $depositSubAccount->id,
+    ],
+    $actor,
+);
+```
+
+- 税込金額は `net_amount + tax_amount` として扱われます
+- 貸方の売上仕訳には `net_amount` と `tax_amount` がそのまま記録されます（プラン既定の税率での再計算は行いません）
+- 税率（8% / 10%）は `net_amount` と `tax_amount` から自動判定されるため `tax_option` は指定できません
+  - 判定は `net_amount × 税率 ≒ tax_amount`（1 円までの差を許容）で行います
+  - どちらの税率にも一致しない場合や、両方の税率で完全一致してしまう場合はエラーになります
+- 翌月受取（売掛金経由）や年払いの実現でも同じ形式で使えます
+- 課税年度のみで利用できます。非課税年度は `input_mode` を省略するか `'gross'` を指定してください
+
 ### 入力項目
 
+- `input_mode`
+  - `'gross'`（既定）または `'net_tax'`
+  - `'gross'` のときは `amount` を、`'net_tax'` のときは `net_amount` と `tax_amount` を使います
 - `amount`
-  - 実際の税込受取額
+  - `input_mode = 'gross'` のときの税込受取額
+- `net_amount`
+  - `input_mode = 'net_tax'` のときの税抜金額
+- `tax_amount`
+  - `input_mode = 'net_tax'` のときの消費税額
+- `tax_option`
+  - `'8'` または `'10'`
+  - 課税年度で `input_mode = 'gross'` のときのみ指定します
+  - `input_mode = 'net_tax'` のときは自動判定されるため指定できません
 - `withholding_tax_amount`
   - 源泉徴収税額
   - 現時点では計画どおりの金額だけ実現できます

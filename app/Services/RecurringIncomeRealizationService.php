@@ -45,13 +45,51 @@ class RecurringIncomeRealizationService
             ]);
         }
 
-        $validated = Validator::make($input, [
-            'amount' => ['required', 'integer', 'min:1'],
+        $isTaxableFiscalYear = (bool) $plan->businessUnit->currentFiscalYear?->is_taxable;
+
+        $validator = Validator::make($input, [
+            'input_mode' => ['nullable', 'in:gross,net_tax'],
+            'amount' => ['nullable', 'integer', 'min:1'],
+            'net_amount' => ['nullable', 'integer', 'min:1'],
+            'tax_amount' => ['nullable', 'integer', 'min:0'],
             'withholding_tax_amount' => ['nullable', 'integer', 'min:0'],
             'receipt_date' => ['required', 'date'],
             'receipt_sub_account_id' => ['required', $plan->businessUnit->subAccountExistsRule()],
             'tax_option' => ['nullable', 'in:8,10'],
-        ])->validate();
+        ], [], [
+            'input_mode' => __('recurring_income_realizations.fields.input_mode'),
+            'amount' => __('recurring_income_realizations.fields.amount'),
+            'net_amount' => __('recurring_income_realizations.fields.net_amount'),
+            'tax_amount' => __('recurring_income_realizations.fields.tax_amount'),
+            'tax_option' => __('recurring_income_realizations.fields.tax_rate'),
+            'withholding_tax_amount' => __('recurring_income_realizations.fields.withholding_tax_amount'),
+            'receipt_date' => __('recurring_income_realizations.fields.receipt_date'),
+            'receipt_sub_account_id' => __('recurring_income_realizations.fields.receipt_sub_account'),
+        ]);
+
+        $validator->sometimes('amount', ['required', 'integer', 'min:1'], fn ($payload): bool => ($payload->input_mode ?? 'gross') === 'gross');
+        $validator->sometimes('net_amount', ['required', 'integer', 'min:1'], fn ($payload): bool => $payload->input_mode === 'net_tax');
+        $validator->sometimes('tax_amount', ['required', 'integer', 'min:0'], fn ($payload): bool => $payload->input_mode === 'net_tax');
+        $validator->sometimes('tax_option', ['required', 'in:8,10'], fn ($payload): bool => $isTaxableFiscalYear && ($payload->input_mode ?? 'gross') === 'gross');
+        $validator->sometimes('tax_option', ['prohibited'], fn ($payload): bool => ($payload->input_mode ?? 'gross') === 'net_tax');
+        $validator->sometimes('input_mode', ['in:gross'], fn (): bool => ! $isTaxableFiscalYear);
+
+        $validated = $validator->validate();
+
+        if (($validated['input_mode'] ?? 'gross') === 'net_tax' && $isTaxableFiscalYear) {
+            $detectedTaxOption = self::detectTaxOptionFromNetTax(
+                (int) ($validated['net_amount'] ?? 0),
+                (int) ($validated['tax_amount'] ?? 0),
+            );
+
+            if ($detectedTaxOption === null) {
+                throw ValidationException::withMessages([
+                    'tax_amount' => [__('recurring_income_realizations.validation.net_tax_invalid_rate')],
+                ]);
+            }
+
+            $validated['tax_option'] = $detectedTaxOption;
+        }
 
         $receiptDate = Carbon::parse($validated['receipt_date']);
         $plannedDate = $plannedTransaction->date?->copy();
@@ -83,13 +121,16 @@ class RecurringIncomeRealizationService
         }
 
         $taxType = $this->resolveTaxType($plan, $validated['tax_option'] ?? null);
+        $grossAmount = $this->resolveGrossAmount($validated);
+        $creditEntryOverrides = $this->creditEntryOverrides($validated);
 
         if ($plan->interval === 'yearly') {
             $confirmed = $plan->confirmTransaction($plannedTransaction->id, [
                 'date' => $receiptDate->toDateString(),
-                'amount' => (int) $validated['amount'],
+                'amount' => $grossAmount,
                 'debit_sub_account_id' => (int) $validated['receipt_sub_account_id'],
                 'tax_type' => $taxType,
+                ...$creditEntryOverrides,
             ], $actor);
 
             if ($confirmed === null) {
@@ -116,9 +157,10 @@ class RecurringIncomeRealizationService
 
         $confirmed = $plan->confirmTransaction($plannedTransaction->id, [
             'date' => $receiptDate->toDateString(),
-            'amount' => (int) $validated['amount'],
+            'amount' => $grossAmount,
             'debit_sub_account_id' => (int) $validated['receipt_sub_account_id'],
             'tax_type' => $taxType,
+            ...$creditEntryOverrides,
         ], $actor);
 
         if ($confirmed === null) {
@@ -152,9 +194,21 @@ class RecurringIncomeRealizationService
                 ]);
             }
 
-            $plannedGrossAmount = (int) $validated['amount'];
+            $plannedGrossAmount = $this->resolveGrossAmount($validated);
             $withholdingTaxAmount = (int) ($validated['withholding_tax_amount'] ?? 0);
             $taxType = $this->resolveTaxType($plan, $validated['tax_option'] ?? null);
+            $creditEntry = [
+                'sub_account_id' => $plan->credit_sub_account_id,
+                'type' => 'credit',
+                'tax_type' => $taxType,
+            ];
+
+            if (($validated['input_mode'] ?? 'gross') === 'net_tax') {
+                $creditEntry['net_amount'] = (int) $validated['net_amount'];
+                $creditEntry['tax_amount'] = (int) $validated['tax_amount'];
+            } else {
+                $creditEntry['gross_amount'] = $plannedGrossAmount;
+            }
 
             $confirmedSalesTransaction = $this->plannedTransactionConfirmer->confirm(
                 $plannedTransaction,
@@ -167,12 +221,7 @@ class RecurringIncomeRealizationService
                         'gross_amount' => $plannedGrossAmount,
                         'tax_type' => JournalEntry::TAX_TYPE_OUT_OF_SCOPE,
                     ],
-                    [
-                        'sub_account_id' => $plan->credit_sub_account_id,
-                        'type' => 'credit',
-                        'gross_amount' => $plannedGrossAmount,
-                        'tax_type' => $taxType,
-                    ],
+                    $creditEntry,
                 ],
             );
 
@@ -233,5 +282,57 @@ class RecurringIncomeRealizationService
         }
 
         return $plan->defaultTaxType();
+    }
+
+    private function resolveGrossAmount(array $validated): int
+    {
+        if (($validated['input_mode'] ?? 'gross') === 'net_tax') {
+            return (int) $validated['net_amount'] + (int) $validated['tax_amount'];
+        }
+
+        return (int) $validated['amount'];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function creditEntryOverrides(array $validated): array
+    {
+        if (($validated['input_mode'] ?? 'gross') !== 'net_tax') {
+            return [];
+        }
+
+        return [
+            'credit_net_amount' => (int) $validated['net_amount'],
+            'credit_tax_amount' => (int) $validated['tax_amount'],
+        ];
+    }
+
+    public static function detectTaxOptionFromNetTax(int $netAmount, int $taxAmount): ?string
+    {
+        $candidates = collect(['8', '10'])
+            ->map(fn (string $taxOption): array => [
+                'tax_option' => $taxOption,
+                'diff' => abs(intdiv($netAmount * (int) $taxOption, 100) - $taxAmount),
+            ]);
+
+        $exactMatches = $candidates
+            ->filter(fn (array $candidate): bool => $candidate['diff'] === 0)
+            ->values();
+
+        if ($exactMatches->count() === 1) {
+            return $exactMatches->first()['tax_option'];
+        }
+
+        $nearMatches = $candidates
+            ->filter(fn (array $candidate): bool => $candidate['diff'] <= 1)
+            ->sortBy('diff')
+            ->values();
+
+        if ($nearMatches->count() === 1) {
+            return $nearMatches->first()['tax_option'];
+        }
+
+        return null;
     }
 }
