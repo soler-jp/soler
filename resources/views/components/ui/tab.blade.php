@@ -25,12 +25,12 @@
 
     $countClasses = match ($variant) {
         'connected' => [
-            'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+            'rounded-badge px-2 py-0.5 text-xs font-semibold',
             ($activeCountClass ?? 'bg-surface-muted text-content') => $active,
             ($inactiveCountClass ?? 'bg-surface text-content-muted') => ! $active,
         ],
         default => [
-            'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+            'rounded-badge px-2 py-0.5 text-xs font-semibold',
             'bg-action-primary text-action-primary-fg' => $active,
             'bg-surface text-content-muted' => ! $active,
         ],
