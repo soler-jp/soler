@@ -6,6 +6,7 @@ use App\Data\TransactionSearchFilters;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -61,6 +62,18 @@ class TransactionJournalIndex extends Component
     public array $availableCreditAccountCounts = [];
 
     public function mount(): void
+    {
+        $this->refreshAvailableAccountCounts();
+    }
+
+    #[On('dashboard-transaction-created')]
+    public function refreshList(): void
+    {
+        $this->refreshAvailableAccountCounts();
+        $this->resetPage();
+    }
+
+    protected function refreshAvailableAccountCounts(): void
     {
         $fiscalYear = auth()->user()->selectedBusinessUnit->currentFiscalYear;
 

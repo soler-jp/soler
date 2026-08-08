@@ -200,6 +200,69 @@ return [
         ],
     ],
 
+    'journal_form' => [
+        'title' => '仕訳の入力',
+        'sides' => [
+            'debit' => '借方',
+            'credit' => '貸方',
+        ],
+        'fields' => [
+            'date' => '日付',
+            'description' => '摘要',
+            'counterparty_name' => '取引先',
+            'sub_account' => '補助科目',
+            'gross_amount' => '金額（税込）',
+            'tax_type' => '消費税区分',
+            'business_ratio' => '事業割合',
+        ],
+        'placeholders' => [
+            'date' => 'MMDD',
+            'description' => '取引の内容',
+            'counterparty_name' => '株式会社△△ / ◯◯さん',
+            'sub_account' => '補助科目を選択',
+            'tax_type' => '消費税区分を選択',
+        ],
+        'actions' => [
+            'submit' => '仕訳を登録する',
+            'add_debit' => '借方に行を追加',
+            'add_credit' => '貸方に行を追加',
+            'remove_entry' => '削除',
+        ],
+        'account_type_labels' => [
+            'asset' => '資産',
+            'liability' => '負債',
+            'equity' => '資本',
+            'revenue' => '収益',
+            'expense' => '費用',
+        ],
+        'tax_type_labels' => [
+            'taxable_sales_10' => '課税売上10%',
+            'taxable_sales_8' => '課税売上8%',
+            'taxable_purchases_10' => '課税仕入10%',
+            'taxable_purchases_8' => '課税仕入8%',
+            'deemed_taxable_sales_10' => '見なし課税売上10%',
+            'deemed_taxable_purchases_10' => '見なし課税仕入10%',
+            'exempt' => '非課税',
+            'out_of_scope' => '不課税',
+            'zero_rated' => '免税(0%)',
+        ],
+        'summary' => [
+            'debit_total' => '借方合計',
+            'credit_total' => '貸方合計',
+            'unbalanced' => '借方と貸方の金額が一致していません',
+        ],
+        'messages' => [
+            'registered' => '仕訳を登録しました',
+        ],
+        'errors' => [
+            'registration_failed' => '仕訳の登録に失敗しました',
+            'invalid_date' => '日付が正しくありません。MMDD形式で入力してください。',
+            'unbalanced' => '借方と貸方の金額が一致していません。',
+            'need_debit_and_credit' => '借方と貸方それぞれ1行以上必要です。',
+            'ratio_only_on_expense_debit' => '事業割合は借方の費用科目でのみ指定できます。',
+        ],
+    ],
+
     'index' => [
         'tabs' => [
             'yearly' => '全年',
